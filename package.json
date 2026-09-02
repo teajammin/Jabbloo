@@ -1,0 +1,22 @@
+{
+  "name": "jabbloo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Whimsical creative multiplayer fighting game",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "gen:placeholders": "node scripts/generate-placeholders.mjs"
+  },
+  "dependencies": {
+    "gsap": "^3.12.5",
+    "pixi.js": "^7.4.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3"
+  }
+}

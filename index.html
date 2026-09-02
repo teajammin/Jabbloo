@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jabbloo — Engine Sandbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --cream: #fffdf7;
+        --ink: #4a4458;
+        --coral: #f98b8b;
+        --lavender: #c9b6ec;
+        --radius: 24px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 20px;
+        background: var(--cream);
+        color: var(--ink);
+        font-family: 'Baloo 2', 'Quicksand', ui-rounded, system-ui, sans-serif;
+      }
+
+      header {
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(28px, 5vw, 44px);
+        font-weight: 800;
+        letter-spacing: 0.5px;
+      }
+
+      .subtitle {
+        margin: 2px 0 0;
+        opacity: 0.6;
+        font-size: 15px;
+      }
+
+      #stage {
+        width: 100%;
+        max-width: 1280px;
+        flex: 1;
+        min-height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Pixi paints the battleground; this just rounds and lifts the canvas. */
+      #stage canvas {
+        border-radius: var(--radius);
+        box-shadow: 0 10px 30px rgba(74, 68, 88, 0.16);
+        display: block;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+      }
+
+      button {
+        font: inherit;
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--ink);
+        padding: 10px 22px;
+        border: none;
+        border-radius: 999px;
+        background: #fff;
+        box-shadow: 0 3px 0 rgba(74, 68, 88, 0.14);
+        cursor: pointer;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 0 rgba(74, 68, 88, 0.14);
+      }
+
+      button:active {
+        transform: translateY(1px);
+        box-shadow: 0 1px 0 rgba(74, 68, 88, 0.14);
+      }
+
+      button[aria-pressed='true'] {
+        background: var(--lavender);
+      }
+
+      button:focus-visible {
+        outline: 3px solid var(--coral);
+        outline-offset: 2px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        button {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Jabbloo</h1>
+      <p class="subtitle">Engine sandbox · sprite rig · v0.1.0</p>
+    </header>
+
+    <main id="stage" aria-label="Battle stage preview"></main>
+
+    <nav class="controls" id="controls" aria-label="Battleground selection"></nav>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
