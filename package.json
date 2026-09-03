@@ -5,17 +5,26 @@
   "type": "module",
   "description": "Whimsical creative multiplayer fighting game",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"npm:dev:server\"",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "gen:placeholders": "node scripts/generate-placeholders.mjs"
+    "gen:placeholders": "node scripts/generate-placeholders.mjs",
+    "dev:web": "vite",
+    "dev:server": "tsx watch server/index.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "gsap": "^3.12.5",
     "pixi.js": "^7.4.2"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.4.1",
+    "concurrently": "^10.0.5",
+    "tsx": "^4.23.13",
     "typescript": "^5.6.3",
     "vite": "^6.0.3"
   }

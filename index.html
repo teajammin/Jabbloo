@@ -57,6 +57,36 @@
         background: #c9b6ec;
       }
 
+      .ask {
+        width: 100%;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .ask input {
+        flex: 1;
+        min-width: 240px;
+        font: inherit;
+        font-size: 15px;
+        color: var(--ink);
+        padding: 12px 18px;
+        border: none;
+        border-radius: 999px;
+        background: #fff;
+        box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.1);
+      }
+
+      .ask input:focus-visible {
+        outline: 3px solid var(--coral);
+        outline-offset: 2px;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+
       .editor {
         width: 100%;
         max-width: 720px;
@@ -176,6 +206,19 @@
     <main id="stage" aria-label="Battle stage preview"></main>
 
     <nav class="controls" id="moves" aria-label="Animation primitives"></nav>
+
+    <section class="editor" aria-label="AI choreographer">
+      <div class="ask">
+        <label class="sr-only" for="prompt">Describe your attack</label>
+        <input
+          id="prompt"
+          type="text"
+          placeholder="Describe your attack — e.g. spin the sword overhead and slam it down"
+          value="Spin the sword overhead three times, then slam it down like a thunderbolt"
+        />
+        <button id="ask" class="primary">Ask AI</button>
+      </div>
+    </section>
 
     <section class="editor" aria-label="Choreography">
       <div class="controls" id="presets"></div>

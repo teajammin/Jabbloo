@@ -24,6 +24,7 @@ import {
   type Step,
 } from './engine';
 import type { BattlegroundId } from './engine';
+import { requestChoreography } from './api';
 
 const $ = <T extends HTMLElement>(sel: string): T => {
   const el = document.querySelector<T>(sel);
@@ -183,6 +184,44 @@ $('#play').addEventListener('click', () => {
   const fellBack = choreography === DEFAULT_CHOREOGRAPHY;
   status.textContent = fellBack ? 'unusable → default bonk' : 'playing…';
   play(choreography);
+});
+
+// --- AI choreographer ------------------------------------------------------
+
+const promptInput = $<HTMLInputElement>('#prompt');
+const askButton = $<HTMLButtonElement>('#ask');
+
+async function askAI(): Promise<void> {
+  const prompt = promptInput.value.trim();
+  if (!prompt) return;
+
+  askButton.disabled = true;
+  status.textContent = 'thinking…';
+
+  const response = await requestChoreography({
+    prompt,
+    characterName: left.name,
+    weaponName: left.weaponName,
+    enemyName: right.name,
+  });
+
+  askButton.disabled = false;
+
+  // Show what came back, so the JSON can be tweaked and replayed by hand.
+  editor.value = JSON.stringify(response.choreography ?? DEFAULT_CHOREOGRAPHY, null, 2);
+
+  const choreography = parseChoreography(response.choreography);
+  const label =
+    response.source === 'default'
+      ? 'AI unavailable → default bonk'
+      : `${response.source} · ${response.ms}ms`;
+  status.textContent = label;
+  play(choreography);
+}
+
+askButton.addEventListener('click', () => void askAI());
+promptInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') void askAI();
 });
 
 // --- Battlegrounds ---------------------------------------------------------
