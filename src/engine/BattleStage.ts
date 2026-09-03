@@ -31,6 +31,8 @@ export class BattleStage {
   private readonly backdrop = new Graphics();
   private readonly ground = new Graphics();
   private readonly parent: HTMLElement;
+  /** Which side each fighter was placed on, so the stage can restore them. */
+  private readonly sides = new Map<Fighter, Side>();
   private currentBattleground: BattlegroundId;
   private readonly resizeObserver: ResizeObserver;
 
@@ -100,15 +102,38 @@ export class BattleStage {
    * automatically facing their opponent.
    */
   addFighter(fighter: Fighter, side: Side): void {
-    const x =
-      side === 'left' ? this.width * SPAWN_INSET : this.width * (1 - SPAWN_INSET);
-    fighter.setPosition(x, this.height * GROUND_Y);
-    fighter.facing = side === 'left' ? 'right' : 'left';
+    this.sides.set(fighter, side);
+    this.place(fighter, side);
     this.fighters.addChild(fighter.root);
   }
 
   removeFighter(fighter: Fighter): void {
+    this.sides.delete(fighter);
     this.fighters.removeChild(fighter.root);
+  }
+
+  private place(fighter: Fighter, side: Side): void {
+    const x =
+      side === 'left' ? this.width * SPAWN_INSET : this.width * (1 - SPAWN_INSET);
+    fighter.setPosition(x, this.height * GROUND_Y);
+    fighter.facing = side === 'left' ? 'right' : 'left';
+  }
+
+  /**
+   * Restores the opening tableau: everyone back on their mark in a neutral
+   * pose, and any screen shake offset cleared.
+   */
+  reset(): void {
+    this.world.position.set(0, 0);
+    for (const [fighter, side] of this.sides) {
+      fighter.resetPose();
+      this.place(fighter, side);
+    }
+  }
+
+  /** The fighters currently on stage, in insertion order. */
+  get roster(): Fighter[] {
+    return [...this.sides.keys()];
   }
 
   /**

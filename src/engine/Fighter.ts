@@ -146,6 +146,23 @@ export class Fighter {
       (this._facing === 'left' ? -1 : 1);
   }
 
+  /**
+   * Returns the fighter to a neutral pose: weapon in hand, no leftover
+   * rotation, offset or squash from a previous move.
+   *
+   * Choreographies are played back-to-back, so every move must begin from a
+   * known state or errors accumulate across a round.
+   */
+  resetPose(): void {
+    this.reattachWeapon();
+    this.body.position.set(0, 0);
+    this.body.rotation = 0;
+    this.body.scale.set(1, 1);
+    this.hand.rotation = 0;
+    this.hand.position.set(0, 0);
+    this.positionHand();
+  }
+
   /** Returns the weapon to the hand and clears any transform it picked up. */
   reattachWeapon(): void {
     this.hand.addChild(this.weaponSprite);

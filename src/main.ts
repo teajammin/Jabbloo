@@ -2,31 +2,36 @@
  * Engine sandbox.
  *
  * A workbench for developing the engine — NOT a screen in the game. It exists
- * so each primitive can be fired in isolation and tuned by eye. It imports only
- * from `./engine`, which keeps that module's public API honest: anything needed
- * here but not exported there means the API is wrong.
+ * so primitives and choreographies can be fired in isolation and tuned by eye.
+ * It imports only from `./engine`, which keeps that module's public API honest:
+ * anything needed here but not exported there means the API is wrong.
  */
 
-import gsap from 'gsap';
 import {
   BattleStage,
   BubbleText,
   Fighter,
   battlegrounds,
-  createStep,
+  parseChoreography,
+  playChoreography,
   toCss,
   palette,
+  DEFAULT_CHOREOGRAPHY,
+  MAX_CHOREOGRAPHY_SECONDS,
+  type Choreography,
+  type Playback,
   type PrimitiveContext,
   type Step,
 } from './engine';
 import type { BattlegroundId } from './engine';
 
-const parent = document.querySelector<HTMLElement>('#stage');
-const grounds = document.querySelector<HTMLElement>('#grounds');
-const moves = document.querySelector<HTMLElement>('#moves');
-if (!parent || !grounds || !moves) throw new Error('Sandbox markup missing');
+const $ = <T extends HTMLElement>(sel: string): T => {
+  const el = document.querySelector<T>(sel);
+  if (!el) throw new Error(`Sandbox markup missing: ${sel}`);
+  return el;
+};
 
-const stage = new BattleStage({ parent, battleground: 'meadow' });
+const stage = new BattleStage({ parent: $('#stage'), battleground: 'meadow' });
 
 const [left, right] = await Promise.all([
   Fighter.create({
@@ -46,18 +51,37 @@ const [left, right] = await Promise.all([
 stage.addFighter(left, 'left');
 stage.addFighter(right, 'right');
 
-// The title, spelled from the artwork's own letters.
-const title = await BubbleText.create('JABBLOO', { height: 96, jitter: 5 });
+const title = await BubbleText.create('JABBLOO', { height: 92, jitter: 5 });
 title.x = (stage.width - title.width) / 2;
-title.y = 130;
+title.y = 128;
 stage.overlay.addChild(title);
 
-// --- Firing primitives -----------------------------------------------------
-
 const ctx: PrimitiveContext = { actor: left, enemy: right, stage };
+let playback: Playback | null = null;
 
-/** Demo parameters chosen to show each move at its most legible. */
-const demos: { label: string; step: Step }[] = [
+const status = $<HTMLParagraphElement>('#status');
+
+function play(choreography: Choreography): void {
+  playback?.stop();
+  playback = playChoreography(ctx, choreography, {
+    onStep: (index, step) => {
+      status.textContent = `${index + 1}/${choreography.steps.length}  ${step.move}`;
+    },
+  });
+
+  const { requestedSeconds, actualSeconds, compressed } = playback;
+  const summary = compressed
+    ? `${requestedSeconds.toFixed(1)}s asked → compressed to ${actualSeconds.toFixed(1)}s`
+    : `${actualSeconds.toFixed(1)}s`;
+
+  playback.finished.then(() => {
+    status.textContent = `done · ${summary}`;
+  });
+}
+
+// --- Single primitives -----------------------------------------------------
+
+const singles: { label: string; step: Step }[] = [
   { label: 'move_to', step: { move: 'move_to', params: { x: 0.42, duration: 0.8 } } },
   { label: 'charge', step: { move: 'charge', params: { target: 'enemy', duration: 0.8 } } },
   { label: 'recoil', step: { move: 'recoil', params: { distance: 120, duration: 0.5 } } },
@@ -70,69 +94,114 @@ const demos: { label: string; step: Step }[] = [
   { label: 'idle', step: { move: 'idle', params: { duration: 0.8 } } },
 ];
 
-let running: gsap.core.Timeline | null = null;
-
-/** Returns both fighters to their starting pose. */
-function reset(): void {
-  running?.kill();
-  running = null;
-  gsap.killTweensOf([
-    left.root, left.body, left.hand, left.weapon,
-    right.root, right.body, right.hand, right.weapon,
-    stage.world,
-  ]);
-
-  left.reattachWeapon();
-  right.reattachWeapon();
-
-  for (const [fighter, side] of [[left, 'left'], [right, 'right']] as const) {
-    fighter.body.position.set(0, 0);
-    fighter.body.rotation = 0;
-    fighter.body.scale.set(1, 1);
-    fighter.hand.rotation = 0;
-    stage.addFighter(fighter, side);
-  }
-  stage.world.position.set(0, 0);
-}
-
-function fire(step: Step): void {
-  reset();
-  running = createStep(ctx, step);
-}
-
-for (const demo of demos) {
+const moves = $('#moves');
+for (const { label, step } of singles) {
   const button = document.createElement('button');
-  button.textContent = demo.label;
-  button.addEventListener('click', () => fire(demo.step));
+  button.textContent = label;
+  button.addEventListener('click', () => play({ steps: [step] }));
   moves.appendChild(button);
 }
 
 const resetButton = document.createElement('button');
 resetButton.textContent = '↺ reset';
 resetButton.className = 'ghost';
-resetButton.addEventListener('click', reset);
+resetButton.addEventListener('click', () => {
+  playback?.stop();
+  stage.reset();
+  status.textContent = 'reset';
+});
 moves.appendChild(resetButton);
 
-// --- Battleground switcher -------------------------------------------------
+// --- Choreography editor ---------------------------------------------------
 
+const editor = $<HTMLTextAreaElement>('#choreography');
+
+/**
+ * Presets, including deliberately broken input. The malformed and overlong
+ * cases matter most: they are what an AI actually produces on a bad day, and
+ * the engine's handling of them is the thing worth watching.
+ */
+const presets: Record<string, unknown> = {
+  'Sword combo': {
+    steps: [
+      { move: 'charge', params: { target: 'enemy', duration: 0.7 } },
+      { move: 'swing', params: { direction: 'down', arc: 160, duration: 0.5 } },
+      { move: 'shake_screen', params: { intensity: 6, duration: 0.3 } },
+      { move: 'swing', params: { direction: 'up', arc: 120, duration: 0.5 } },
+      { move: 'recoil', params: { distance: 70, duration: 0.5 } },
+    ],
+  },
+  'Spin and throw': {
+    steps: [
+      { move: 'spin_weapon', params: { rotations: 3, duration: 0.9 } },
+      { move: 'jump', params: { height: 150, forward: false, duration: 0.7 } },
+      { move: 'throw', params: { target: 'enemy', returnAfter: true, duration: 1.4 } },
+      { move: 'shake_screen', params: { intensity: 8, duration: 0.4 } },
+    ],
+  },
+  'Overlong (tests 7s cap)': {
+    steps: Array.from({ length: 8 }, () => ({
+      move: 'slam',
+      params: { direction: 'down', duration: 2.5 },
+    })),
+  },
+  'Malformed (tests fallback)': {
+    steps: [
+      { move: 'teleport_behind_you', params: { style: 'anime' } },
+      { move: 'summon_dragon' },
+      'not even an object',
+    ],
+  },
+  'Default bonk': DEFAULT_CHOREOGRAPHY,
+};
+
+const presetBar = $('#presets');
+for (const [label, value] of Object.entries(presets)) {
+  const button = document.createElement('button');
+  button.textContent = label;
+  button.className = 'ghost';
+  button.addEventListener('click', () => {
+    editor.value = JSON.stringify(value, null, 2);
+  });
+  presetBar.appendChild(button);
+}
+
+editor.value = JSON.stringify(presets['Sword combo'], null, 2);
+
+$('#play').addEventListener('click', () => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(editor.value);
+  } catch {
+    // Invalid JSON is itself a realistic AI failure — fall back, don't complain.
+    status.textContent = 'invalid JSON → default bonk';
+    play(DEFAULT_CHOREOGRAPHY);
+    return;
+  }
+
+  const choreography = parseChoreography(parsed);
+  const fellBack = choreography === DEFAULT_CHOREOGRAPHY;
+  status.textContent = fellBack ? 'unusable → default bonk' : 'playing…';
+  play(choreography);
+});
+
+// --- Battlegrounds ---------------------------------------------------------
+
+const grounds = $('#grounds');
 for (const ground of battlegrounds) {
   const button = document.createElement('button');
   button.textContent = ground.label;
   button.style.background = toCss(ground.colour);
   button.setAttribute('aria-pressed', String(ground.id === 'meadow'));
-
   button.addEventListener('click', () => {
     stage.setBattleground(ground.id as BattlegroundId);
     for (const other of grounds.querySelectorAll('button')) {
       other.setAttribute('aria-pressed', String(other === button));
     }
   });
-
   grounds.appendChild(button);
 }
 
-// Flip both fighters, to check that mirroring keeps each weapon on the
-// correct side of its body.
 window.addEventListener('keydown', (event) => {
   if (event.key.toLowerCase() !== 'f') return;
   left.facing = left.facing === 'right' ? 'left' : 'right';
@@ -142,5 +211,5 @@ window.addEventListener('keydown', (event) => {
 console.log(
   '%cJabbloo engine sandbox',
   `color:${toCss(palette.ink)};font-weight:bold`,
-  '\n  click a move to fire it · F flips fighters',
+  `\n  ceiling: ${MAX_CHOREOGRAPHY_SECONDS}s · F flips fighters`,
 );
