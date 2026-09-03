@@ -121,6 +121,39 @@ export class Fighter {
     return this.bodySprite.height;
   }
 
+  /** The weapon sprite, for primitives that animate it directly. */
+  get weapon(): Sprite {
+    return this.weaponSprite;
+  }
+
+  /**
+   * Moves the weapon out of the hand and into another container, preserving its
+   * on-screen position and rotation so there is no visual jump.
+   *
+   * `throw` needs this: a thrown weapon must travel in stage coordinates rather
+   * than the fighter's, or it would drag along with the body that threw it.
+   */
+  detachWeapon(into: Container): void {
+    if (this.weaponSprite.parent === into) return;
+    const position = into.toLocal(this.weaponSprite.getGlobalPosition());
+    // Undo the fighter's mirroring so a thrown weapon isn't double-flipped.
+    const rotation = this.weaponSprite.rotation * (this._facing === 'left' ? -1 : 1);
+
+    into.addChild(this.weaponSprite);
+    this.weaponSprite.position.copyFrom(position);
+    this.weaponSprite.rotation = rotation;
+    this.weaponSprite.scale.x = Math.abs(this.weaponSprite.scale.x) *
+      (this._facing === 'left' ? -1 : 1);
+  }
+
+  /** Returns the weapon to the hand and clears any transform it picked up. */
+  reattachWeapon(): void {
+    this.hand.addChild(this.weaponSprite);
+    this.weaponSprite.position.set(0, 0);
+    this.weaponSprite.rotation = 0;
+    this.weaponSprite.scale.x = Math.abs(this.weaponSprite.scale.x);
+  }
+
   destroy(): void {
     this.root.destroy({ children: true });
   }

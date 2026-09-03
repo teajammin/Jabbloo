@@ -4,12 +4,14 @@
  * Consumers import from here and nothing deeper. Everything below this file is
  * an implementation detail and free to change.
  *
- * Currently exposes stage + sprite rigging. Animation primitives and
- * `playChoreography()` land in the next task.
+ * Currently exposes the stage, the sprite rig, bubble lettering, and the
+ * animation primitive library. The choreography player and the AI backend
+ * land in the next tasks.
  */
 
 export { BattleStage } from './BattleStage';
 export { Fighter } from './Fighter';
+export { BubbleText, type BubbleTextOptions } from './BubbleText';
 export {
   palette,
   battlegrounds,
@@ -27,3 +29,16 @@ export {
   type Facing,
   type Side,
 } from './types';
+export {
+  primitives,
+  createStep,
+  isPrimitiveName,
+  PRIMITIVE_NAMES,
+  DURATION_MIN,
+  DURATION_MAX,
+  type PrimitiveContext,
+  type PrimitiveName,
+  type PrimitiveParams,
+  type Step,
+  type SwingDirection,
+} from './primitives';

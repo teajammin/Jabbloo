@@ -40,17 +40,17 @@
         text-align: center;
       }
 
-      h1 {
+      .subtitle {
         margin: 0;
-        font-size: clamp(28px, 5vw, 44px);
-        font-weight: 800;
-        letter-spacing: 0.5px;
+        max-width: 620px;
+        text-align: center;
+        opacity: 0.65;
+        font-size: 15px;
       }
 
-      .subtitle {
-        margin: 2px 0 0;
-        opacity: 0.6;
-        font-size: 15px;
+      button.ghost {
+        background: transparent;
+        box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.18);
       }
 
       #stage {
@@ -119,13 +119,16 @@
   </head>
   <body>
     <header>
-      <h1>Jabbloo</h1>
-      <p class="subtitle">Engine sandbox · sprite rig · v0.1.0</p>
+      <p class="subtitle">
+        <strong>Engine sandbox</strong> — a development workbench, not a game screen.
+        Fire each primitive to see how it reads.
+      </p>
     </header>
 
     <main id="stage" aria-label="Battle stage preview"></main>
 
-    <nav class="controls" id="controls" aria-label="Battleground selection"></nav>
+    <nav class="controls" id="moves" aria-label="Animation primitives"></nav>
+    <nav class="controls" id="grounds" aria-label="Battleground selection"></nav>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
