@@ -1,6 +1,10 @@
 import { charge, jump, move_to, recoil } from './locomotion';
 import { slam, spin_weapon, swing, throw_ } from './weapon';
 import { idle, shake_screen } from './effects';
+import { bite, grab, headbutt, kick, lick, punch, stomp } from './melee';
+import { flip, handspring, taunt, teleport } from './acrobatics';
+import { beam, projectile, shockwave, summon } from './ranged';
+import { dizzy, grow, inhale, knockdown, shrink } from './special';
 import type { PrimitiveContext, PrimitiveName, PrimitiveParams, Step } from './types';
 
 /**
@@ -22,6 +26,34 @@ export const primitives = {
   jump,
   shake_screen,
   idle,
+
+  // Melee
+  kick,
+  punch,
+  headbutt,
+  bite,
+  lick,
+  grab,
+  stomp,
+
+  // Acrobatics and performance
+  flip,
+  handspring,
+  teleport,
+  taunt,
+
+  // Ranged and summoned
+  projectile,
+  beam,
+  shockwave,
+  summon,
+
+  // Transformations and reactions
+  inhale,
+  grow,
+  shrink,
+  knockdown,
+  dizzy,
 } as const;
 
 export const PRIMITIVE_NAMES = Object.keys(primitives) as PrimitiveName[];
@@ -42,7 +74,13 @@ export function createStep(ctx: PrimitiveContext, step: Step): gsap.core.Timelin
     ctx: PrimitiveContext,
     params: PrimitiveParams[typeof name],
   ) => gsap.core.Timeline;
-  return primitive(ctx, (step.params ?? {}) as PrimitiveParams[typeof name]);
+
+  // `on: "enemy"` simply swaps the two fighters. Every primitive then works on
+  // either of them for free, with no per-move targeting logic.
+  const scoped: PrimitiveContext =
+    step.on === 'enemy' ? { actor: ctx.enemy, enemy: ctx.actor, stage: ctx.stage } : ctx;
+
+  return primitive(scoped, (step.params ?? {}) as PrimitiveParams[typeof name]);
 }
 
 export * from './types';

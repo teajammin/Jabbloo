@@ -90,14 +90,59 @@ function play(choreography: Choreography): void {
 // --- Single primitives -----------------------------------------------------
 
 const singles: { label: string; step: Step }[] = [
+  // Movement
   { label: 'move_to', step: { move: 'move_to', params: { x: 0.42, duration: 0.8 } } },
   { label: 'charge', step: { move: 'charge', params: { target: 'enemy', duration: 0.8 } } },
   { label: 'recoil', step: { move: 'recoil', params: { distance: 120, duration: 0.5 } } },
-  { label: 'spin_weapon', step: { move: 'spin_weapon', params: { rotations: 2, duration: 0.8 } } },
+  { label: 'jump', step: { move: 'jump', params: { height: 160, forward: true, duration: 0.9 } } },
+  { label: 'teleport', step: { move: 'teleport', params: { to: 'behind', duration: 0.7 } } },
+
+  // Weapon
   { label: 'swing', step: { move: 'swing', params: { direction: 'down', arc: 140, duration: 0.6 } } },
   { label: 'slam', step: { move: 'slam', params: { direction: 'down', duration: 0.8 } } },
+  { label: 'spin_weapon', step: { move: 'spin_weapon', params: { rotations: 2, duration: 0.8 } } },
   { label: 'throw', step: { move: 'throw', params: { target: 'enemy', returnAfter: true, duration: 1.2 } } },
-  { label: 'jump', step: { move: 'jump', params: { height: 160, forward: true, duration: 0.9 } } },
+
+  // Melee
+  { label: 'kick·round', step: { move: 'kick', params: { style: 'roundhouse', duration: 0.7 } } },
+  { label: 'kick·front', step: { move: 'kick', params: { style: 'front', duration: 0.7 } } },
+  { label: 'kick·sweep', step: { move: 'kick', params: { style: 'sweep', duration: 0.7 } } },
+  { label: 'punch·jab', step: { move: 'punch', params: { style: 'jab', duration: 0.5 } } },
+  { label: 'punch·upper', step: { move: 'punch', params: { style: 'uppercut', duration: 0.6 } } },
+  { label: 'punch·hook', step: { move: 'punch', params: { style: 'hook', duration: 0.6 } } },
+  { label: 'headbutt', step: { move: 'headbutt', params: { duration: 0.7 } } },
+  { label: 'bite', step: { move: 'bite', params: { duration: 0.8 } } },
+  { label: 'lick', step: { move: 'lick', params: { duration: 1 } } },
+  { label: 'grab', step: { move: 'grab', params: { duration: 1 } } },
+  { label: 'stomp', step: { move: 'stomp', params: { duration: 0.9 } } },
+
+  // Acrobatics
+  { label: 'flip', step: { move: 'flip', params: { rotations: 1, forward: true, duration: 1 } } },
+  { label: 'handspring', step: { move: 'handspring', params: { duration: 1.3 } } },
+  { label: 'taunt·twerk', step: { move: 'taunt', params: { style: 'twerk', duration: 1.4 } } },
+  { label: 'taunt·dance', step: { move: 'taunt', params: { style: 'dance', duration: 1.4 } } },
+  { label: 'taunt·point', step: { move: 'taunt', params: { style: 'point', duration: 1.2 } } },
+  { label: 'taunt·bow', step: { move: 'taunt', params: { style: 'bow', duration: 1.1 } } },
+
+  // Ranged
+  { label: 'projectile·sun', step: { move: 'projectile', params: { kind: 'sun', size: 240, arc: 110, duration: 1 } } },
+  { label: 'projectile·fire', step: { move: 'projectile', params: { kind: 'fire', arc: 60, duration: 0.9 } } },
+  { label: 'beam·energy', step: { move: 'beam', params: { kind: 'energy', chargeDuration: 0.9, duration: 2 } } },
+  { label: 'beam·rainbow', step: { move: 'beam', params: { kind: 'rainbow', chargeDuration: 0.7, duration: 1.8 } } },
+  { label: 'shockwave·sound', step: { move: 'shockwave', params: { kind: 'sound', intensity: 8, duration: 1.2 } } },
+  { label: 'shockwave·water', step: { move: 'shockwave', params: { kind: 'water', intensity: 9, duration: 1.3 } } },
+  { label: 'summon·drone', step: { move: 'summon', params: { kind: 'drone', duration: 1.5 } } },
+  { label: 'summon·anvil', step: { move: 'summon', params: { kind: 'anvil', duration: 1.3 } } },
+  { label: 'summon·piano', step: { move: 'summon', params: { kind: 'piano', duration: 1.3 } } },
+
+  // Special and reactions
+  { label: 'inhale', step: { move: 'inhale', params: { duration: 1.6 } } },
+  { label: 'grow', step: { move: 'grow', params: { scale: 1.9, duration: 0.9 } } },
+  { label: 'shrink', step: { move: 'shrink', params: { scale: 0.45, duration: 0.7 } } },
+  { label: 'knockdown→', step: { move: 'knockdown', on: 'enemy', params: { duration: 1.1 } } },
+  { label: 'dizzy→', step: { move: 'dizzy', on: 'enemy', params: { duration: 1.2 } } },
+
+  // Stage
   { label: 'shake_screen', step: { move: 'shake_screen', params: { intensity: 7, duration: 0.6 } } },
   { label: 'idle', step: { move: 'idle', params: { duration: 0.8 } } },
 ];
@@ -158,6 +203,31 @@ const presets: Record<string, unknown> = {
       { move: 'teleport_behind_you', params: { style: 'anime' } },
       { move: 'summon_dragon' },
       'not even an object',
+    ],
+  },
+  'Kamehameha': {
+    steps: [
+      { move: 'taunt', params: { style: 'point', duration: 0.7 } },
+      { move: 'beam', params: { kind: 'energy', chargeDuration: 1.1, thickness: 130, duration: 2.4 } },
+      { move: 'shake_screen', params: { intensity: 9, duration: 0.4 } },
+      { move: 'knockdown', on: 'enemy', params: { duration: 1.2 } },
+    ],
+  },
+  'Twerk then piano': {
+    steps: [
+      { move: 'taunt', params: { style: 'twerk', duration: 1.5 } },
+      { move: 'summon', params: { kind: 'piano', duration: 1.4 } },
+      { move: 'shake_screen', params: { intensity: 8, duration: 0.4 } },
+      { move: 'dizzy', on: 'enemy', params: { duration: 1.2 } },
+    ],
+  },
+  'Teleport combo': {
+    steps: [
+      { move: 'teleport', params: { to: 'behind', duration: 0.6 } },
+      { move: 'punch', params: { style: 'uppercut', duration: 0.6 } },
+      { move: 'shake_screen', params: { intensity: 7, duration: 0.3 } },
+      { move: 'kick', params: { style: 'roundhouse', duration: 0.7 } },
+      { move: 'knockdown', on: 'enemy', params: { duration: 1.1 } },
     ],
   },
   'Default bonk': DEFAULT_CHOREOGRAPHY,

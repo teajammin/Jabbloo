@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "gen:placeholders": "node scripts/generate-placeholders.mjs",
     "dev:web": "vite",
-    "dev:server": "tsx watch server/index.ts"
+    "dev:server": "tsx watch server/index.ts",
+    "test": "esbuild test/parse.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/parse.test.mjs --log-level=error && node node_modules/.cache/parse.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

@@ -53,6 +53,7 @@ export {
   type PrimitiveParams,
   type Step,
   type SwingDirection,
+  type Performer,
 } from './primitives';
 export {
   playChoreography,

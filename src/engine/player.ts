@@ -15,6 +15,17 @@ export const MAX_CHOREOGRAPHY_SECONDS = 7;
 /** Beyond this, a choreography is padding rather than choreography. */
 export const MAX_STEPS = 12;
 
+/**
+ * The only moves that may be performed by the opponent.
+ *
+ * Models over-apply `on: "enemy"` — asked to inhale someone, they mark the
+ * inhale itself as the opponent's, which plays as the victim swallowing the
+ * attacker. Attacks are always performed by whoever is taking the turn; only
+ * consequences belong to the other fighter. Enforced here rather than trusted
+ * to the prompt, because it inverts the meaning of a move when it goes wrong.
+ */
+const REACTION_MOVES = new Set(['knockdown', 'dizzy', 'recoil', 'idle']);
+
 export interface Choreography {
   steps: Step[];
 }
@@ -79,8 +90,11 @@ export function parseChoreography(input: unknown): Choreography {
     const move = (entry as { move?: unknown }).move;
     if (!isPrimitiveName(move)) continue;
     const params = (entry as { params?: unknown }).params;
+    const on = (entry as { on?: unknown }).on;
+    const performedByEnemy = on === 'enemy' && REACTION_MOVES.has(move);
     steps.push({
       move,
+      ...(performedByEnemy ? { on: 'enemy' as const } : {}),
       params: typeof params === 'object' && params !== null ? params : {},
     } as Step);
     if (steps.length >= MAX_STEPS) break;
