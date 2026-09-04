@@ -192,9 +192,15 @@ export function teamBoard(connection: RoomConnection): TeamBoard {
       }
     }
 
-    // Judges are pointless in a two-player game — the AI judges instead.
+    // Judges only exist at odd player counts. Two is 1v1 with an AI judge;
+    // four and six are tag team, where everyone fights. Showing an empty bench
+    // in those games just invites the host to strand someone on it.
+    // Kept visible anyway if someone is already on it, so nobody can vanish.
     const judgeZone = zones.find((z) => z.role === 'judge')!;
-    judgeZone.root.hidden = players.length <= 2;
+    const seats = state.capacity || players.length;
+    const needsJudges = seats % 2 === 1;
+    const hasJudges = players.some((p) => p.role === 'judge');
+    judgeZone.root.hidden = !needsJudges && !hasJudges;
 
     setSelected(selected && players.some((p) => p.id === selected) ? selected : null);
   }

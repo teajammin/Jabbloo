@@ -24,11 +24,13 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'lette
 const SCALE = Number(process.argv[2]) || 2;
 
 // Design box. Letters are authored here, then scaled on output.
-const W = 220, H = 270;
-const TOP = 56, BOT = 214, L = 42, R = 178;
-const MX = 110, MY = (TOP + BOT) / 2;
-const T = 27;          // stroke radius; 54px wide strokes read as "bubble"
-const OUTLINE = 9;
+const W = 226, H = 270;
+// Wider and slightly squatter than a normal face — the reference letters are
+// inflated almost to the point of touching themselves.
+const TOP = 60, BOT = 212, L = 36, R = 190;
+const MX = 113, MY = (TOP + BOT) / 2;
+const T = 29;          // stroke radius; fatter seals the counters on B, P and R
+const OUTLINE = 11;
 
 // ------------------------------------------------------------------- geometry
 
@@ -61,22 +63,22 @@ const glyph = (...paths) => paths;
 
 // --------------------------------------------------------------------- shapes
 
-const CIRCLE = arcPts(MX, MY, 70, 79, 0, 360, 40);
+const CIRCLE = arcPts(MX, MY, 76, 78, 0, 360, 44);
 
 const LETTERS = {
   A: glyph([[L, BOT], [MX, TOP], [R, BOT]], [[L + 28, 180], [R - 28, 180]]),
   B: glyph(
     [[L, TOP], [L, BOT]],
-    [[L, TOP], ...arcPts(102, 100, 60, 44, -90, 90), [L, MY]],
-    [[L, MY], ...arcPts(102, 170, 64, 46, -90, 90), [L, BOT]],
+    [[L, TOP], ...arcPts(98, 106, 68, 52, -90, 90), [L, MY]],
+    [[L, MY], ...arcPts(98, 166, 72, 54, -90, 90), [L, BOT]],
   ),
-  C: glyph(arcPts(MX, MY, 70, 79, 52, 308)),
-  D: glyph([[L, TOP], [L, BOT]], [[L, TOP], ...arcPts(L + 6, MY, 76, 79, -90, 90), [L, BOT]]),
+  C: glyph(arcPts(MX, MY, 76, 78, 52, 308)),
+  D: glyph([[L, TOP], [L, BOT]], [[L, TOP], ...arcPts(L + 8, MY, 90, 76, -90, 90), [L, BOT]]),
   E: glyph(
     [[L, TOP], [L, BOT]], [[L, TOP], [R, TOP]], [[L, MY], [R - 20, MY]], [[L, BOT], [R, BOT]],
   ),
   F: glyph([[L, TOP], [L, BOT]], [[L, TOP], [R, TOP]], [[L, MY], [R - 20, MY]]),
-  G: glyph(arcPts(MX, MY, 70, 79, 52, 308), [[MX - 4, MY + 16], [R - 4, MY + 16]]),
+  G: glyph(arcPts(MX, MY, 76, 78, 52, 308), [[MX - 6, MY + 18], [R - 20, MY + 18]]),
   H: glyph([[L, TOP], [L, BOT]], [[R, TOP], [R, BOT]], [[L, MY], [R, MY]]),
   I: glyph([[MX, TOP], [MX, BOT]]),
   J: glyph([[R - 16, TOP], [R - 16, 164]], [...arcPts(R - 16 - 52, 164, 52, 44, 0, 180)]),
@@ -85,22 +87,22 @@ const LETTERS = {
   M: glyph([[L, BOT], [L, TOP], [MX, MY + 26], [R, TOP], [R, BOT]]),
   N: glyph([[L, BOT], [L, TOP], [R, BOT], [R, TOP]]),
   O: glyph(CIRCLE),
-  P: glyph([[L, TOP], [L, BOT]], [[L, TOP], ...arcPts(102, 112, 62, 52, -90, 90), [L, MY + 20]]),
+  P: glyph([[L, TOP], [L, BOT]], [[L, TOP], ...arcPts(98, 118, 70, 62, -90, 90), [L, MY + 20]]),
   Q: glyph(CIRCLE, [[MX + 36, MY + 45], [R + 6, BOT + 16]]),
   R: glyph(
     [[L, TOP], [L, BOT]],
-    [[L, TOP], ...arcPts(100, 106, 60, 50, -90, 90), [L, MY + 12]],
+    [[L, TOP], ...arcPts(98, 110, 68, 56, -90, 90), [L, MY + 12]],
     [[L + 10, MY + 12], [R, BOT]],
   ),
   // Drawn as one continuous ribbon rather than two arcs. At this stroke weight
   // any pair of bowls round enough to read as an S closes into an 8 — the waist
   // lands inside both openings. A single open path cannot close on itself.
   S: glyph([
-    [160, 92], [126, 68], [84, 74], [66, 100], [80, 124],
-    [122, 136], [152, 156], [158, 182], [132, 206], [88, 208], [60, 190],
+    [166, 96], [126, 70], [82, 80], [70, 108], [96, 128],
+    [138, 144], [158, 168], [150, 194], [110, 210], [66, 198],
   ]),
   T: glyph([[L, TOP], [R, TOP]], [[MX, TOP], [MX, BOT]]),
-  U: glyph([[L, TOP], [L, 152], ...arcPts(MX, 152, 68, 60, 180, 0), [R, 152], [R, TOP]]),
+  U: glyph([[L, TOP], [L, 150], ...arcPts(MX, 150, MX - L, 58, 180, 0), [R, 150], [R, TOP]]),
   V: glyph([[L, TOP], [MX, BOT], [R, TOP]]),
   W: glyph([[L, TOP], [L + 32, BOT], [MX, 132], [R - 32, BOT], [R, TOP]]),
   X: glyph([[L, TOP], [R, BOT]], [[R, TOP], [L, BOT]]),
@@ -134,9 +136,11 @@ function render(paths, colour, scale) {
   c.fill(s(outline), darken(colour, 0.58));
   c.fill(s(body), colour);
 
-  // Gloss, clipped to the letter so it only lights the stroke.
-  c.fill(s(all(body, ellipse(66, 104, 13, 24))), C.white, 0.5);
-  c.fill(s(all(body, ellipse(150, 96, 9, 15))), lighten(colour, 0.5), 0.55);
+  // Gloss, clipped to the letter so it only ever lights the stroke. Long and
+  // bright rather than a subtle dot — the reference letters look wet.
+  c.fill(s(all(body, capsule(60, 88, 74, 132, 11))), C.white, 0.62);
+  c.fill(s(all(body, ellipse(150, 92, 12, 9))), C.white, 0.5);
+  c.fill(s(all(body, capsule(96, 196, 150, 200, 9))), lighten(colour, 0.55), 0.5);
 
   return { w, h, buf: c.buf };
 }

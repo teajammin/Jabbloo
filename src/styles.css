@@ -51,7 +51,10 @@ body {
 .axe-cursor-on a,
 .axe-cursor-on input,
 .axe-cursor-on label,
-.axe-cursor-on .card {
+.axe-cursor-on .card,
+.axe-cursor-on dialog,
+.axe-cursor-on .help,
+.axe-cursor-on .help * {
   cursor: none;
 }
 
@@ -308,9 +311,14 @@ input[type='text'] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   width: min(1100px, 100%);
 }
+
+/* Keep Start and Leave near the board rather than adrift below it. */
+.screen-lobby { gap: 14px; }
+.screen-lobby .stack { gap: 8px; }
+.board-hint { font-size: 13px; margin: 0; }
 
 .board {
   display: grid;

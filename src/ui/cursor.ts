@@ -11,6 +11,21 @@
  * stays put.
  */
 
+/**
+ * The follower element, so it can be moved into a modal.
+ *
+ * A <dialog> opened with showModal() paints in the browser's top layer, above
+ * every z-index — so the cursor vanished behind the help panel. Reparenting it
+ * into the dialog puts it back in front; position: fixed keeps it tracking
+ * viewport coordinates either way.
+ */
+let cursorRoot: HTMLElement | null = null;
+
+export function reparentCursor(parent: HTMLElement | null): void {
+  if (!cursorRoot) return;
+  (parent ?? document.body).appendChild(cursorRoot);
+}
+
 /** Follower size in CSS pixels. The art is authored at 176. */
 const SIZE = 88;
 /** Grip position within the art, at that size. */
@@ -36,6 +51,7 @@ export function initAxeCursor(): () => void {
   img.style.marginTop = `${-GRIP_Y}px`;
   root.appendChild(img);
   document.body.appendChild(root);
+  cursorRoot = root;
 
   document.documentElement.classList.add('axe-cursor-on');
 
@@ -98,5 +114,6 @@ export function initAxeCursor(): () => void {
     if (frame) cancelAnimationFrame(frame);
     document.documentElement.classList.remove('axe-cursor-on');
     root.remove();
+    cursorRoot = null;
   };
 }
