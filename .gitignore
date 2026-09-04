@@ -36,3 +36,6 @@ coverage/
 
 # PartyKit
 .partykit/
+
+# Letter-generator review sheet
+letters-sheet.png

@@ -103,7 +103,8 @@ button, a, input, label { cursor: inherit; }
 .bubble-text img {
   height: var(--bubble-height, 90px);
   width: auto;
-  margin-inline: -0.012em;
+  /* Glyph boxes carry a little side padding; pull them together slightly. */
+  margin-inline: calc(var(--bubble-height, 90px) * -0.018);
   user-select: none;
 }
 

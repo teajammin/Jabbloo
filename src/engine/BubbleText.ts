@@ -19,9 +19,6 @@ const GLYPH_ALIASES: Record<string, string> = {
   ',': 'comma',
 };
 
-/** Tallest glyph in the source sheet — the common scale reference. */
-const REFERENCE_HEIGHT = 286;
-
 export interface BubbleTextOptions {
   /** Cap height in pixels. Glyphs share one scale factor, preserving proportions. */
   height?: number;
@@ -57,7 +54,6 @@ export class BubbleText extends Container {
     } = options;
 
     const instance = new BubbleText();
-    const scale = height / REFERENCE_HEIGHT;
 
     // Resolve every glyph first so a missing asset fails before anything is
     // laid out, rather than leaving a half-drawn title on screen.
@@ -88,7 +84,10 @@ export class BubbleText extends Container {
       if (!texture) continue;
 
       const sprite = new Sprite(texture);
-      sprite.scale.set(scale);
+      // Every glyph is exported at the same height, so scaling each by its own
+      // texture height keeps them consistent and survives the artwork being
+      // regenerated at a different resolution.
+      sprite.scale.set(height / texture.height);
       // Bottom-anchored so glyphs of differing heights share a baseline.
       sprite.anchor.set(0, 1);
       sprite.x = cursor;

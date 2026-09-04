@@ -14,7 +14,10 @@
     "dev:server": "tsx watch server/index.ts",
     "test": "esbuild test/parse.test.ts test/protocol.test.ts --bundle --platform=node --format=esm --outdir=node_modules/.cache/tests --out-extension:.js=.mjs --log-level=error && node node_modules/.cache/tests/parse.test.mjs && node node_modules/.cache/tests/protocol.test.mjs",
     "dev:party": "partykit dev",
-    "test:room": "node test/room.test.mjs"
+    "test:room": "node test/room.test.mjs",
+    "gen:letters": "node scripts/generate-letters.mjs",
+    "gen:effects": "node scripts/generate-effects.mjs",
+    "gen:cursor": "node scripts/make-cursor.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
