@@ -12,7 +12,7 @@
     "gen:placeholders": "node scripts/generate-placeholders.mjs",
     "dev:web": "vite",
     "dev:server": "tsx watch server/index.ts",
-    "test": "esbuild test/parse.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/parse.test.mjs --log-level=error && node node_modules/.cache/parse.test.mjs",
+    "test": "esbuild test/parse.test.ts test/protocol.test.ts --bundle --platform=node --format=esm --outdir=node_modules/.cache/tests --out-extension:.js=.mjs --log-level=error && node node_modules/.cache/tests/parse.test.mjs && node node_modules/.cache/tests/protocol.test.mjs",
     "dev:party": "partykit dev",
     "test:room": "node test/room.test.mjs"
   },

@@ -1,7 +1,8 @@
 import { bubbleText } from './bubbleText';
 import { el, button, goHome, type Screen } from './screens';
 import { RoomConnection } from '../net/room';
-import { canStart, type Player, type RoomState } from '../shared/protocol';
+import { startBlockedBecause, type Player, type RoomState } from '../shared/protocol';
+import { teamBoard } from './teams';
 
 interface JoinDetails {
   name: string;
@@ -15,8 +16,8 @@ interface JoinDetails {
  * affordances differ. The host sees the code, the roster and Start; a phone
  * sees confirmation that it is in and who else has arrived.
  *
- * Team assignment is deliberately absent: the brief puts the drag onto the
- * host laptop, and that lands in the next task.
+ * Team assignment appears on the host screen only — the brief puts that drag
+ * on the laptop, never on a phone.
  */
 export function lobbyScreen(
   code: string,
@@ -35,6 +36,9 @@ export function lobbyScreen(
 
     const startButton = button('Start', () => connection.send({ type: 'start' }), 'big primary');
     startButton.disabled = true;
+
+    const board = isHost ? teamBoard(connection) : null;
+    const blocked = el('p', { class: 'help-note blocked' });
 
     function renderRoster(state: RoomState): void {
       const players = state.players.filter((p) => !p.isHost);
@@ -56,9 +60,12 @@ export function lobbyScreen(
         error.textContent = '';
       },
       onState: (state) => {
-        renderRoster(state);
         const players = state.players.filter((p) => !p.isHost);
         const target = state.capacity || capacity;
+
+        // The host arranges on the board; phones just see who is here.
+        if (board) board.update(state);
+        else renderRoster(state);
 
         status.textContent = isHost
           ? players.length >= target
@@ -66,7 +73,9 @@ export function lobbyScreen(
             : `${players.length} of ${target} joined.`
           : `You're in. ${players.length} here so far.`;
 
-        startButton.disabled = !canStart(state);
+        const reason = startBlockedBecause(state);
+        startButton.disabled = reason !== null;
+        blocked.textContent = reason ?? '';
 
         if (state.phase !== 'lobby') {
           status.textContent = 'Starting…';
@@ -111,13 +120,16 @@ export function lobbyScreen(
             )
           : bubbleText(code, { height: 62, className: 'title' }),
         status,
-        roster,
+        board ? board.root : roster,
         error,
         isHost
-          ? el('div', { class: 'stack' }, startButton, button('Leave', () => {
-              connection.close();
-              goHome(go);
-            }, 'ghost'))
+          ? el('div', { class: 'stack' },
+              blocked,
+              startButton,
+              button('Leave', () => {
+                connection.close();
+                goHome(go);
+              }, 'ghost'))
           : el('p', { class: 'help-note' }, 'Keep this page open — the game happens on the big screen.'),
       ),
     );

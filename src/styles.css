@@ -272,3 +272,134 @@ input[type='text'] {
   background: transparent;
   box-shadow: none;
 }
+
+/* ------------------------------------------------------------- team board */
+
+.board-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(1100px, 100%);
+}
+
+.board {
+  display: grid;
+  /* Team A | waiting pool | Team B, with the judges bench spanning underneath. */
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas:
+    'teamA waiting teamB'
+    'judge judge  judge';
+  gap: 14px;
+  width: 100%;
+}
+
+.zone-teamA { grid-area: teamA; }
+.zone-unassigned { grid-area: waiting; }
+.zone-teamB { grid-area: teamB; }
+.zone-judge { grid-area: judge; }
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 168px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.zone-teamA { background: #fff4f4; }
+.zone-teamB { background: #eef6ff; }
+.zone-judge { background: #f6f2ff; min-height: 118px; }
+.zone-unassigned { background: #fffbef; }
+
+/* Highlighted while a card is dragged over, or while one is picked up. */
+.zone.over,
+.placing .zone:hover {
+  box-shadow: inset 0 0 0 3px var(--coral), var(--shadow);
+}
+
+.zone-name {
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+  padding: 8px 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.1);
+  width: 100%;
+}
+
+.zone-name.static {
+  margin: 0;
+  box-shadow: none;
+  background: transparent;
+  opacity: 0.65;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.zone-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  align-content: flex-start;
+  flex: 1;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 16px 6px 6px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  font-weight: 600;
+  font-size: 15px;
+  user-select: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.card:hover { transform: translateY(-2px); }
+.card.dragging { opacity: 0.4; }
+.card.picked { box-shadow: 0 0 0 3px var(--coral), var(--shadow); transform: translateY(-3px); }
+.card.offline { opacity: 0.5; }
+.card:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
+
+.card .avatar { width: 32px; height: 32px; font-size: 14px; }
+
+.zone.empty .zone-list::after {
+  content: 'Drop players here';
+  font-size: 13px;
+  opacity: 0.35;
+  align-self: center;
+  font-weight: 500;
+}
+
+.blocked:not(:empty) { margin: 0 0 -4px; opacity: 0.75; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .zone { transition: none; }
+  .card:hover, .card.picked { transform: none; }
+}
+
+/* On a narrow screen the board stacks — though the host is expected on a laptop. */
+@media (max-width: 720px) {
+  .board {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'teamA' 'waiting' 'teamB' 'judge';
+  }
+  .zone { min-height: 110px; }
+}

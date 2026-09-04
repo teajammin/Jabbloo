@@ -51,23 +51,39 @@ export type ServerMessage =
   | { type: 'error'; reason: string };
 
 /**
- * Whether the lobby is ready to start.
+ * Why the lobby cannot start yet, or null when it can.
+ *
+ * Returns a reason rather than a boolean so the host screen can say what is
+ * missing instead of showing a dulled button with no explanation.
  *
  * Kept here rather than in the server so the host's Start button and the
  * server's validation cannot drift apart — one is the UI for the other.
  */
-export function canStart(state: RoomState): boolean {
+export function startBlockedBecause(state: RoomState): string | null {
   const active = state.players.filter((p) => !p.isHost);
-  if (active.length < MIN_PLAYERS) return false;
-  if (active.some((p) => p.role === 'unassigned')) return false;
 
-  const fighters = active.filter((p) => p.role === 'teamA' || p.role === 'teamB');
-  if (fighters.length < MIN_PLAYERS) return false;
+  if (active.length < MIN_PLAYERS) {
+    return `Waiting for ${MIN_PLAYERS - active.length} more player${
+      MIN_PLAYERS - active.length === 1 ? '' : 's'
+    }.`;
+  }
 
-  // A two-fighter game is 1v1; anything larger needs both sides populated.
+  const waiting = active.filter((p) => p.role === 'unassigned');
+  if (waiting.length > 0) {
+    return waiting.length === 1
+      ? `${waiting[0]!.name} still needs a place.`
+      : `${waiting.length} players still need a place.`;
+  }
+
   const a = active.filter((p) => p.role === 'teamA').length;
   const b = active.filter((p) => p.role === 'teamB').length;
-  return a >= 1 && b >= 1;
+  if (a === 0 || b === 0) return 'Both teams need at least one fighter.';
+
+  return null;
+}
+
+export function canStart(state: RoomState): boolean {
+  return startBlockedBecause(state) === null;
 }
 
 /** Codes avoid vowels so the generator cannot produce a real word. */
