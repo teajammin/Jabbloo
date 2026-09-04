@@ -31,11 +31,23 @@ import {
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'letters');
 const SCALE = Number(process.argv[2]) || 2;
 
-const W = 250, H = 290;
-const TOP = 62, BOT = 220, L = 42, R = 208;
+const W = 270, H = 300;
+const TOP = 70, BOT = 228, L = 55, R = 215;
 const MX = (L + R) / 2, MY = (TOP + BOT) / 2;
 const T = 42;         // stroke radius — fat enough that letters read as blobs
 const O = 6;          // outline weight
+
+/**
+ * The VISUAL box.
+ *
+ * A stroked skeleton grows by half a stroke in every direction, so a path from
+ * L to R actually occupies L-T to R+T. Shapes that are not stroked — the solid
+ * blobs behind B, E, F, H and O — have to be authored against these bounds
+ * instead, or they come out a stroke-width smaller than every letter beside
+ * them.
+ */
+const VL = L - T, VR = R + T, VT = TOP - T, VB = BOT + T;
+const VW = VR - VL, VH = VB - VT;
 
 // ------------------------------------------------------------ shape factories
 // Each returns (d) => shape, where d inflates or deflates it.
@@ -82,25 +94,30 @@ const LETTERS = {
     [[62, 120, 12, 44, -0.2], [MX + 30, 186, 10, 26, 0.1]],
   ),
   B: g(
-    [P([L, TOP], [L, BOT]), BOWL(MX + 8, TOP + 46, 76, 50), BOWL(MX + 8, BOT - 46, 80, 52)],
-    [Hole(MX + 14, TOP + 46, HOLE_R), Hole(MX + 14, BOT - 46, HOLE_R)],
-    [[L + 16, TOP + 26, 11, 30, 0], [MX + 40, BOT - 20, 12, 22, -0.5]],
+    [Rect(VL, VT, VW, VH, 84)],
+    // A round bite rather than a slot: B's waist is a pinch between two lobes,
+    // and a parallel-sided slit cut deep enough to read at all turns it into a G.
+    [Hole(VR + 34, MY, 92),
+     Hole(MX + 34, VT + 64, HOLE_R), Hole(MX + 34, VB - 64, HOLE_R)],
+    [[VL + 34, VT + 44, 13, 34, 0], [MX + 54, VB - 44, 12, 24, -0.5]],
   ),
   C: g([P(...arc(MX, MY, 78, 76, 54, 306))], [], [[MX - 34, TOP + 34, 13, 30, -0.7]]),
   D: g(
-    [P([L + 8, TOP], [L + 8, BOT]), BOWL(MX + 2, MY, 80, 79)],
-    [Hole(MX + 8, MY, HOLE_R)],
-    [[L + 18, TOP + 30, 11, 32, 0], [MX + 54, MY + 40, 11, 24, -0.6]],
+    [P([L + 8, TOP], [L + 8, BOT]), BOWL(MX + 4, MY, VW / 2 - 12, VH / 2)],
+    [Hole(MX + 24, MY, HOLE_R)],
+    [[VL + 34, VT + 44, 12, 34, 0], [MX + 66, MY + 56, 12, 26, -0.6]],
   ),
   E: g(
-    [Rect(L, TOP, R - L, BOT - TOP, 46)],
-    [Slit(R + 40, TOP + 50, MX - 10, TOP + 50, 12), Slit(R + 40, BOT - 50, MX - 10, BOT - 50, 12)],
-    [[L + 22, TOP + 28, 11, 26, 0], [L + 22, BOT - 30, 10, 22, 0]],
+    [Rect(VL, VT, VW, VH, 66)],
+    [Slit(VR + 40, VT + 73, VL + 100, VT + 73, 15),
+     Slit(VR + 40, VB - 73, VL + 100, VB - 73, 15)],
+    [[VL + 34, VT + 42, 12, 30, 0], [VL + 34, VB - 44, 11, 24, 0]],
   ),
   F: g(
-    [Rect(L, TOP, R - L, BOT - TOP, 46)],
-    [Slit(R + 40, TOP + 56, MX - 10, TOP + 56, 12), Rect(MX - 14, MY + 24, R - MX + 70, 140, 30)],
-    [[L + 22, TOP + 28, 11, 26, 0]],
+    [Rect(VL, VT, VW, VH, 66)],
+    [Slit(VR + 40, VT + 78, VL + 100, VT + 78, 15),
+     Rect(VL + 100, MY + 28, VW, VH, 34)],
+    [[VL + 34, VT + 42, 12, 30, 0]],
   ),
   G: g(
     [P(...arc(MX, MY, 78, 76, 54, 306)), Pt(40, [MX + 4, MY + 24], [R - 8, MY + 24])],
@@ -108,9 +125,9 @@ const LETTERS = {
     [[MX - 34, TOP + 34, 13, 30, -0.7]],
   ),
   H: g(
-    [Rect(L, TOP, R - L, BOT - TOP, 46)],
-    [Slit(MX, TOP - 60, MX, MY - 64, 38), Slit(MX, MY + 64, MX, BOT + 60, 38)],
-    [[L + 22, TOP + 28, 11, 30, 0], [R - 22, BOT - 32, 10, 24, 0]],
+    [Rect(VL, VT, VW, VH, 66)],
+    [Slit(MX, VT - 60, MX, MY - 72, 42), Slit(MX, MY + 72, MX, VB + 60, 42)],
+    [[VL + 34, VT + 42, 12, 32, 0], [VR - 34, VB - 46, 11, 26, 0]],
   ),
   I: g([P([MX, TOP], [MX, BOT])], [], [[MX - 14, TOP + 28, 11, 34, 0]]),
   J: g(
@@ -139,30 +156,30 @@ const LETTERS = {
     [[L + 16, TOP + 30, 11, 30, 0], [R - 16, TOP + 34, 10, 26, 0]],
   ),
   O: g(
-    [BOWL(MX, MY, 84, 80)],
+    [BOWL(MX, MY, VW / 2, VH / 2)],
     [Hole(MX, MY, HOLE_R)],
-    [[MX - 44, TOP + 30, 13, 32, -0.5], [MX + 48, BOT - 40, 11, 24, -0.5]],
+    [[MX - 66, VT + 46, 15, 36, -0.5], [MX + 70, VB - 56, 13, 28, -0.5]],
   ),
   P: g(
-    [P([L, TOP], [L, BOT]), BOWL(MX + 8, TOP + 56, 78, 60)],
-    [Hole(MX + 12, TOP + 56, HOLE_R)],
-    [[L + 18, TOP + 30, 11, 30, 0], [MX + 46, TOP + 96, 10, 20, -0.6]],
+    [P([L, TOP], [L, BOT]), BOWL(MX + 10, VT + 78, VW / 2 - 16, 78)],
+    [Hole(MX + 26, VT + 78, HOLE_R)],
+    [[VL + 32, VT + 44, 12, 32, 0], [MX + 60, VT + 132, 11, 22, -0.6]],
   ),
   Q: g(
-    [BOWL(MX, MY, 80, 78), Pt(28, [MX + 44, MY + 48], [R + 4, BOT + 16])],
+    [BOWL(MX, MY, VW / 2 - 6, VH / 2 - 4), Pt(28, [MX + 60, MY + 72], [VR - 10, VB + 4])],
     [Hole(MX, MY, HOLE_R)],
-    [[MX - 40, TOP + 30, 13, 32, -0.5]],
+    [[MX - 62, VT + 48, 15, 34, -0.5]],
   ),
   R: g(
-    [P([L, TOP], [L, BOT]), BOWL(MX + 6, TOP + 50, 72, 54), Pt(38, [L + 20, MY + 12], [R, BOT])],
-    [Hole(MX + 12, TOP + 50, HOLE_R)],
-    [[L + 18, TOP + 28, 11, 28, 0]],
+    [P([L, TOP], [L, BOT]), BOWL(MX + 6, VT + 74, VW / 2 - 24, 74), Pt(38, [L + 20, MY + 12], [R, BOT])],
+    [Hole(MX + 20, VT + 74, HOLE_R)],
+    [[VL + 32, VT + 44, 12, 30, 0]],
   ),
   S: g(
-    [Pt(33, [182, 92], [134, 64], [78, 76], [64, 110], [98, 134],
-        [152, 152], [174, 180], [158, 208], [110, 222], [60, 206])],
+    [Pt(33, [192, 100], [144, 72], [88, 84], [74, 118], [108, 142],
+        [162, 160], [184, 188], [168, 216], [120, 230], [70, 214])],
     [],
-    [[104, 88, 12, 24, 0.5], [128, 190, 11, 22, 0.4]],
+    [[114, 96, 12, 24, 0.5], [138, 198, 11, 22, 0.4]],
   ),
   T: g(
     [P([L, TOP], [R, TOP]), P([MX, TOP], [MX, BOT])],
