@@ -33,3 +33,6 @@ logs/
 # Test / coverage
 coverage/
 .nyc_output/
+
+# PartyKit
+.partykit/

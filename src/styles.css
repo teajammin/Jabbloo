@@ -1,0 +1,274 @@
+/**
+ * Jabbloo screen styles.
+ *
+ * Soft pastels, heavy rounding, generous tap targets — the brief asks for cozy
+ * and bubbly, and most players are on a phone.
+ */
+
+:root {
+  --cream: #fffdf7;
+  --ink: #4a4458;
+  --butter: #fbd87f;
+  --coral: #f98b8b;
+  --mint: #b7e9ae;
+  --sky: #a5cdf2;
+  --lavender: #c9b6ec;
+  --blossom: #f7a8c4;
+  --peach: #ffc49b;
+
+  --radius: 28px;
+  --shadow: 0 4px 0 rgba(74, 68, 88, 0.16);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: 'Baloo 2', 'Quicksand', ui-rounded, system-ui, -apple-system, sans-serif;
+  font-size: 17px;
+  /* The brief asks for a spear cursor; hotspot at the spear tip. */
+  cursor: url('/cursor-spear.png') 38 3, auto;
+}
+
+/* Touch devices have no cursor, and a custom one costs a needless request. */
+@media (hover: none) {
+  body { cursor: auto; }
+}
+
+button, a, input, label { cursor: inherit; }
+
+#app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 32px 20px 56px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------ bubble letters */
+
+.bubble-text {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.bubble-text img {
+  height: var(--bubble-height, 90px);
+  width: auto;
+  margin-inline: -0.012em;
+  user-select: none;
+}
+
+.bubble-space { width: calc(var(--bubble-height, 90px) * 0.3); }
+
+.title { margin-bottom: 4px; }
+
+/* Long words must shrink rather than overflow a phone. */
+@media (max-width: 560px) {
+  .bubble-text { --bubble-height: min(var(--bubble-height, 90px), 17vw) !important; }
+}
+
+/* -------------------------------------------------------------------- text */
+
+.version { margin: 0; opacity: 0.5; font-size: 15px; letter-spacing: 0.5px; }
+.lede { margin: 0; max-width: 34ch; opacity: 0.72; line-height: 1.45; }
+.error:not(:empty) {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: #fff;
+  font-size: 15px;
+}
+.help-note { margin: 0; max-width: 40ch; font-size: 14px; opacity: 0.6; line-height: 1.5; }
+
+/* ----------------------------------------------------------------- controls */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(340px, 100%);
+}
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  padding: 13px 26px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  /* Comfortably tappable on a phone. */
+  min-height: 48px;
+}
+
+button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 0 rgba(74, 68, 88, 0.16); }
+button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(74, 68, 88, 0.16); }
+button:disabled { opacity: 0.42; box-shadow: none; }
+button:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 3px solid var(--coral);
+  outline-offset: 3px;
+}
+
+.big { font-size: 19px; padding: 17px 30px; min-height: 58px; }
+.primary { background: var(--lavender); }
+.ghost { background: transparent; box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.16); }
+.count { min-width: 60px; font-size: 19px; }
+.count[aria-pressed='true'] { background: var(--mint); }
+
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none; }
+  button:hover:not(:disabled), button:active:not(:disabled) { transform: none; }
+}
+
+/* -------------------------------------------------------------------- forms */
+
+.form { text-align: left; }
+label { font-size: 14px; font-weight: 600; opacity: 0.7; margin-bottom: -6px; }
+
+input[type='text'] {
+  font: inherit;
+  font-size: 18px;
+  color: var(--ink);
+  padding: 14px 20px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.12);
+  width: 100%;
+}
+
+.code-input {
+  text-transform: uppercase;
+  letter-spacing: 0.4em;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.file { font-size: 15px; }
+.file-label { margin-bottom: 0; }
+.photo-preview {
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  align-self: center;
+  box-shadow: 0 0 0 4px #fff, var(--shadow);
+}
+
+/* ------------------------------------------------------------------- lobby */
+
+.code-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.join-url { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+.join-link { color: var(--ink); opacity: 0.55; font-size: 14px; }
+
+.roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  width: min(620px, 100%);
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px 8px 8px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  font-weight: 600;
+}
+
+.player.empty {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.12);
+  opacity: 0.5;
+  padding: 8px 18px;
+  font-weight: 500;
+}
+
+.player.offline { opacity: 0.5; }
+
+.avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--butter);
+  font-weight: 700;
+}
+
+.you {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+}
+
+/* -------------------------------------------------------------------- help */
+
+.help-open {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 52px; height: 52px;
+  padding: 0;
+  font-size: 24px;
+  font-weight: 700;
+  background: var(--butter);
+}
+
+.help {
+  border: none;
+  border-radius: var(--radius);
+  padding: 32px;
+  max-width: 520px;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgba(74, 68, 88, 0.28);
+}
+
+.help::backdrop { background: rgba(74, 68, 88, 0.35); }
+.help h2 { margin: 0 0 12px; }
+.help-steps { margin: 0; padding-left: 22px; line-height: 1.6; }
+.help-steps li { margin-bottom: 6px; }
+.help-close {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 40px; height: 40px;
+  padding: 0;
+  font-size: 22px;
+  background: transparent;
+  box-shadow: none;
+}

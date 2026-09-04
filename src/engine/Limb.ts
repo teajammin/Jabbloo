@@ -12,6 +12,13 @@ import { darken } from './colour';
  * Limbs are hidden by default and only appear for the duration of a melee
  * move, which keeps them from looking like a permanent mis-rig on characters
  * that already have legs drawn on.
+ *
+ * PLANNED — drawn limbs take priority:
+ *   When the drawing tool lands, character art must first be scanned for limbs
+ *   the player actually drew. Where arms or legs are found, the rig should
+ *   animate THOSE, emitting anchor points for them, and this procedural limb
+ *   becomes the fallback for limbless characters only. Drawing a capsule leg
+ *   onto a character who already has two legs reads as a bug, not a feature.
  */
 export class Limb {
   readonly view = new Graphics();

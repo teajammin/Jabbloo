@@ -104,6 +104,17 @@ These are the only moves the choreographer may call.
 All durations are in seconds. If the AI returns something unusable, the engine falls back to
 a default swing — the weapon hits the opponent like an axe.
 
+### Limbs
+
+Characters are flat PNGs with no skeleton, so kicks and punches have nothing to articulate.
+The engine draws procedural bubble limbs, colour-sampled from the character's own artwork,
+which appear only for the duration of a melee move.
+
+**Planned:** when the drawing tool is built, player art must be scanned for limbs the player
+actually drew, and those animated in preference. Procedural limbs are the fallback for
+limbless characters only — drawing a capsule leg onto a character who already has two legs
+reads as a bug.
+
 ---
 
 ## Repository

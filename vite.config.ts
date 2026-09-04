@@ -16,5 +16,9 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    rollupOptions: {
+      // The engine sandbox ships as a second page so it survives alongside the game.
+      input: { main: 'index.html', sandbox: 'sandbox.html' },
+    },
   },
 });

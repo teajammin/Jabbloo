@@ -1,0 +1,7 @@
+{
+  "$schema": "https://www.partykit.io/schema.json",
+  "name": "jabbloo",
+  "main": "party/room.ts",
+  "compatibilityDate": "2025-01-01",
+  "port": 1999
+}
