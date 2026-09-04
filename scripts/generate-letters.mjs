@@ -93,13 +93,15 @@ const LETTERS = {
     [Hole(MX - 2, 124, HOLE_R)],
     [[62, 120, 12, 44, -0.2], [MX + 30, 186, 10, 26, 0.1]],
   ),
+  // Two big overlapping lobes over a left block. The waist is the natural gap
+  // where the lobes' right edges recede — punching a notch into a straight
+  // edge instead gives a rounded rectangle with a bite, not a B.
   B: g(
-    [Rect(VL, VT, VW, VH, 84)],
-    // A round bite rather than a slot: B's waist is a pinch between two lobes,
-    // and a parallel-sided slit cut deep enough to read at all turns it into a G.
-    [Hole(VR + 34, MY, 92),
-     Hole(MX + 34, VT + 64, HOLE_R), Hole(MX + 34, VB - 64, HOLE_R)],
-    [[VL + 34, VT + 44, 13, 34, 0], [MX + 54, VB - 44, 12, 24, -0.5]],
+    [Rect(VL, VT, 116, VH, 52),
+     BOWL(VL + 128, VT + 70, 112, 70),
+     BOWL(VL + 132, VB - 72, 112, 72)],
+    [Hole(VL + 166, VT + 70, HOLE_R), Hole(VL + 170, VB - 72, HOLE_R)],
+    [[VL + 38, VT + 46, 14, 36, 0.1], [VL + 52, VB - 44, 12, 26, 0.15]],
   ),
   C: g([P(...arc(MX, MY, 78, 76, 54, 306))], [], [[MX - 34, TOP + 34, 13, 30, -0.7]]),
   D: g(
