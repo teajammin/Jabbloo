@@ -1,14 +1,22 @@
 /**
  * Draws the Jabbloo alphabet.
  *
- * Original artwork, so there is no licence to honour and glyphs can be
- * regenerated at any resolution. The previous set was extracted from a 642x350
- * bitmap in the design brief and was soft above about 90px.
+ * Original artwork, so there is no licence to honour and glyphs regenerate at
+ * any resolution.
  *
- * Every letter is one or more stroked paths: a polyline rendered as a chain of
- * overlapping round-capped capsules. That gives uniform, fully rounded strokes
- * with no corner joins to fix, and counters — the holes in O, B, P — fall out
- * for free wherever a path closes on itself.
+ * The reference letters are not stroked outlines — they are near-solid
+ * inflated blobs. Counters are tiny pinholes rather than proportional holes,
+ * notches are narrow slits cut into an otherwise solid mass, the outline is a
+ * thin dark shade of the fill, and each letter carries bright white shines.
+ * Building them as thin strokes gets the skeleton right and the character
+ * completely wrong, so every glyph here is:
+ *
+ *     body    = union(fills) minus union(cuts)
+ *     outline = union(fills grown by O) minus union(cuts shrunk by O)
+ *
+ * Every fill and cut is a function of an inflation delta, which is what lets
+ * the same definition produce both passes and give notches and pinholes their
+ * own dark rims.
  *
  *   node scripts/generate-letters.mjs [scale]
  */
@@ -17,25 +25,39 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  Canvas, encodePng, capsule, ellipse, any, all, darken, lighten, C,
+  Canvas, encodePng, capsule, ellipse, roundedRect, any, all, minus, darken,
 } from './lib/raster.mjs';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'letters');
 const SCALE = Number(process.argv[2]) || 2;
 
-// Design box. Letters are authored here, then scaled on output.
-const W = 226, H = 270;
-// Wider and slightly squatter than a normal face — the reference letters are
-// inflated almost to the point of touching themselves.
-const TOP = 60, BOT = 212, L = 36, R = 190;
-const MX = 113, MY = (TOP + BOT) / 2;
-const T = 29;          // stroke radius; fatter seals the counters on B, P and R
-const OUTLINE = 11;
+const W = 250, H = 290;
+const TOP = 62, BOT = 220, L = 42, R = 208;
+const MX = (L + R) / 2, MY = (TOP + BOT) / 2;
+const T = 42;         // stroke radius — fat enough that letters read as blobs
+const O = 6;          // outline weight
 
-// ------------------------------------------------------------------- geometry
+// ------------------------------------------------------------ shape factories
+// Each returns (d) => shape, where d inflates or deflates it.
 
-/** Points along an ellipse arc, in degrees, either direction. */
-function arcPts(cx, cy, rx, ry, a0, a1, steps = 22) {
+const P = (...pts) => (d) => strokePath(pts, T + d);
+const Pt = (t, ...pts) => (d) => strokePath(pts, t + d);
+const E = (cx, cy, rx, ry) => (d) => ellipse(cx, cy, rx + d, ry + d);
+const Rect = (x, y, w, h, r) => (d) => roundedRect(x - d, y - d, w + 2 * d, h + 2 * d, r + d);
+const Slit = (x1, y1, x2, y2, r) => (d) => capsule(x1, y1, x2, y2, r + d);
+const Hole = (x, y, r) => (d) => ellipse(x, y, r + d, r + d);
+
+function strokePath(points, radius) {
+  if (points.length === 1) return ellipse(points[0][0], points[0][1], radius, radius);
+  const segs = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    segs.push(capsule(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1], radius));
+  }
+  return any(...segs);
+}
+
+/** Points along an ellipse arc, degrees, either direction. */
+function arc(cx, cy, rx, ry, a0, a1, steps = 26) {
   const pts = [];
   for (let i = 0; i <= steps; i++) {
     const a = ((a0 + ((a1 - a0) * i) / steps) * Math.PI) / 180;
@@ -44,115 +66,190 @@ function arcPts(cx, cy, rx, ry, a0, a1, steps = 22) {
   return pts;
 }
 
-/** A polyline stroked with round caps. */
-function stroke(points, radius) {
-  const segments = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const [x1, y1] = points[i];
-    const [x2, y2] = points[i + 1];
-    segments.push(capsule(x1, y1, x2, y2, radius));
-  }
-  // A single point is a dot.
-  if (segments.length === 0 && points.length === 1) {
-    return ellipse(points[0][0], points[0][1], radius, radius);
-  }
-  return any(...segments);
-}
+const g = (fills, cuts = [], shines = []) => ({ fills, cuts, shines });
 
-const glyph = (...paths) => paths;
+// A pinhole counter plus the shine that usually sits beside it.
+const HOLE_R = 11;
 
-// --------------------------------------------------------------------- shapes
+// ---------------------------------------------------------------------- glyphs
 
-const CIRCLE = arcPts(MX, MY, 76, 78, 0, 360, 44);
+const BOWL = (cx, cy, rx, ry) => E(cx, cy, rx, ry);
 
 const LETTERS = {
-  A: glyph([[L, BOT], [MX, TOP], [R, BOT]], [[L + 28, 180], [R - 28, 180]]),
-  B: glyph(
-    [[L, TOP], [L, BOT]],
-    [[L, TOP], ...arcPts(98, 106, 68, 52, -90, 90), [L, MY]],
-    [[L, MY], ...arcPts(98, 166, 72, 54, -90, 90), [L, BOT]],
+  A: g(
+    [P([L + 6, BOT], [MX - 4, TOP], [R - 6, BOT]), Pt(34, [L + 30, 176], [R - 30, 176])],
+    [Hole(MX - 2, 124, HOLE_R)],
+    [[62, 120, 12, 44, -0.2], [MX + 30, 186, 10, 26, 0.1]],
   ),
-  C: glyph(arcPts(MX, MY, 76, 78, 52, 308)),
-  D: glyph([[L, TOP], [L, BOT]], [[L, TOP], ...arcPts(L + 8, MY, 90, 76, -90, 90), [L, BOT]]),
-  E: glyph(
-    [[L, TOP], [L, BOT]], [[L, TOP], [R, TOP]], [[L, MY], [R - 20, MY]], [[L, BOT], [R, BOT]],
+  B: g(
+    [P([L, TOP], [L, BOT]), BOWL(MX + 8, TOP + 46, 76, 50), BOWL(MX + 8, BOT - 46, 80, 52)],
+    [Hole(MX + 14, TOP + 46, HOLE_R), Hole(MX + 14, BOT - 46, HOLE_R)],
+    [[L + 16, TOP + 26, 11, 30, 0], [MX + 40, BOT - 20, 12, 22, -0.5]],
   ),
-  F: glyph([[L, TOP], [L, BOT]], [[L, TOP], [R, TOP]], [[L, MY], [R - 20, MY]]),
-  G: glyph(arcPts(MX, MY, 76, 78, 52, 308), [[MX - 6, MY + 18], [R - 20, MY + 18]]),
-  H: glyph([[L, TOP], [L, BOT]], [[R, TOP], [R, BOT]], [[L, MY], [R, MY]]),
-  I: glyph([[MX, TOP], [MX, BOT]]),
-  J: glyph([[R - 16, TOP], [R - 16, 164]], [...arcPts(R - 16 - 52, 164, 52, 44, 0, 180)]),
-  K: glyph([[L, TOP], [L, BOT]], [[L + 8, MY + 6], [R, TOP]], [[L + 8, MY - 6], [R, BOT]]),
-  L: glyph([[L, TOP], [L, BOT]], [[L, BOT], [R, BOT]]),
-  M: glyph([[L, BOT], [L, TOP], [MX, MY + 26], [R, TOP], [R, BOT]]),
-  N: glyph([[L, BOT], [L, TOP], [R, BOT], [R, TOP]]),
-  O: glyph(CIRCLE),
-  P: glyph([[L, TOP], [L, BOT]], [[L, TOP], ...arcPts(98, 118, 70, 62, -90, 90), [L, MY + 20]]),
-  Q: glyph(CIRCLE, [[MX + 36, MY + 45], [R + 6, BOT + 16]]),
-  R: glyph(
-    [[L, TOP], [L, BOT]],
-    [[L, TOP], ...arcPts(98, 110, 68, 56, -90, 90), [L, MY + 12]],
-    [[L + 10, MY + 12], [R, BOT]],
+  C: g([P(...arc(MX, MY, 78, 76, 54, 306))], [], [[MX - 34, TOP + 34, 13, 30, -0.7]]),
+  D: g(
+    [P([L + 8, TOP], [L + 8, BOT]), BOWL(MX + 2, MY, 80, 79)],
+    [Hole(MX + 8, MY, HOLE_R)],
+    [[L + 18, TOP + 30, 11, 32, 0], [MX + 54, MY + 40, 11, 24, -0.6]],
   ),
-  // Drawn as one continuous ribbon rather than two arcs. At this stroke weight
-  // any pair of bowls round enough to read as an S closes into an 8 — the waist
-  // lands inside both openings. A single open path cannot close on itself.
-  S: glyph([
-    [166, 96], [126, 70], [82, 80], [70, 108], [96, 128],
-    [138, 144], [158, 168], [150, 194], [110, 210], [66, 198],
-  ]),
-  T: glyph([[L, TOP], [R, TOP]], [[MX, TOP], [MX, BOT]]),
-  U: glyph([[L, TOP], [L, 150], ...arcPts(MX, 150, MX - L, 58, 180, 0), [R, 150], [R, TOP]]),
-  V: glyph([[L, TOP], [MX, BOT], [R, TOP]]),
-  W: glyph([[L, TOP], [L + 32, BOT], [MX, 132], [R - 32, BOT], [R, TOP]]),
-  X: glyph([[L, TOP], [R, BOT]], [[R, TOP], [L, BOT]]),
-  Y: glyph([[L, TOP], [MX, MY + 14]], [[R, TOP], [MX, MY + 14]], [[MX, MY + 14], [MX, BOT]]),
-  Z: glyph([[L, TOP], [R, TOP], [L, BOT], [R, BOT]]),
+  E: g(
+    [Rect(L, TOP, R - L, BOT - TOP, 46)],
+    [Slit(R + 40, TOP + 50, MX - 10, TOP + 50, 12), Slit(R + 40, BOT - 50, MX - 10, BOT - 50, 12)],
+    [[L + 22, TOP + 28, 11, 26, 0], [L + 22, BOT - 30, 10, 22, 0]],
+  ),
+  F: g(
+    [Rect(L, TOP, R - L, BOT - TOP, 46)],
+    [Slit(R + 40, TOP + 56, MX - 10, TOP + 56, 12), Rect(MX - 14, MY + 24, R - MX + 70, 140, 30)],
+    [[L + 22, TOP + 28, 11, 26, 0]],
+  ),
+  G: g(
+    [P(...arc(MX, MY, 78, 76, 54, 306)), Pt(40, [MX + 4, MY + 24], [R - 8, MY + 24])],
+    [],
+    [[MX - 34, TOP + 34, 13, 30, -0.7]],
+  ),
+  H: g(
+    [Rect(L, TOP, R - L, BOT - TOP, 46)],
+    [Slit(MX, TOP - 60, MX, MY - 64, 38), Slit(MX, MY + 64, MX, BOT + 60, 38)],
+    [[L + 22, TOP + 28, 11, 30, 0], [R - 22, BOT - 32, 10, 24, 0]],
+  ),
+  I: g([P([MX, TOP], [MX, BOT])], [], [[MX - 14, TOP + 28, 11, 34, 0]]),
+  J: g(
+    [P([R - 30, TOP], [R - 30, 148], ...arc(R - 30 - 52, 148, 52, 48, 0, 176))],
+    [],
+    [[R - 44, TOP + 28, 11, 30, 0]],
+  ),
+  K: g(
+    [P([L, TOP], [L, BOT]), P([L + 10, MY], [R, TOP]), P([L + 10, MY], [R, BOT])],
+    [],
+    [[L + 16, TOP + 28, 11, 30, 0], [R - 40, TOP + 42, 10, 22, 0.7]],
+  ),
+  L: g(
+    [P([L, TOP], [L, BOT]), P([L, BOT], [R, BOT])],
+    [],
+    [[L + 16, TOP + 30, 11, 34, 0], [MX + 30, BOT - 18, 12, 22, -0.5]],
+  ),
+  M: g(
+    [P([L, BOT], [L, TOP], [MX, MY + 24], [R, TOP], [R, BOT])],
+    [],
+    [[L + 16, TOP + 30, 11, 30, 0], [R - 16, TOP + 30, 10, 26, 0]],
+  ),
+  N: g(
+    [P([L, BOT], [L, TOP], [R, BOT], [R, TOP])],
+    [],
+    [[L + 16, TOP + 30, 11, 30, 0], [R - 16, TOP + 34, 10, 26, 0]],
+  ),
+  O: g(
+    [BOWL(MX, MY, 84, 80)],
+    [Hole(MX, MY, HOLE_R)],
+    [[MX - 44, TOP + 30, 13, 32, -0.5], [MX + 48, BOT - 40, 11, 24, -0.5]],
+  ),
+  P: g(
+    [P([L, TOP], [L, BOT]), BOWL(MX + 8, TOP + 56, 78, 60)],
+    [Hole(MX + 12, TOP + 56, HOLE_R)],
+    [[L + 18, TOP + 30, 11, 30, 0], [MX + 46, TOP + 96, 10, 20, -0.6]],
+  ),
+  Q: g(
+    [BOWL(MX, MY, 80, 78), Pt(28, [MX + 44, MY + 48], [R + 4, BOT + 16])],
+    [Hole(MX, MY, HOLE_R)],
+    [[MX - 40, TOP + 30, 13, 32, -0.5]],
+  ),
+  R: g(
+    [P([L, TOP], [L, BOT]), BOWL(MX + 6, TOP + 50, 72, 54), Pt(38, [L + 20, MY + 12], [R, BOT])],
+    [Hole(MX + 12, TOP + 50, HOLE_R)],
+    [[L + 18, TOP + 28, 11, 28, 0]],
+  ),
+  S: g(
+    [Pt(33, [182, 92], [134, 64], [78, 76], [64, 110], [98, 134],
+        [152, 152], [174, 180], [158, 208], [110, 222], [60, 206])],
+    [],
+    [[104, 88, 12, 24, 0.5], [128, 190, 11, 22, 0.4]],
+  ),
+  T: g(
+    [P([L, TOP], [R, TOP]), P([MX, TOP], [MX, BOT])],
+    [],
+    [[L + 30, TOP - 12, 11, 22, 1.4], [MX - 14, MY, 11, 32, 0]],
+  ),
+  U: g(
+    [P([L, TOP], [L, 144], ...arc(MX, 144, MX - L, 62, 180, 0), [R, 144], [R, TOP])],
+    [],
+    [[L + 16, TOP + 30, 11, 32, 0], [R - 16, TOP + 34, 10, 26, 0]],
+  ),
+  V: g([P([L + 4, TOP], [MX, BOT], [R - 4, TOP])], [], [[L + 20, TOP + 30, 11, 30, 0.25]]),
+  W: g(
+    [P([L, TOP], [L + 36, BOT], [MX, MY + 6], [R - 36, BOT], [R, TOP])],
+    [],
+    [[L + 14, TOP + 30, 11, 28, 0.2], [R - 14, TOP + 30, 10, 24, -0.2]],
+  ),
+  X: g(
+    [P([L + 4, TOP], [R - 4, BOT]), P([R - 4, TOP], [L + 4, BOT])],
+    [],
+    [[L + 24, TOP + 26, 11, 24, 0.7], [R - 24, TOP + 26, 10, 22, -0.7]],
+  ),
+  Y: g(
+    [P([L + 4, TOP], [MX, MY + 12]), P([R - 4, TOP], [MX, MY + 12]), P([MX, MY + 12], [MX, BOT])],
+    [],
+    [[L + 20, TOP + 28, 11, 26, 0.3]],
+  ),
+  Z: g(
+    [P([L, TOP], [R, TOP], [L, BOT], [R, BOT])],
+    [],
+    [[L + 30, TOP - 12, 11, 22, 1.4], [MX + 20, BOT + 12, 11, 22, 1.4]],
+  ),
 
-  excl: glyph([[MX, TOP], [MX, 156]], [[MX, BOT - 4]]),
-  query: glyph(
-    [...arcPts(MX, TOP + 48, 48, 44, 185, 398), [MX + 6, 146], [MX, 162]],
-    [[MX, BOT - 4]],
+  excl: g([P([MX, TOP], [MX, 152]), P([MX, BOT - 6])], [], [[MX - 12, TOP + 26, 10, 26, 0]]),
+  query: g(
+    [Pt(36, ...arc(MX, TOP + 56, 56, 52, 184, 398), [MX + 10, 146], [MX, 162]), P([MX, BOT - 6])],
+    [],
+    [[MX - 26, TOP + 22, 10, 22, 0.6]],
   ),
-  dot: glyph([[MX, BOT - 4]]),
-  comma: glyph([[MX, BOT - 20]], [[MX + 4, BOT - 12], [MX - 14, BOT + 26]]),
+  dot: g([P([MX, BOT - 6])], [], [[MX - 10, BOT - 22, 8, 14, 0]]),
+  comma: g([P([MX, BOT - 26]), Pt(26, [MX + 6, BOT - 18], [MX - 16, BOT + 28])], [], []),
 };
 
-/** One pastel per letter, cycling — the reference alphabet is multicoloured. */
-const PALETTE = [C.butter, C.coral, C.mint, C.sky, C.lavender, C.aqua, C.blossom, C.peach];
+/**
+ * Per-letter colours, following the reference sheet rather than a repeating
+ * cycle — the original alphabet's colours are deliberately scattered.
+ */
+const COLOURS = {
+  A: 0xfbd268, B: 0xf79bb8, C: 0x8fb8f0, D: 0xa8de9b, E: 0xf4796f, F: 0xcbb2ed,
+  G: 0xa9e5c8, H: 0x8fb8f0, I: 0xf4796f, J: 0xa9d8f0, K: 0xfbd268, L: 0xcbb2ed,
+  M: 0xf79bb8, N: 0xa8de9b, O: 0xfbd268, P: 0xf4796f, Q: 0xa8de9b, R: 0x7fcfc4,
+  S: 0xa9d8f0, T: 0xf4796f, U: 0x8fb8f0, V: 0xcbb2ed, W: 0xf79bb8, X: 0xa8e4ec,
+  Y: 0xa8de9b, Z: 0xfbd268, excl: 0xf79bb8, query: 0xa9d8f0, dot: 0xcbb2ed,
+  comma: 0x7fcfc4,
+};
+
+const rgb = (n) => [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 
 // ------------------------------------------------------------------------ draw
 
-function render(paths, colour, scale) {
+function render({ fills, cuts, shines }, colour, scale) {
   const w = Math.round(W * scale), h = Math.round(H * scale);
   const c = new Canvas(w, h);
-
-  // Scale every shape by rendering into a scaled coordinate test.
   const s = (shape) => (px, py) => shape(px / scale, py / scale);
 
-  const body = any(...paths.map((p) => stroke(p, T)));
-  const outline = any(...paths.map((p) => stroke(p, T + OUTLINE)));
+  const body = cuts.length
+    ? minus(any(...fills.map((f) => f(0))), any(...cuts.map((k) => k(0))))
+    : any(...fills.map((f) => f(0)));
 
-  c.fill(s(outline), darken(colour, 0.58));
-  c.fill(s(body), colour);
+  // Cuts shrink for the outline pass, so notches and pinholes get a dark rim.
+  const outline = cuts.length
+    ? minus(any(...fills.map((f) => f(O))), any(...cuts.map((k) => k(-O))))
+    : any(...fills.map((f) => f(O)));
 
-  // Gloss, clipped to the letter so it only ever lights the stroke. Long and
-  // bright rather than a subtle dot — the reference letters look wet.
-  c.fill(s(all(body, capsule(60, 88, 74, 132, 11))), C.white, 0.62);
-  c.fill(s(all(body, ellipse(150, 92, 12, 9))), C.white, 0.5);
-  c.fill(s(all(body, capsule(96, 196, 150, 200, 9))), lighten(colour, 0.55), 0.5);
+  c.fill(s(outline), darken(rgb(colour), 0.45));
+  c.fill(s(body), rgb(colour));
+
+  // Shines: bright, slightly tilted streaks clipped to the letter.
+  for (const [x, y, rx, ry, tilt] of shines) {
+    const dx = Math.sin(tilt) * ry * 0.8, dy = Math.cos(tilt) * ry * 0.8;
+    c.fill(s(all(body, capsule(x - dx, y - dy, x + dx, y + dy, rx))), [255, 255, 255], 0.92);
+  }
 
   return { w, h, buf: c.buf };
 }
 
-/**
- * Trims transparent columns from both sides.
- *
- * Height is left alone on purpose: every glyph keeping the full design height
- * means baselines line up automatically wherever they are laid out, with no
- * per-glyph offset table. Only the width needs to be tight, or an I would carry
- * as much side padding as a W.
- */
+/** Trim transparent columns; keep full height so baselines align everywhere. */
 function cropWidth(buf, w, h) {
   let left = w, right = -1;
   for (let y = 0; y < h; y++) {
@@ -164,12 +261,9 @@ function cropWidth(buf, w, h) {
     }
   }
   if (right < left) return { buf, w, h };
-
   const pad = Math.round(4 * SCALE);
-  const x0 = Math.max(0, left - pad);
-  const x1 = Math.min(w - 1, right + pad);
+  const x0 = Math.max(0, left - pad), x1 = Math.min(w - 1, right + pad);
   const nw = x1 - x0 + 1;
-
   const out = Buffer.alloc(nw * h * 4);
   for (let y = 0; y < h; y++) {
     buf.copy(out, y * nw * 4, (y * w + x0) * 4, (y * w + x1 + 1) * 4);
@@ -180,36 +274,41 @@ function cropWidth(buf, w, h) {
 mkdirSync(OUT, { recursive: true });
 
 const manifest = {};
-let index = 0;
-for (const [name, paths] of Object.entries(LETTERS)) {
-  const colour = PALETTE[index++ % PALETTE.length];
-  const raw = render(paths, colour, SCALE);
+for (const [name, def] of Object.entries(LETTERS)) {
+  const raw = render(def, COLOURS[name] ?? 0xfbd268, SCALE);
   const { buf, w, h } = cropWidth(raw.buf, raw.w, raw.h);
   writeFileSync(join(OUT, `${name}.png`), encodePng(w, h, buf));
   manifest[name] = { w, h };
 }
-
 writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));
-console.log(`Wrote ${Object.keys(LETTERS).length} glyphs at ${W * SCALE}x${H * SCALE} to public/letters/`);
+console.log(`Wrote ${Object.keys(LETTERS).length} glyphs at ${W * SCALE}x${H * SCALE}`);
 
 // ------------------------------------------------------------- contact sheet
 
 const COLS = 8;
 const rows = Math.ceil(Object.keys(LETTERS).length / COLS);
-const cell = 120;
+const cell = 130;
 const sheet = new Canvas(COLS * cell, rows * cell);
-index = 0;
-for (const [, paths] of Object.entries(LETTERS)) {
-  const col = index % COLS, row = Math.floor(index / COLS);
-  const colour = PALETTE[index % PALETTE.length];
+let i = 0;
+for (const [name, def] of Object.entries(LETTERS)) {
+  const col = i % COLS, row = Math.floor(i / COLS);
   const k = cell / H;
   const ox = col * cell + (cell - W * k) / 2, oy = row * cell;
-  const body = any(...paths.map((p) => stroke(p, T)));
-  const outline = any(...paths.map((p) => stroke(p, T + OUTLINE)));
-  sheet.fill((px, py) => outline((px - ox) / k, (py - oy) / k), darken(colour, 0.58));
+  const colour = rgb(COLOURS[name] ?? 0xfbd268);
+  const body = def.cuts.length
+    ? minus(any(...def.fills.map((f) => f(0))), any(...def.cuts.map((c2) => c2(0))))
+    : any(...def.fills.map((f) => f(0)));
+  const outline = def.cuts.length
+    ? minus(any(...def.fills.map((f) => f(O))), any(...def.cuts.map((c2) => c2(-O))))
+    : any(...def.fills.map((f) => f(O)));
+  sheet.fill((px, py) => outline((px - ox) / k, (py - oy) / k), darken(colour, 0.45));
   sheet.fill((px, py) => body((px - ox) / k, (py - oy) / k), colour);
-  index++;
+  for (const [x, y, rx, ry, tilt] of def.shines) {
+    const dx = Math.sin(tilt) * ry * 0.8, dy = Math.cos(tilt) * ry * 0.8;
+    const sh = all(body, capsule(x - dx, y - dy, x + dx, y + dy, rx));
+    sheet.fill((px, py) => sh((px - ox) / k, (py - oy) / k), [255, 255, 255], 0.92);
+  }
+  i++;
 }
-// Review artifact, not a game asset — kept out of public/ so it never ships.
 writeFileSync(join(OUT, '..', '..', 'letters-sheet.png'), encodePng(sheet.width, sheet.height, sheet.buf));
 console.log('Wrote letters-sheet.png (repo root) for review');
