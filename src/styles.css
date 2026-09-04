@@ -33,14 +33,42 @@ body {
   color: var(--ink);
   font-family: 'Baloo 2', 'Quicksand', ui-rounded, system-ui, -apple-system, sans-serif;
   font-size: 17px;
-  /* The brief asks for a spear cursor; hotspot at the spear tip. */
-  cursor: url('/cursor-spear.png') 38 3, auto;
+  /* Fallback for before the animated follower mounts. Hotspot is the grip. */
+  cursor: url('/cursor-axe.png') 35 37, auto;
 }
 
 /* Touch devices have no cursor, and a custom one costs a needless request. */
 @media (hover: none) {
   body { cursor: auto; }
 }
+
+/* ------------------------------------------------------------- axe cursor */
+
+/* Only once the follower exists — otherwise a JS failure leaves no pointer. */
+.axe-cursor-on,
+.axe-cursor-on body,
+.axe-cursor-on button,
+.axe-cursor-on a,
+.axe-cursor-on input,
+.axe-cursor-on label,
+.axe-cursor-on .card {
+  cursor: none;
+}
+
+/* Text fields keep a real caret — an axe gives no idea where you are typing. */
+.axe-cursor-on input[type='text'] { cursor: text; }
+
+.axe-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform;
+}
+
+.axe-cursor img { display: block; }
 
 button, a, input, label { cursor: inherit; }
 
