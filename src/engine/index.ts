@@ -4,13 +4,26 @@
  * Consumers import from here and nothing deeper. Everything below this file is
  * an implementation detail and free to change.
  *
- * Currently exposes the stage, the sprite rig, bubble lettering, the animation
- * primitive library, and choreography playback. The AI backend lands next.
+ * Currently exposes the stage, the sprite rig with procedural limbs, bubble
+ * lettering, the effect sprite library, the animation primitives, and
+ * choreography playback.
  */
 
 export { BattleStage } from './BattleStage';
 export { Fighter } from './Fighter';
 export { BubbleText, type BubbleTextOptions } from './BubbleText';
+export { Limb } from './Limb';
+export {
+  EFFECT_KINDS,
+  isEffectKind,
+  effectUrl,
+  preloadEffects,
+  spawnEffect,
+  despawnEffect,
+  type EffectKind,
+  type SpawnOptions,
+} from './effects';
+export { sampleDominantColour } from './colour';
 export {
   palette,
   battlegrounds,

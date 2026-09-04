@@ -1,4 +1,6 @@
 import { Container, Sprite, Texture, Assets } from 'pixi.js';
+import { Limb } from './Limb';
+import { sampleDominantColour } from './colour';
 import type { FighterOptions, HandAnchor, Facing } from './types';
 
 const DEFAULT_ANCHOR: HandAnchor = { x: 0.42, y: 0.05 };
@@ -11,6 +13,7 @@ const WEAPON_HEIGHT_RATIO = 0.55;
  * Deliberately built as three nested containers:
  *
  *   root          moved by locomotion primitives (move_to, charge, jump)
+ *    +- limbs     procedural leg and arm, drawn behind the body
  *    +- body      the character PNG; squashed/rotated by body primitives
  *    +- hand      sits at the anchor point; weapon primitives rotate THIS
  *        +- weapon    the weapon PNG
@@ -18,11 +21,19 @@ const WEAPON_HEIGHT_RATIO = 0.55;
  * The separate `hand` pivot is what lets a weapon swing or spin independently
  * of the body while still travelling with it — rotating `hand` sweeps the
  * weapon through an arc around the grip rather than around its own centre.
+ *
+ * Limbs sit behind the body so they appear to emerge from the character
+ * rather than being pasted on top of the drawing.
  */
 export class Fighter {
   readonly root = new Container();
+  readonly limbs = new Container();
   readonly body = new Container();
   readonly hand = new Container();
+
+  /** Procedural limbs, hidden until a melee move extends them. */
+  leg!: Limb;
+  arm!: Limb;
 
   readonly name: string;
   readonly weaponName: string;
@@ -43,6 +54,7 @@ export class Fighter {
       options.weaponHeight ?? this.targetHeight * WEAPON_HEIGHT_RATIO;
     this._facing = options.facing ?? 'right';
 
+    this.root.addChild(this.limbs);
     this.root.addChild(this.body);
     this.root.addChild(this.hand);
   }
@@ -75,8 +87,34 @@ export class Fighter {
     this.weaponSprite.scale.set(this.targetWeaponHeight / weaponTexture.height);
     this.hand.addChild(this.weaponSprite);
 
+    this.buildLimbs(characterTexture);
     this.positionHand();
     this.applyFacing();
+  }
+
+  /**
+   * Creates the leg and arm, tinted to match the character's own artwork.
+   *
+   * Thickness scales with the sprite so a small character doesn't get
+   * comically thick limbs and a large one doesn't get spindly ones.
+   */
+  private buildLimbs(characterTexture: Texture): void {
+    const colour = sampleDominantColour(characterTexture);
+    const scale = this.targetHeight / 320;
+
+    this.leg = new Limb(colour, 24 * scale, 19 * scale);
+    this.arm = new Limb(colour, 19 * scale, 15 * scale);
+
+    const width = this.bodySprite.width;
+    const height = this.bodySprite.height;
+
+    // Leg from the lower body, arm from the upper — both offset forward so
+    // they read as reaching toward the opponent.
+    this.leg.view.position.set(width * 0.06, -height * 0.16);
+    this.arm.view.position.set(width * 0.14, -height * 0.56);
+
+    this.limbs.addChild(this.leg.view);
+    this.limbs.addChild(this.arm.view);
   }
 
   /** Places the hand container at the anchor offset from the body's centre. */
@@ -155,6 +193,8 @@ export class Fighter {
    */
   resetPose(): void {
     this.reattachWeapon();
+    this.leg.hide();
+    this.arm.hide();
     this.body.position.set(0, 0);
     this.body.rotation = 0;
     this.body.scale.set(1, 1);
@@ -172,6 +212,8 @@ export class Fighter {
   }
 
   destroy(): void {
+    this.leg.destroy();
+    this.arm.destroy();
     this.root.destroy({ children: true });
   }
 }

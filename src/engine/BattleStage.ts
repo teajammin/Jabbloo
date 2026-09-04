@@ -20,12 +20,15 @@ const SPAWN_INSET = 0.24;
  *   world      everything shakeable; shake_screen offsets THIS, not the canvas
  *    +- ground     floor line
  *    +- fighters   the combatants
+ *    +- effects    projectiles, beams, impacts — drawn over the fighters
  *   overlay    future UI (health bars, damage numbers) — immune to shake
  */
 export class BattleStage {
   readonly app: Application;
   readonly world = new Container();
   readonly fighters = new Container();
+  /** Where projectiles, beams and impacts live. Above fighters, below UI. */
+  readonly effects = new Container();
   readonly overlay = new Container();
 
   private readonly backdrop = new Graphics();
@@ -59,6 +62,7 @@ export class BattleStage {
     this.world.addChild(this.backdrop);
     this.world.addChild(this.ground);
     this.world.addChild(this.fighters);
+    this.world.addChild(this.effects);
     this.app.stage.addChild(this.world);
     this.app.stage.addChild(this.overlay);
 
@@ -125,6 +129,7 @@ export class BattleStage {
    */
   reset(): void {
     this.world.position.set(0, 0);
+    this.effects.removeChildren().forEach((child) => child.destroy());
     for (const [fighter, side] of this.sides) {
       fighter.resetPose();
       this.place(fighter, side);

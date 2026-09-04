@@ -7,10 +7,14 @@
  * anything needed here but not exported there means the API is wrong.
  */
 
+import gsap from 'gsap';
 import {
   BattleStage,
   BubbleText,
   Fighter,
+  EFFECT_KINDS,
+  preloadEffects,
+  spawnEffect,
   battlegrounds,
   parseChoreography,
   playChoreography,
@@ -33,6 +37,9 @@ const $ = <T extends HTMLElement>(sel: string): T => {
 };
 
 const stage = new BattleStage({ parent: $('#stage'), battleground: 'meadow' });
+
+// Effects are preloaded so a move never has to await mid-timeline.
+await preloadEffects();
 
 const [left, right] = await Promise.all([
   Fighter.create({
@@ -185,6 +192,64 @@ $('#play').addEventListener('click', () => {
   status.textContent = fellBack ? 'unusable → default bonk' : 'playing…';
   play(choreography);
 });
+
+// --- Toolkit preview (task 5) ----------------------------------------------
+//
+// Temporary scaffolding so the new effect sprites and limbs can be eyeballed
+// before the moves that use them exist. Task 6 replaces this with real moves.
+
+const toolkit = $('#toolkit');
+
+for (const kind of EFFECT_KINDS) {
+  const button = document.createElement('button');
+  button.textContent = kind;
+  button.className = 'ghost';
+  button.addEventListener('click', () => {
+    playback?.stop();
+    stage.reset();
+    const sprite = spawnEffect(stage.effects, kind, {
+      x: stage.width / 2,
+      y: stage.height * 0.55,
+      height: 220,
+    });
+    gsap.fromTo(
+      sprite,
+      { alpha: 0 },
+      { alpha: 1, duration: 0.15 },
+    );
+    gsap.fromTo(
+      sprite.scale,
+      { x: sprite.scale.x * 0.4, y: sprite.scale.y * 0.4 },
+      { x: sprite.scale.x, y: sprite.scale.y, duration: 0.45, ease: 'back.out(2)' },
+    );
+    status.textContent = `effect: ${kind}`;
+  });
+  toolkit.appendChild(button);
+}
+
+const limbButton = document.createElement('button');
+limbButton.textContent = '🦵 limb test';
+limbButton.addEventListener('click', () => {
+  playback?.stop();
+  stage.reset();
+  left.leg.show();
+  left.arm.show();
+  const legState = { angle: Math.PI / 2, length: 10 };
+  const armState = { angle: Math.PI / 2, length: 10 };
+  gsap.to(legState, {
+    angle: 0.15, length: 130, duration: 0.35, ease: 'back.out(2.5)',
+    onUpdate: () => left.leg.set(legState.angle, legState.length),
+    yoyo: true, repeat: 1, repeatDelay: 0.5,
+  });
+  gsap.to(armState, {
+    angle: -0.5, length: 95, duration: 0.3, ease: 'back.out(2.5)', delay: 0.15,
+    onUpdate: () => left.arm.set(armState.angle, armState.length),
+    yoyo: true, repeat: 1, repeatDelay: 0.4,
+    onComplete: () => { left.leg.hide(); left.arm.hide(); },
+  });
+  status.textContent = 'limb rig: kick + punch';
+});
+toolkit.appendChild(limbButton);
 
 // --- AI choreographer ------------------------------------------------------
 
