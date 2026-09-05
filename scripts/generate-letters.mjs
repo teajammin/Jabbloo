@@ -60,6 +60,18 @@ const VW = VR - VL, VH = VB - VT;
 const SL = VL + 58;
 const SW = VR - SL;
 
+/**
+ * Bowl geometry for B, D, P and R.
+ *
+ * A bowl tangent to the flat top touches it at a single point. If that point
+ * sits to the right of the stem, the top edge dips between the two — the seam
+ * that made these letters look like a line joined onto a shape. Putting the
+ * tangent point INSIDE the stem closes the gap, so stem and bowl read as one
+ * mass.
+ */
+const BX = SL + 50;
+const BRX = VR - BX;
+
 // ------------------------------------------------------------ shape factories
 // Each returns (d) => shape, where d inflates or deflates it.
 
@@ -164,12 +176,12 @@ const LETTERS = {
     [Both(
       Union(
         Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)),
-        BOWL(SL + 84, VT + 70, 92, 70),
-        BOWL(SL + 88, VB - 72, 92, 72),
+        BOWL(BX, VT + 70, BRX, 70),
+        BOWL(BX, VB - 72, BRX, 72),
       ),
       Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(SL + 112, VT + 70, HOLE_R), Hole(SL + 116, VB - 72, HOLE_R)],
+    [Hole(BX + 48, VT + 70, HOLE_R), Hole(BX + 52, VB - 72, HOLE_R)],
     [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 40, VB - 44, 12, 26, 0.15]],
   ),
   C: g([P(...arc(MX, MY, 78, 76, 54, 306))], [], [[MX - 34, TOP + 34, 13, 30, -0.7]]),
@@ -178,10 +190,10 @@ const LETTERS = {
   // not what the reference does.
   D: g(
     [Both(
-      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(SL + 76, MY, 96, VH / 2)),
+      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(BX, MY, BRX, VH / 2)),
       Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(SL + 104, MY, HOLE_R)],
+    [Hole(BX + 44, MY, HOLE_R)],
     [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 108, VB - 66, 12, 26, -0.5]],
   ),
   // Deeper notches with rounder arm tips: corner radius up so the right ends
@@ -265,10 +277,10 @@ const LETTERS = {
   // Stem is a stadium, so its foot is perfectly round.
   P: g(
     [Both(
-      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(SL + 78, VT + 68, 96, 68)),
+      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(BX, VT + 68, BRX, 68)),
       Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(SL + 106, VT + 68, HOLE_R)],
+    [Hole(BX + 44, VT + 68, HOLE_R)],
     [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 26, VB - 46, 12, 26, 0.15]],
   ),
   Q: g(
@@ -281,11 +293,11 @@ const LETTERS = {
   // which made the left one look short.
   R: g(
     [Both(
-      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(SL + 76, VT + 66, 96, 66)),
+      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(BX, VT + 66, BRX, 66)),
       Rect(SL, VT, SW, VH, 34),
     ),
      Pt(34, [SL + 52, VT + 136], [VR - 40, VB - 34])],
-    [Hole(SL + 102, VT + 66, HOLE_R)],
+    [Hole(BX + 42, VT + 66, HOLE_R)],
     [[SL + 26, VT + 46, 13, 34, 0.1]],
   ),
   // Thicker and rounder, with more turns through the waist.
