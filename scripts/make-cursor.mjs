@@ -1,102 +1,89 @@
 /**
  * Draws the axe cursor.
  *
- *   cursor-axe.png        44px — the CSS cursor, used before JS loads and on
- *                         devices where the follower is disabled
+ *   cursor-axe.png        44px — the CSS cursor, used before JS loads and
+ *                         wherever the animated follower is disabled
  *   cursor-axe-large.png  176px — the DOM follower that actually swings
+ *
+ * Flat style with no dark outline, matching the reference art: a gold
+ * double-bit head with a pale inner bevel, a steel shaft with red diamond
+ * bindings, and a red arrowhead pommel.
  *
  *   node scripts/make-cursor.mjs
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Canvas, encodePng, capsule, ellipse, star, minus, any, all, C } from './lib/raster.mjs';
+import { Canvas, encodePng, capsule, ellipse, star, minus, any } from './lib/raster.mjs';
+
+/**
+ * A diamond: a square on its corner.
+ *
+ * star() with a small inner radius gives needle spikes — an X, not a diamond.
+ * Straight edges need the inner radius at about 0.72 of the outer, which is
+ * where linear interpolation between the two approximates |x|+|y| <= r.
+ */
+const diamond = (x, y, r) => star(x, y, 4, r * 0.72, r, Math.PI / 4, 1);
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 mkdirSync(OUT, { recursive: true });
 
-/**
- * The axe, drawn at any size.
- *
- * Blade at the top-left so the cutting edge sits under the pointer hotspot;
- * handle running down to the lower right, the way a held axe reads.
- *
- * @param s pixels of the square canvas
- */
-// Palette for the axe specifically: silver blades, gold collar, rust handle.
-const STEEL = [214, 217, 222];
-const STEEL_DARK = [140, 148, 160];
-const RUST = [178, 84, 56];
-const GOLD = [252, 196, 68];
+const GOLD = [255, 184, 28];
+const CREAM = [255, 240, 186];
+const STEEL = [176, 178, 182];
+const STEEL_LIGHT = [214, 216, 220];
+const RED = [232, 56, 44];
 
 /**
- * A double-bladed battle axe, matching the reference art.
- *
- * Each blade is a disc with a disc bitten out of its inner side, giving the
- * curved cutting edge; the two are mirrored about the head so they read as one
- * symmetric head rather than two separate crescents.
- *
  * @param s pixels of the square canvas
+ *
+ * The shaft runs bottom-left to top-right, so the two bits flare perpendicular
+ * to it — up-left and down-right. Each is a disc with a larger disc bitten out
+ * of its inner side; the bite has to swallow the blade's own centre or the
+ * result is a disc with a nick rather than a crescent.
  */
 function axe(s) {
   const c = new Canvas(s, s);
-  const u = s / 176;              // authored at 176px, scaled to fit
+  const u = s / 176;
   const px = (v) => v * u;
-  const o = px(8);                // outline weight
 
-  const hx = px(76), hy = px(76); // head centre
+  // --- shaft ---------------------------------------------------------------
+  c.fill(capsule(px(26), px(150), px(146), px(30), px(7.5)), STEEL);
+  c.fill(capsule(px(30), px(146), px(142), px(34), px(2.6)), STEEL_LIGHT);
 
-  // --- handle, drawn first so the head covers the joint --------------------
-  const gripA = [px(80), px(80), px(150), px(150)];
-  c.fill(capsule(...gripA, px(12) + o), [40, 38, 46]);
-  c.fill(capsule(...gripA, px(12)), RUST);
-  c.fill(capsule(px(96), px(96), px(138), px(138), px(3.5)), C.white, 0.28);
+  // Pommel and tip.
+  c.fill(diamond(px(20), px(156), px(15)), RED);
+  c.fill(diamond(px(150), px(26), px(11)), RED);
 
-  // Gold band partway down the shaft.
-  c.fill(capsule(px(106), px(106), px(122), px(122), px(12) + o * 0.8), [40, 38, 46]);
-  c.fill(capsule(px(106), px(106), px(122), px(122), px(12)), GOLD);
+  // --- head ----------------------------------------------------------------
+  // Each bit is a bar lying ALONG the shaft, offset out to one side, with a
+  // circle centred on the shaft carving its inner edge concave. Biting one
+  // disc out of another instead pushes the blades away from the shaft, because
+  // the bite has to be large enough to hollow the disc and takes the middle
+  // with it.
+  const hx = px(88), hy = px(88);
+  const k = 0.7071;
+  const outA = px(42), Rb = px(62), waist = px(46);
+  const ox = outA * k;
 
-  // Pommel.
-  c.fill(ellipse(px(152), px(152), px(13) + o, px(13) + o), [40, 38, 46]);
-  c.fill(ellipse(px(152), px(152), px(13), px(13)), STEEL);
-
-  // --- blades ---------------------------------------------------------------
-  // The handle runs down-right, so the two bits flare perpendicular to it:
-  // one up-right, one down-left. Offsetting them along the handle instead makes
-  // the crescents overlap and fill in as a single disc.
-  // The bite must swallow the blade's own centre, or the subtraction leaves a
-  // near-whole disc rather than a crescent.
-  const R = px(46), BITE = px(56), off = px(28), back = px(4);
-
-  const upA = [hx + off, hy - off];        // up-right bit
-  const upBite = [hx - back, hy + back];
-  const dnA = [hx - off, hy + off];        // down-left bit
-  const dnBite = [hx + back, hy - back];
-
-  const bladeA = minus(ellipse(upA[0], upA[1], R, R), ellipse(upBite[0], upBite[1], BITE, BITE));
-  const bladeB = minus(ellipse(dnA[0], dnA[1], R, R), ellipse(dnBite[0], dnBite[1], BITE, BITE));
-
-  const outlineA = minus(
-    ellipse(upA[0], upA[1], R + o, R + o),
-    ellipse(upBite[0], upBite[1], BITE - o * 0.5, BITE - o * 0.5),
-  );
-  const outlineB = minus(
-    ellipse(dnA[0], dnA[1], R + o, R + o),
-    ellipse(dnBite[0], dnBite[1], BITE - o * 0.5, BITE - o * 0.5),
+  // Each bit is a disc set out to one side of the shaft, with a circle centred
+  // ON the shaft carving its inner edge. That yields a fan — fat at the cutting
+  // edge, tapering where it meets the haft. Carving with a disc centred on the
+  // OPPOSITE bit instead pushes both blades away from the shaft entirely.
+  const bit = (sign, r, cut) => minus(
+    ellipse(hx + sign * ox, hy + sign * ox, r, r),
+    ellipse(hx, hy, cut, cut),
   );
 
-  c.fill(any(outlineA, outlineB), [40, 38, 46]);
-  c.fill(any(bladeA, bladeB), STEEL);
+  c.fill(any(bit(-1, Rb, waist), bit(1, Rb, waist)), GOLD);
+  c.fill(any(bit(-1, Rb - px(11), waist + px(8)), bit(1, Rb - px(11), waist + px(8))), CREAM);
 
-  // Shade the inner half of each bit, shine along the outer cutting edge.
-  c.fill(all(bladeA, ellipse(hx + px(20), hy - px(20), px(34), px(34))), STEEL_DARK, 0.4);
-  c.fill(all(bladeB, ellipse(hx - px(20), hy + px(20), px(34), px(34))), STEEL_DARK, 0.4);
-  c.fill(all(bladeA, ellipse(hx + px(48), hy - px(40), px(12), px(8))), C.white, 0.8);
-  c.fill(all(bladeB, ellipse(hx - px(40), hy + px(48), px(8), px(12))), C.white, 0.8);
-
-  // --- gold collar where the bits meet the shaft ----------------------------
-  c.fill(star(hx, hy, 4, px(9), px(25), Math.PI / 4, 1.6), [40, 38, 46]);
-  c.fill(star(hx, hy, 4, px(7), px(20), Math.PI / 4, 1.6), GOLD);
+  // --- bindings ------------------------------------------------------------
+  // Redrawn over the head so the shaft reads as passing through it.
+  c.fill(capsule(px(70), px(106), px(106), px(70), px(7.5)), STEEL);
+  c.fill(capsule(px(73), px(103), px(103), px(73), px(2.6)), STEEL_LIGHT);
+  c.fill(diamond(px(62), px(114), px(13)), RED);
+  c.fill(diamond(px(114), px(62), px(13)), RED);
 
   return c;
 }

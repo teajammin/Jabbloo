@@ -106,13 +106,13 @@ const LETTERS = {
   B: g(
     [Both(
       Union(
-        Rect(VL, VT, 116, VH, 72),
+        Rect(VL, VT, 116, VH, 84),
         BOWL(VL + 128, VT + 62, 112, 86),
         BOWL(VL + 132, VB - 64, 112, 88),
       ),
-      // Generous corners, but well short of half the height, so the top and
-      // bottom keep a genuine flat run rather than becoming a stadium.
-      Rect(VL, VT, VW, VH, 72),
+      // Very generous corners — the letter should read as inflated — but still
+      // short of half the height, so the top and bottom keep a flat run.
+      Rect(VL, VT, VW, VH, 84),
     )],
     [Hole(VL + 166, VT + 66, HOLE_R), Hole(VL + 170, VB - 68, HOLE_R)],
     [[VL + 38, VT + 44, 14, 34, 0.1], [VL + 52, VB - 42, 12, 26, 0.15]],
