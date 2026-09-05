@@ -440,3 +440,92 @@ input[type='text'] {
   }
   .zone { min-height: 110px; }
 }
+
+/* ------------------------------------------------------------ drawing screen */
+
+.screen-draw {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 12px 20px;
+}
+
+.draw-title { margin: 0; font-size: 15px; }
+
+.draw-stage {
+  width: min(560px, 100%);
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  /* Stops the browser panning or zooming the page while drawing. */
+  touch-action: none;
+}
+
+.draw-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* A pen icon would fight the axe follower; the axe reads fine here. */
+  touch-action: none;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(560px, 100%);
+}
+
+.tool-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+/* Every control clears the 44px minimum tap target. */
+.tool {
+  min-width: 52px;
+  min-height: 52px;
+  padding: 8px 12px;
+  font-size: 20px;
+  border-radius: 18px;
+}
+
+.tool.wide { min-width: 84px; font-size: 15px; }
+.tool[aria-pressed='true'] { background: var(--lavender); }
+
+.size {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: #fff;
+  border: none;
+  box-shadow: var(--shadow);
+}
+
+.size[aria-pressed='true'] { background: var(--mint); }
+.size-dot { display: block; border-radius: 50%; background: var(--ink); }
+
+.swatch {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  box-shadow: var(--shadow);
+  min-height: 40px;
+}
+
+.swatch[aria-pressed='true'] { box-shadow: 0 0 0 3px var(--ink), var(--shadow); }
+.swatch.custom { padding: 2px; background: #fff; cursor: inherit; }
+
+@media (max-width: 420px) {
+  .tool { min-width: 46px; min-height: 46px; font-size: 18px; }
+  .size { width: 46px; height: 46px; }
+  .swatch { width: 34px; height: 34px; min-height: 34px; }
+}
