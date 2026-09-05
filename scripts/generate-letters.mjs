@@ -59,6 +59,10 @@ const Rect = (x, y, w, h, r) => (d) => roundedRect(x - d, y - d, w + 2 * d, h + 
 const Slit = (x1, y1, x2, y2, r) => (d) => capsule(x1, y1, x2, y2, r + d);
 const Hole = (x, y, r) => (d) => ellipse(x, y, r + d, r + d);
 
+/** Union / intersection of shape factories, so a glyph can be clipped. */
+const Union = (...fs) => (d) => any(...fs.map((f) => f(d)));
+const Both = (...fs) => (d) => all(...fs.map((f) => f(d)));
+
 function strokePath(points, radius) {
   if (points.length === 1) return ellipse(points[0][0], points[0][1], radius, radius);
   const segs = [];
@@ -93,15 +97,23 @@ const LETTERS = {
     [Hole(MX - 2, 124, HOLE_R)],
     [[62, 120, 12, 44, -0.2], [MX + 30, 186, 10, 26, 0.1]],
   ),
-  // Two big overlapping lobes over a left block. The waist is the natural gap
-  // where the lobes' right edges recede — punching a notch into a straight
-  // edge instead gives a rounded rectangle with a bite, not a B.
+  // Flat top and bottom with the curvature on the right.
+  //
+  // The lobes are drawn taller than the letter and then clipped to a
+  // straight-edged box: letting them dome instead gives a rounded blob, and
+  // flattening them by shrinking the ellipses loses the bulge that makes the
+  // waist read. The pinch is the gap where the two lobes' right edges recede.
   B: g(
-    [Rect(VL, VT, 116, VH, 52),
-     BOWL(VL + 128, VT + 70, 112, 70),
-     BOWL(VL + 132, VB - 72, 112, 72)],
-    [Hole(VL + 166, VT + 70, HOLE_R), Hole(VL + 170, VB - 72, HOLE_R)],
-    [[VL + 38, VT + 46, 14, 36, 0.1], [VL + 52, VB - 44, 12, 26, 0.15]],
+    [Both(
+      Union(
+        Rect(VL, VT, 116, VH, 44),
+        BOWL(VL + 128, VT + 62, 112, 86),
+        BOWL(VL + 132, VB - 64, 112, 88),
+      ),
+      Rect(VL, VT, VW, VH, 46),
+    )],
+    [Hole(VL + 166, VT + 66, HOLE_R), Hole(VL + 170, VB - 68, HOLE_R)],
+    [[VL + 38, VT + 44, 14, 34, 0.1], [VL + 52, VB - 42, 12, 26, 0.15]],
   ),
   C: g([P(...arc(MX, MY, 78, 76, 54, 306))], [], [[MX - 34, TOP + 34, 13, 30, -0.7]]),
   D: g(
