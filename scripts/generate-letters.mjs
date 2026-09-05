@@ -124,7 +124,7 @@ function arc(cx, cy, rx, ry, a0, a1, steps = 26) {
 const g = (fills, cuts = [], shines = []) => ({ fills, cuts, shines });
 
 // A pinhole counter plus the shine that usually sits beside it.
-const HOLE_R = 11;
+const HOLE_R = 22;
 
 // ---------------------------------------------------------------------- glyphs
 
@@ -169,21 +169,32 @@ const LETTERS = {
   ),
   // Deeper notches with rounder arm tips: corner radius up so the right ends
   // curve rather than running straight between corners.
+  // Built from a stem plus horizontal bars, unioned — not a block with slits
+  // cut out of it. A cut can only ever make concave curves, so the corners
+  // where a slit met the right edge stayed square no matter how the slit was
+  // shaped. As rounded bars, every arm tip is a half-round cap: as curved as
+  // the corners at the top and bottom.
+  //
+  // Bars are 58 tall with 34 between them. The gap has to clear twice the
+  // outline weight plus daylight: at 16 the outline closed it to 4 units and
+  // the notches read as dark scratches rather than open gaps.
   E: g(
-    [Rect(VL, VT, VW, VH, 88)],
-    [Slit(VR + 60, VT + 73, VL + 160, VT + 73, 15),
-     Slit(VR + 60, VB - 73, VL + 160, VB - 73, 15)],
-    [[VL + 34, VT + 42, 12, 30, 0], [VL + 34, VB - 44, 11, 24, 0]],
+    [Rect(VL, VT, 84, VH, 42),
+     Rect(VL, VT, VW, 58, 29),
+     Rect(VL, VT + 92, 176, 58, 29),
+     Rect(VL, VB - 58, VW, 58, 29)],
+    [],
+    [[VL + 32, VT + 100, 12, 26, 0], [VL + 32, VB - 96, 11, 22, 0]],
   ),
   F: g(
-    [Rect(VL, VT, VW, VH, 88)],
-    [Slit(VR + 60, VT + 78, VL + 160, VT + 78, 15),
-     // Big radius so the shoulder under the arm is a curve, not a corner.
-     Rect(VL + 112, MY + 30, VW, VH, 70)],
-    [[VL + 34, VT + 42, 12, 30, 0]],
+    [Rect(VL, VT, 84, VH, 42),
+     Rect(VL, VT, VW, 58, 29),
+     Rect(VL, VT + 92, 176, 58, 29)],
+    [],
+    [[VL + 32, VT + 100, 12, 26, 0], [VL + 32, VB - 60, 11, 24, 0]],
   ),
   G: g(
-    [Pt(29, ...arc(MX, MY, 88, 86, 52, 308)), Pt(27, [MX + 36, MY - 14], [R - 26, MY - 14])],
+    [Pt(29, ...arc(MX, MY, 88, 86, 52, 308)), Pt(27, [MX + 4, MY + 30], [MX + 78, MY + 30])],
     [],
     [[MX - 38, TOP + 30, 13, 30, -0.7]],
   ),
