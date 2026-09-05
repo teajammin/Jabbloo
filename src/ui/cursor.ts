@@ -26,11 +26,17 @@ export function reparentCursor(parent: HTMLElement | null): void {
   (parent ?? document.body).appendChild(cursorRoot);
 }
 
-/** Follower size in CSS pixels. The art is authored at 176. */
-const SIZE = 88;
-/** Grip position within the art, at that size. */
-const GRIP_X = 70;
-const GRIP_Y = 74;
+/** Follower size in CSS pixels. */
+const SIZE = 84;
+/**
+ * Where the pointer sits within the art, as a fraction of its size.
+ *
+ * The lower shaft, where a hand would hold it — not the blade. A click pivots
+ * about this point, so putting it at the grip makes the head sweep the way a
+ * real swing does.
+ */
+const GRIP_X = Math.round(SIZE * 0.3);
+const GRIP_Y = Math.round(SIZE * 0.7);
 
 export function initAxeCursor(): () => void {
   // Touch has no pointer to follow, and coarse pointers get the native cursor.

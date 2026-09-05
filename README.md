@@ -117,6 +117,15 @@ reads as a bug.
 
 ---
 
+## Assets
+
+`public/letters/` and `public/effects/` are generated — `npm run gen:letters`,
+`npm run gen:effects`. Both are original artwork drawn procedurally, so they can
+be re-rendered at any resolution.
+
+`public/cursor-axe*.png` is supplied artwork, not generated. Check its licence
+before release and add attribution to the credits screen if required.
+
 ## Repository
 
 Branching follows a **main + dev** strategy.

@@ -106,22 +106,30 @@ const LETTERS = {
   B: g(
     [Both(
       Union(
-        Rect(VL, VT, 116, VH, 84),
+        Rect(VL, VT, 116, VH, 90),
         BOWL(VL + 128, VT + 62, 112, 86),
         BOWL(VL + 132, VB - 64, 112, 88),
       ),
       // Very generous corners — the letter should read as inflated — but still
       // short of half the height, so the top and bottom keep a flat run.
-      Rect(VL, VT, VW, VH, 84),
+      Rect(VL, VT, VW, VH, 90),
     )],
     [Hole(VL + 166, VT + 66, HOLE_R), Hole(VL + 170, VB - 68, HOLE_R)],
     [[VL + 38, VT + 44, 14, 34, 0.1], [VL + 52, VB - 42, 12, 26, 0.15]],
   ),
   C: g([P(...arc(MX, MY, 78, 76, 54, 306))], [], [[MX - 34, TOP + 34, 13, 30, -0.7]]),
+  // Same construction as B: a block with a lobe clipped to a flat-edged box.
+  // A stroked stem plus a domed bowl gives round tops and bottoms, which is
+  // not what the reference does.
   D: g(
-    [P([L + 8, TOP], [L + 8, BOT]), BOWL(MX + 4, MY, VW / 2 - 12, VH / 2)],
-    [Hole(MX + 24, MY, HOLE_R)],
-    [[VL + 34, VT + 44, 12, 34, 0], [MX + 66, MY + 56, 12, 26, -0.6]],
+    [Both(
+      // The lobe has to stop short of the clip box, or the box's own rounded
+      // right edge becomes the silhouette and D reads as a rounded square.
+      Union(Rect(VL, VT, 116, VH, 90), BOWL(VL + 112, MY, 114, 138)),
+      Rect(VL, VT, VW, VH, 90),
+    )],
+    [Hole(VL + 152, MY, HOLE_R)],
+    [[VL + 38, VT + 46, 14, 36, 0.1], [VL + 140, VB - 66, 12, 26, -0.5]],
   ),
   E: g(
     [Rect(VL, VT, VW, VH, 66)],
@@ -177,9 +185,12 @@ const LETTERS = {
     [[MX - 66, VT + 46, 15, 36, -0.5], [MX + 70, VB - 56, 13, 28, -0.5]],
   ),
   P: g(
-    [P([L, TOP], [L, BOT]), BOWL(MX + 10, VT + 78, VW / 2 - 16, 78)],
-    [Hole(MX + 26, VT + 78, HOLE_R)],
-    [[VL + 32, VT + 44, 12, 32, 0], [MX + 60, VT + 132, 11, 22, -0.6]],
+    [Both(
+      Union(Rect(VL, VT, 116, VH, 90), BOWL(VL + 116, VT + 78, 110, 116)),
+      Rect(VL, VT, VW, VH, 90),
+    )],
+    [Hole(VL + 150, VT + 78, HOLE_R)],
+    [[VL + 38, VT + 46, 14, 36, 0.1], [VL + 52, VB - 46, 12, 26, 0.15]],
   ),
   Q: g(
     [BOWL(MX, MY, VW / 2 - 6, VH / 2 - 4), Pt(28, [MX + 60, MY + 72], [VR - 10, VB + 4])],
@@ -187,9 +198,13 @@ const LETTERS = {
     [[MX - 62, VT + 48, 15, 34, -0.5]],
   ),
   R: g(
-    [P([L, TOP], [L, BOT]), BOWL(MX + 6, VT + 74, VW / 2 - 24, 74), Pt(38, [L + 20, MY + 12], [R, BOT])],
-    [Hole(MX + 20, VT + 74, HOLE_R)],
-    [[VL + 32, VT + 44, 12, 30, 0]],
+    [Both(
+      Union(Rect(VL, VT, 116, VH, 90), BOWL(VL + 114, VT + 74, 106, 108)),
+      Rect(VL, VT, VW, VH, 90),
+    ),
+     Pt(38, [VL + 96, VT + 148], [VR - 30, VB - 12])],
+    [Hole(VL + 146, VT + 74, HOLE_R)],
+    [[VL + 38, VT + 46, 14, 36, 0.1]],
   ),
   S: g(
     [Pt(33, [192, 100], [144, 72], [88, 84], [74, 118], [108, 142],
