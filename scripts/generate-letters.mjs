@@ -170,27 +170,27 @@ const LETTERS = {
   // Deeper notches with rounder arm tips: corner radius up so the right ends
   // curve rather than running straight between corners.
   E: g(
-    [Rect(VL, VT, VW, VH, 92)],
-    [Slit(VR + 50, VT + 73, VL + 88, VT + 73, 15),
-     Slit(VR + 50, VB - 73, VL + 88, VB - 73, 15)],
+    [Rect(VL, VT, VW, VH, 110)],
+    [Slit(VR + 60, VT + 73, VL + 84, VT + 73, 15),
+     Slit(VR + 60, VB - 73, VL + 84, VB - 73, 15)],
     [[VL + 34, VT + 42, 12, 30, 0], [VL + 34, VB - 44, 11, 24, 0]],
   ),
   F: g(
-    [Rect(VL, VT, VW, VH, 92)],
-    [Slit(VR + 50, VT + 78, VL + 88, VT + 78, 15),
+    [Rect(VL, VT, VW, VH, 110)],
+    [Slit(VR + 60, VT + 78, VL + 84, VT + 78, 15),
      // Big radius so the shoulder under the arm is a curve, not a corner.
      Rect(VL + 96, MY + 28, VW, VH, 62)],
     [[VL + 34, VT + 42, 12, 30, 0]],
   ),
   G: g(
-    [Pt(34, ...arc(MX, MY, 82, 80, 54, 306)), Pt(32, [MX + 4, MY + 24], [R - 8, MY + 24])],
+    [Pt(29, ...arc(MX, MY, 88, 86, 52, 308)), Pt(27, [MX + 2, MY + 26], [R - 4, MY + 26])],
     [],
     [[MX - 38, TOP + 30, 13, 30, -0.7]],
   ),
   H: g(
-    [Rect(VL, VT, VW, VH, 72)],
-    // Notch radius matched to the corner radius so every curve reads the same.
-    [Slit(MX, VT - 60, MX, MY - 76, 46), Slit(MX, MY + 76, MX, VB + 60, 46)],
+    [Rect(VL, VT, VW, VH, 56)],
+    // Same radius inside and out, so every corner on the letter matches.
+    [Slit(MX, VT - 60, MX, MY - 78, 56), Slit(MX, MY + 78, MX, VB + 60, 56)],
     [[VL + 34, VT + 42, 12, 32, 0], [VR - 34, VB - 46, 11, 26, 0]],
   ),
   I: g([P([MX, TOP], [MX, BOT])], [], [[MX - 14, TOP + 28, 11, 34, 0]]),
