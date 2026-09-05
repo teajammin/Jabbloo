@@ -34,7 +34,7 @@ body {
   font-family: 'Baloo 2', 'Quicksand', ui-rounded, system-ui, -apple-system, sans-serif;
   font-size: 17px;
   /* Fallback for before the animated follower mounts. Hotspot is the grip. */
-  cursor: url('/cursor-axe.png') 13 31, auto;
+  cursor: url('/cursor-axe.png') 31 31, auto;
 }
 
 /* Touch devices have no cursor, and a custom one costs a needless request. */

@@ -35,7 +35,9 @@ const SIZE = 84;
  * about this point, so putting it at the grip makes the head sweep the way a
  * real swing does.
  */
-const GRIP_X = Math.round(SIZE * 0.3);
+// The art is mirrored so the head faces left, which puts the grip on the
+// right-hand side of the image.
+const GRIP_X = Math.round(SIZE * 0.7);
 const GRIP_Y = Math.round(SIZE * 0.7);
 
 export function initAxeCursor(): () => void {
