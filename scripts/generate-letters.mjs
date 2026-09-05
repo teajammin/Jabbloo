@@ -57,7 +57,7 @@ const VW = VR - VL, VH = VB - VT;
  * have. Insetting their left edge slims that side without touching the stroke
  * weight everywhere else.
  */
-const SL = VL + 58;
+const SL = VL + 30;
 const SW = VR - SL;
 
 /**
@@ -302,12 +302,14 @@ const LETTERS = {
   ),
   // Thicker and rounder, with more turns through the waist.
   S: g(
-    [Pt(36, ...smooth([
-      [198, 74], [148, 46], [84, 60], [58, 104], [96, 132], [132, 148],
-      [168, 170], [188, 210], [156, 246], [98, 256], [52, 232],
+    // Lighter stroke than before: re-proportioning shortened the curve, and at
+    // 36 the counters closed back into slivers.
+    [Pt(31, ...smooth([
+      [216, 76], [158, 62], [90, 75], [62, 111], [103, 134], [143, 147],
+      [182, 164], [204, 197], [169, 226], [103, 236], [52, 226],
     ]))],
     [],
-    [[104, 78, 12, 24, 0.5], [140, 214, 11, 22, 0.4]],
+    [[112, 90, 12, 24, 0.5], [151, 200, 11, 22, 0.4]],
   ),
   T: g(
     [P([L, TOP], [R, TOP]), P([MX, TOP], [MX, BOT])],
