@@ -146,9 +146,9 @@ const LETTERS = {
   B: g(
     [Both(
       Union(
-        Rect(SL, VT, 60, VH, 30),
-        BOWL(SL + 84, VT + 70, 92, 92),
-        BOWL(SL + 88, VB - 72, 92, 94),
+        Rect(SL, VT, 60, VH, 0),
+        BOWL(SL + 84, VT + 70, 92, 70),
+        BOWL(SL + 88, VB - 72, 92, 72),
       ),
       Rect(SL, VT, SW, VH, 34),
     )],
@@ -161,7 +161,7 @@ const LETTERS = {
   // not what the reference does.
   D: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 76, MY, 96, 138)),
+      Union(Rect(SL, VT, 60, VH, 0), BOWL(SL + 76, MY, 96, VH / 2)),
       Rect(SL, VT, SW, VH, 34),
     )],
     [Hole(SL + 104, MY, HOLE_R)],
@@ -171,27 +171,33 @@ const LETTERS = {
   // curve rather than running straight between corners.
   E: g(
     [Rect(VL, VT, VW, VH, 88)],
-    [Slit(VR + 60, VT + 73, VL + 84, VT + 73, 15),
-     Slit(VR + 60, VB - 73, VL + 84, VB - 73, 15)],
+    [Slit(VR + 60, VT + 73, VL + 160, VT + 73, 15),
+     Slit(VR + 60, VB - 73, VL + 160, VB - 73, 15)],
     [[VL + 34, VT + 42, 12, 30, 0], [VL + 34, VB - 44, 11, 24, 0]],
   ),
   F: g(
     [Rect(VL, VT, VW, VH, 88)],
-    [Slit(VR + 60, VT + 78, VL + 84, VT + 78, 15),
+    [Slit(VR + 60, VT + 78, VL + 160, VT + 78, 15),
      // Big radius so the shoulder under the arm is a curve, not a corner.
-     Rect(VL + 96, MY + 28, VW, VH, 62)],
+     Rect(VL + 112, MY + 30, VW, VH, 70)],
     [[VL + 34, VT + 42, 12, 30, 0]],
   ),
   G: g(
-    [Pt(29, ...arc(MX, MY, 88, 86, 52, 308)), Pt(27, [MX + 2, MY + 26], [R - 4, MY + 26])],
+    [Pt(29, ...arc(MX, MY, 88, 86, 52, 308)), Pt(27, [MX + 36, MY - 14], [R - 26, MY - 14])],
     [],
     [[MX - 38, TOP + 30, 13, 30, -0.7]],
   ),
+  // Built as two legs and a crossbar unioned, rather than a block with notches
+  // cut out of it. Cutting can only ever produce concave curves, so the corners
+  // where a notch met the outer edge stayed square however the cut was shaped.
+  // As three rounded rectangles, every corner carries the same radius by
+  // construction — inner and outer alike.
   H: g(
-    [Rect(VL, VT, VW, VH, 56)],
-    // Same radius inside and out, so every corner on the letter matches.
-    [Slit(MX, VT - 60, MX, MY - 78, 56), Slit(MX, MY + 78, MX, VB + 60, 56)],
-    [[VL + 34, VT + 42, 12, 32, 0], [VR - 34, VB - 46, 11, 26, 0]],
+    [Rect(VL, VT, 84, VH, 34),
+     Rect(VR - 84, VT, 84, VH, 34),
+     Rect(VL, MY - 42, VW, 84, 34)],
+    [],
+    [[VL + 32, VT + 42, 12, 32, 0], [VR - 32, VB - 46, 11, 26, 0]],
   ),
   I: g([P([MX, TOP], [MX, BOT])], [], [[MX - 14, TOP + 28, 11, 34, 0]]),
   J: g(
@@ -227,7 +233,7 @@ const LETTERS = {
   // Stem is a stadium, so its foot is perfectly round.
   P: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 78, VT + 68, 96, 100)),
+      Union(Rect(SL, VT, 60, VH, 0), BOWL(SL + 78, VT + 68, 96, 68)),
       Rect(SL, VT, SW, VH, 34),
     )],
     [Hole(SL + 106, VT + 68, HOLE_R)],
@@ -243,7 +249,7 @@ const LETTERS = {
   // which made the left one look short.
   R: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 76, VT + 66, 96, 66)),
+      Union(Rect(SL, VT, 60, VH, 0), BOWL(SL + 76, VT + 66, 96, 66)),
       Rect(SL, VT, SW, VH, 34),
     ),
      Pt(34, [SL + 52, VT + 136], [VR - 40, VB - 34])],
@@ -294,13 +300,16 @@ const LETTERS = {
   // Thinner, with clear air between the stroke and the dot.
   excl: g([Pt(31, [MX, TOP], [MX, 140]), Pt(31, [MX, BOT + 4])], [],
     [[MX - 12, TOP + 26, 10, 26, 0]]),
+  // Rebuilt: hook sweeping up and over, curling down into a short stem, with
+  // a clear gap before the ball.
   query: g(
-    // Lighter stroke and a wider hook: at the blob weight the curl closes on
-    // itself and the tail runs into the ball.
-    [Pt(28, ...smooth([...arc(MX, TOP + 64, 66, 60, 188, 392, 16), [MX + 16, 132], [MX, 152]], 4)),
-     Pt(31, [MX, BOT + 6])],
+    [Pt(30, ...smooth([
+      [MX - 58, VT + 74], [MX - 30, VT + 26], [MX + 24, VT + 24],
+      [MX + 58, VT + 66], [MX + 44, VT + 116], [MX + 4, VT + 138], [MX, VT + 150],
+    ], 8)),
+     Pt(30, [MX, BOT + 16])],
     [],
-    [[MX - 28, TOP + 22, 10, 22, 0.6]],
+    [[MX - 30, VT + 46, 11, 24, 0.5]],
   ),
   dot: g([P([MX, BOT - 6])], [], [[MX - 10, BOT - 22, 8, 14, 0]]),
   comma: g([P([MX, BOT - 26]), Pt(26, [MX + 6, BOT - 18], [MX - 16, BOT + 28])], [], []),
