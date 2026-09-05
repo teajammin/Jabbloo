@@ -57,7 +57,7 @@ const VW = VR - VL, VH = VB - VT;
  * have. Insetting their left edge slims that side without touching the stroke
  * weight everywhere else.
  */
-const SL = VL + 38;
+const SL = VL + 58;
 const SW = VR - SL;
 
 // ------------------------------------------------------------ shape factories
@@ -147,12 +147,12 @@ const LETTERS = {
     [Both(
       Union(
         Rect(SL, VT, 60, VH, 30),
-        BOWL(SL + 96, VT + 70, 100, 86),
-        BOWL(SL + 100, VB - 72, 100, 88),
+        BOWL(SL + 84, VT + 70, 92, 92),
+        BOWL(SL + 88, VB - 72, 92, 94),
       ),
       Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(SL + 128, VT + 70, HOLE_R), Hole(SL + 132, VB - 72, HOLE_R)],
+    [Hole(SL + 112, VT + 70, HOLE_R), Hole(SL + 116, VB - 72, HOLE_R)],
     [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 40, VB - 44, 12, 26, 0.15]],
   ),
   C: g([P(...arc(MX, MY, 78, 76, 54, 306))], [], [[MX - 34, TOP + 34, 13, 30, -0.7]]),
@@ -161,22 +161,22 @@ const LETTERS = {
   // not what the reference does.
   D: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 84, MY, 104, 138)),
+      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 76, MY, 96, 138)),
       Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(SL + 118, MY, HOLE_R)],
+    [Hole(SL + 104, MY, HOLE_R)],
     [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 108, VB - 66, 12, 26, -0.5]],
   ),
   // Deeper notches with rounder arm tips: corner radius up so the right ends
   // curve rather than running straight between corners.
   E: g(
-    [Rect(VL, VT, VW, VH, 110)],
+    [Rect(VL, VT, VW, VH, 88)],
     [Slit(VR + 60, VT + 73, VL + 84, VT + 73, 15),
      Slit(VR + 60, VB - 73, VL + 84, VB - 73, 15)],
     [[VL + 34, VT + 42, 12, 30, 0], [VL + 34, VB - 44, 11, 24, 0]],
   ),
   F: g(
-    [Rect(VL, VT, VW, VH, 110)],
+    [Rect(VL, VT, VW, VH, 88)],
     [Slit(VR + 60, VT + 78, VL + 84, VT + 78, 15),
      // Big radius so the shoulder under the arm is a curve, not a corner.
      Rect(VL + 96, MY + 28, VW, VH, 62)],
@@ -227,10 +227,10 @@ const LETTERS = {
   // Stem is a stadium, so its foot is perfectly round.
   P: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 86, VT + 68, 106, 100)),
+      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 78, VT + 68, 96, 100)),
       Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(SL + 120, VT + 68, HOLE_R)],
+    [Hole(SL + 106, VT + 68, HOLE_R)],
     [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 26, VB - 46, 12, 26, 0.15]],
   ),
   Q: g(
@@ -243,11 +243,11 @@ const LETTERS = {
   // which made the left one look short.
   R: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 84, VT + 66, 102, 66)),
+      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 76, VT + 66, 96, 66)),
       Rect(SL, VT, SW, VH, 34),
     ),
      Pt(34, [SL + 52, VT + 136], [VR - 40, VB - 34])],
-    [Hole(SL + 116, VT + 66, HOLE_R)],
+    [Hole(SL + 102, VT + 66, HOLE_R)],
     [[SL + 26, VT + 46, 13, 34, 0.1]],
   ),
   // Thicker and rounder, with more turns through the waist.
