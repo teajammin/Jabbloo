@@ -49,6 +49,17 @@ const O = 6;          // outline weight
 const VL = L - T, VR = R + T, VT = TOP - T, VB = BOT + T;
 const VW = VR - VL, VH = VB - VT;
 
+/**
+ * Stem letters start further right than the rest.
+ *
+ * B, D, P and R read as left-heavy at the full width: the solid block runs the
+ * whole height, so any extra width there adds mass the other letters do not
+ * have. Insetting their left edge slims that side without touching the stroke
+ * weight everywhere else.
+ */
+const SL = VL + 38;
+const SW = VR - SL;
+
 // ------------------------------------------------------------ shape factories
 // Each returns (d) => shape, where d inflates or deflates it.
 
@@ -131,19 +142,18 @@ const LETTERS = {
   // straight-edged box: letting them dome instead gives a rounded blob, and
   // flattening them by shrinking the ellipses loses the bulge that makes the
   // waist read. The pinch is the gap where the two lobes' right edges recede.
+  // Slim left edge, generously rounded lobe tips on the right.
   B: g(
     [Both(
       Union(
-        Rect(VL, VT, 88, VH, 44),
-        BOWL(VL + 128, VT + 62, 112, 86),
-        BOWL(VL + 132, VB - 64, 112, 88),
+        Rect(SL, VT, 60, VH, 30),
+        BOWL(SL + 96, VT + 70, 100, 86),
+        BOWL(SL + 100, VB - 72, 100, 88),
       ),
-      // Very generous corners — the letter should read as inflated — but still
-      // short of half the height, so the top and bottom keep a flat run.
-      Rect(VL, VT, VW, VH, 90),
+      Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(VL + 166, VT + 66, HOLE_R), Hole(VL + 170, VB - 68, HOLE_R)],
-    [[VL + 38, VT + 44, 14, 34, 0.1], [VL + 52, VB - 42, 12, 26, 0.15]],
+    [Hole(SL + 128, VT + 70, HOLE_R), Hole(SL + 132, VB - 72, HOLE_R)],
+    [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 40, VB - 44, 12, 26, 0.15]],
   ),
   C: g([P(...arc(MX, MY, 78, 76, 54, 306))], [], [[MX - 34, TOP + 34, 13, 30, -0.7]]),
   // Same construction as B: a block with a lobe clipped to a flat-edged box.
@@ -151,34 +161,36 @@ const LETTERS = {
   // not what the reference does.
   D: g(
     [Both(
-      // The lobe has to stop short of the clip box, or the box's own rounded
-      // right edge becomes the silhouette and D reads as a rounded square.
-      Union(Rect(VL, VT, 88, VH, 44), BOWL(VL + 112, MY, 114, 138)),
-      Rect(VL, VT, VW, VH, 90),
+      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 84, MY, 104, 138)),
+      Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(VL + 152, MY, HOLE_R)],
-    [[VL + 38, VT + 46, 14, 36, 0.1], [VL + 140, VB - 66, 12, 26, -0.5]],
+    [Hole(SL + 118, MY, HOLE_R)],
+    [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 108, VB - 66, 12, 26, -0.5]],
   ),
+  // Deeper notches with rounder arm tips: corner radius up so the right ends
+  // curve rather than running straight between corners.
   E: g(
-    [Rect(VL, VT, VW, VH, 66)],
-    [Slit(VR + 40, VT + 73, VL + 100, VT + 73, 15),
-     Slit(VR + 40, VB - 73, VL + 100, VB - 73, 15)],
+    [Rect(VL, VT, VW, VH, 92)],
+    [Slit(VR + 50, VT + 73, VL + 88, VT + 73, 15),
+     Slit(VR + 50, VB - 73, VL + 88, VB - 73, 15)],
     [[VL + 34, VT + 42, 12, 30, 0], [VL + 34, VB - 44, 11, 24, 0]],
   ),
   F: g(
-    [Rect(VL, VT, VW, VH, 66)],
-    [Slit(VR + 40, VT + 78, VL + 100, VT + 78, 15),
-     Rect(VL + 100, MY + 28, VW, VH, 34)],
+    [Rect(VL, VT, VW, VH, 92)],
+    [Slit(VR + 50, VT + 78, VL + 88, VT + 78, 15),
+     // Big radius so the shoulder under the arm is a curve, not a corner.
+     Rect(VL + 96, MY + 28, VW, VH, 62)],
     [[VL + 34, VT + 42, 12, 30, 0]],
   ),
   G: g(
-    [P(...arc(MX, MY, 78, 76, 54, 306)), Pt(40, [MX + 4, MY + 24], [R - 8, MY + 24])],
+    [Pt(34, ...arc(MX, MY, 82, 80, 54, 306)), Pt(32, [MX + 4, MY + 24], [R - 8, MY + 24])],
     [],
-    [[MX - 34, TOP + 34, 13, 30, -0.7]],
+    [[MX - 38, TOP + 30, 13, 30, -0.7]],
   ),
   H: g(
-    [Rect(VL, VT, VW, VH, 66)],
-    [Slit(MX, VT - 60, MX, MY - 72, 42), Slit(MX, MY + 72, MX, VB + 60, 42)],
+    [Rect(VL, VT, VW, VH, 72)],
+    // Notch radius matched to the corner radius so every curve reads the same.
+    [Slit(MX, VT - 60, MX, MY - 76, 46), Slit(MX, MY + 76, MX, VB + 60, 46)],
     [[VL + 34, VT + 42, 12, 32, 0], [VR - 34, VB - 46, 11, 26, 0]],
   ),
   I: g([P([MX, TOP], [MX, BOT])], [], [[MX - 14, TOP + 28, 11, 34, 0]]),
@@ -212,36 +224,37 @@ const LETTERS = {
     [Hole(MX, MY, HOLE_R)],
     [[MX - 66, VT + 46, 15, 36, -0.5], [MX + 70, VB - 56, 13, 28, -0.5]],
   ),
+  // Stem is a stadium, so its foot is perfectly round.
   P: g(
     [Both(
-      Union(Rect(VL, VT, 88, VH, 44), BOWL(VL + 114, VT + 68, 112, 100)),
-      Rect(VL, VT, VW, VH, 90),
+      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 86, VT + 68, 106, 100)),
+      Rect(SL, VT, SW, VH, 34),
     )],
-    [Hole(VL + 148, VT + 68, HOLE_R)],
-    [[VL + 38, VT + 46, 14, 36, 0.1], [VL + 52, VB - 46, 12, 26, 0.15]],
+    [Hole(SL + 120, VT + 68, HOLE_R)],
+    [[SL + 26, VT + 46, 13, 34, 0.1], [SL + 26, VB - 46, 12, 26, 0.15]],
   ),
   Q: g(
-    [BOWL(MX, MY, VW / 2 - 6, VH / 2 - 4), Pt(28, [MX + 60, MY + 72], [VR - 10, VB + 4])],
+    // Tail kept inside the box: it was running past the bottom-right edge.
+    [BOWL(MX, MY, VW / 2 - 6, VH / 2 - 4), Pt(28, [MX + 54, MY + 62], [VR - 30, VB - 34])],
     [Hole(MX, MY, HOLE_R)],
     [[MX - 62, VT + 48, 15, 34, -0.5]],
   ),
+  // Both legs reach the same baseline; the right leg previously hung lower,
+  // which made the left one look short.
   R: g(
     [Both(
-      Union(Rect(VL, VT, 88, VH, 44), BOWL(VL + 112, VT + 66, 108, 96)),
-      Rect(VL, VT, VW, VH, 90),
+      Union(Rect(SL, VT, 60, VH, 30), BOWL(SL + 84, VT + 66, 102, 66)),
+      Rect(SL, VT, SW, VH, 34),
     ),
-     Pt(38, [VL + 84, VT + 140], [VR - 34, VB - 14])],
-    [Hole(VL + 144, VT + 66, HOLE_R)],
-    [[VL + 38, VT + 46, 14, 36, 0.1]],
+     Pt(34, [SL + 52, VT + 136], [VR - 40, VB - 34])],
+    [Hole(SL + 116, VT + 66, HOLE_R)],
+    [[SL + 26, VT + 46, 13, 34, 0.1]],
   ),
+  // Thicker and rounder, with more turns through the waist.
   S: g(
-    // Terminals pushed out and the stroke eased back: at the blob weight the
-    // curve doubles back on itself and the gaps close into dark slivers.
-    // The terminals have to clear the body by more than the outline weight on
-    // both sides, or the gap reads as a scratch instead of an open counter.
-    [Pt(30, ...smooth([
-      [206, 66], [148, 40], [78, 56], [54, 102], [102, 136],
-      [160, 172], [186, 214], [150, 250], [92, 258], [46, 236],
+    [Pt(36, ...smooth([
+      [198, 74], [148, 46], [84, 60], [58, 104], [96, 132], [132, 148],
+      [168, 170], [188, 210], [156, 246], [98, 256], [52, 232],
     ]))],
     [],
     [[104, 78, 12, 24, 0.5], [140, 214, 11, 22, 0.4]],
@@ -278,11 +291,16 @@ const LETTERS = {
     [[L + 30, TOP - 12, 11, 22, 1.4], [MX + 20, BOT + 12, 11, 22, 1.4]],
   ),
 
-  excl: g([P([MX, TOP], [MX, 152]), P([MX, BOT - 6])], [], [[MX - 12, TOP + 26, 10, 26, 0]]),
+  // Thinner, with clear air between the stroke and the dot.
+  excl: g([Pt(31, [MX, TOP], [MX, 140]), Pt(31, [MX, BOT + 4])], [],
+    [[MX - 12, TOP + 26, 10, 26, 0]]),
   query: g(
-    [Pt(36, ...arc(MX, TOP + 56, 56, 52, 184, 398), [MX + 10, 146], [MX, 162]), P([MX, BOT - 6])],
+    // Lighter stroke and a wider hook: at the blob weight the curl closes on
+    // itself and the tail runs into the ball.
+    [Pt(28, ...smooth([...arc(MX, TOP + 64, 66, 60, 188, 392, 16), [MX + 16, 132], [MX, 152]], 4)),
+     Pt(31, [MX, BOT + 6])],
     [],
-    [[MX - 26, TOP + 22, 10, 22, 0.6]],
+    [[MX - 28, TOP + 22, 10, 22, 0.6]],
   ),
   dot: g([P([MX, BOT - 6])], [], [[MX - 10, BOT - 22, 8, 14, 0]]),
   comma: g([P([MX, BOT - 26]), Pt(26, [MX + 6, BOT - 18], [MX - 16, BOT + 28])], [], []),
