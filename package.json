@@ -16,7 +16,8 @@
     "dev:party": "partykit dev",
     "test:room": "node test/room.test.mjs",
     "gen:letters": "node scripts/generate-letters.mjs",
-    "gen:effects": "node scripts/generate-effects.mjs"
+    "gen:effects": "node scripts/generate-effects.mjs",
+    "gen:sheet": "node scripts/letters-tracing-sheet.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
