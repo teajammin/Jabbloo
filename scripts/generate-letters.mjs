@@ -72,6 +72,34 @@ function strokePath(points, radius) {
   return any(...segs);
 }
 
+/**
+ * Catmull-Rom subdivision.
+ *
+ * Chained capsules through hand-placed points leave visible kinks at every
+ * corner. Running the points through a spline first means the stroke follows a
+ * continuous curve, so a shape like S stays fully rounded.
+ */
+function smooth(pts, steps = 10) {
+  const at = (i) => pts[Math.max(0, Math.min(pts.length - 1, i))];
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+    for (let k = 0; k < steps; k++) {
+      const t = k / steps, t2 = t * t, t3 = t2 * t;
+      out.push([
+        0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t
+          + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+          + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+        0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t
+          + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+          + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
+      ]);
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
 /** Points along an ellipse arc, degrees, either direction. */
 function arc(cx, cy, rx, ry, a0, a1, steps = 26) {
   const pts = [];
@@ -106,7 +134,7 @@ const LETTERS = {
   B: g(
     [Both(
       Union(
-        Rect(VL, VT, 116, VH, 90),
+        Rect(VL, VT, 88, VH, 44),
         BOWL(VL + 128, VT + 62, 112, 86),
         BOWL(VL + 132, VB - 64, 112, 88),
       ),
@@ -125,7 +153,7 @@ const LETTERS = {
     [Both(
       // The lobe has to stop short of the clip box, or the box's own rounded
       // right edge becomes the silhouette and D reads as a rounded square.
-      Union(Rect(VL, VT, 116, VH, 90), BOWL(VL + 112, MY, 114, 138)),
+      Union(Rect(VL, VT, 88, VH, 44), BOWL(VL + 112, MY, 114, 138)),
       Rect(VL, VT, VW, VH, 90),
     )],
     [Hole(VL + 152, MY, HOLE_R)],
@@ -186,10 +214,10 @@ const LETTERS = {
   ),
   P: g(
     [Both(
-      Union(Rect(VL, VT, 116, VH, 90), BOWL(VL + 116, VT + 78, 110, 116)),
+      Union(Rect(VL, VT, 88, VH, 44), BOWL(VL + 114, VT + 68, 112, 100)),
       Rect(VL, VT, VW, VH, 90),
     )],
-    [Hole(VL + 150, VT + 78, HOLE_R)],
+    [Hole(VL + 148, VT + 68, HOLE_R)],
     [[VL + 38, VT + 46, 14, 36, 0.1], [VL + 52, VB - 46, 12, 26, 0.15]],
   ),
   Q: g(
@@ -199,18 +227,24 @@ const LETTERS = {
   ),
   R: g(
     [Both(
-      Union(Rect(VL, VT, 116, VH, 90), BOWL(VL + 114, VT + 74, 106, 108)),
+      Union(Rect(VL, VT, 88, VH, 44), BOWL(VL + 112, VT + 66, 108, 96)),
       Rect(VL, VT, VW, VH, 90),
     ),
-     Pt(38, [VL + 96, VT + 148], [VR - 30, VB - 12])],
-    [Hole(VL + 146, VT + 74, HOLE_R)],
+     Pt(38, [VL + 84, VT + 140], [VR - 34, VB - 14])],
+    [Hole(VL + 144, VT + 66, HOLE_R)],
     [[VL + 38, VT + 46, 14, 36, 0.1]],
   ),
   S: g(
-    [Pt(33, [192, 100], [144, 72], [88, 84], [74, 118], [108, 142],
-        [162, 160], [184, 188], [168, 216], [120, 230], [70, 214])],
+    // Terminals pushed out and the stroke eased back: at the blob weight the
+    // curve doubles back on itself and the gaps close into dark slivers.
+    // The terminals have to clear the body by more than the outline weight on
+    // both sides, or the gap reads as a scratch instead of an open counter.
+    [Pt(30, ...smooth([
+      [206, 66], [148, 40], [78, 56], [54, 102], [102, 136],
+      [160, 172], [186, 214], [150, 250], [92, 258], [46, 236],
+    ]))],
     [],
-    [[114, 96, 12, 24, 0.5], [138, 198, 11, 22, 0.4]],
+    [[104, 78, 12, 24, 0.5], [140, 214, 11, 22, 0.4]],
   ),
   T: g(
     [P([L, TOP], [R, TOP]), P([MX, TOP], [MX, BOT])],
