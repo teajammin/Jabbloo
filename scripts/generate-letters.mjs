@@ -70,6 +70,23 @@ const Rect = (x, y, w, h, r) => (d) => roundedRect(x - d, y - d, w + 2 * d, h + 
 const Slit = (x1, y1, x2, y2, r) => (d) => capsule(x1, y1, x2, y2, r + d);
 const Hole = (x, y, r) => (d) => ellipse(x, y, r + d, r + d);
 
+/**
+ * A fillet for a concave corner of the letter.
+ *
+ * Concave corners cannot be softened by cutting — a cut only deepens them —
+ * and a plain disc dropped on the corner bulges into the gap and leaves a
+ * point where its arc crosses the straight edges. The correct shape is the
+ * corner square MINUS a disc tangent to both edges, which is the little curved
+ * triangle that turns a right angle into an arc.
+ *
+ * `x, y` is the corner; the gap is assumed to lie to the right, `sy` says
+ * whether it lies below (+1) or above (-1).
+ */
+const Fillet = (x, y, r, sy) => (d) => minus(
+  roundedRect(x - d, (sy > 0 ? y : y - r) - d, r + 2 * d, r + 2 * d, 0),
+  ellipse(x + r, y + sy * r, r - d, r - d),
+);
+
 /** Union / intersection of shape factories, so a glyph can be clipped. */
 const Union = (...fs) => (d) => any(...fs.map((f) => f(d)));
 const Both = (...fs) => (d) => all(...fs.map((f) => f(d)));
@@ -146,7 +163,7 @@ const LETTERS = {
   B: g(
     [Both(
       Union(
-        Rect(SL, VT, 60, VH, 0),
+        Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)),
         BOWL(SL + 84, VT + 70, 92, 70),
         BOWL(SL + 88, VB - 72, 92, 72),
       ),
@@ -161,7 +178,7 @@ const LETTERS = {
   // not what the reference does.
   D: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 0), BOWL(SL + 76, MY, 96, VH / 2)),
+      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(SL + 76, MY, 96, VH / 2)),
       Rect(SL, VT, SW, VH, 34),
     )],
     [Hole(SL + 104, MY, HOLE_R)],
@@ -182,14 +199,18 @@ const LETTERS = {
     [Rect(VL, VT, 84, VH, 42),
      Rect(VL, VT, VW, 58, 29),
      Rect(VL, VT + 92, 176, 58, 29),
-     Rect(VL, VB - 58, VW, 58, 29)],
+     Rect(VL, VB - 58, VW, 58, 29),
+     Fillet(VL + 84, VT + 58, 17, 1), Fillet(VL + 84, VT + 92, 17, -1),
+     Fillet(VL + 84, VT + 150, 17, 1), Fillet(VL + 84, VB - 58, 17, -1)],
     [],
     [[VL + 32, VT + 100, 12, 26, 0], [VL + 32, VB - 96, 11, 22, 0]],
   ),
   F: g(
     [Rect(VL, VT, 84, VH, 42),
      Rect(VL, VT, VW, 58, 29),
-     Rect(VL, VT + 92, 176, 58, 29)],
+     Rect(VL, VT + 92, 176, 58, 29),
+     Fillet(VL + 84, VT + 58, 17, 1), Fillet(VL + 84, VT + 92, 17, -1),
+     Fillet(VL + 84, VT + 150, 17, 1)],
     [],
     [[VL + 32, VT + 100, 12, 26, 0], [VL + 32, VB - 60, 11, 24, 0]],
   ),
@@ -244,7 +265,7 @@ const LETTERS = {
   // Stem is a stadium, so its foot is perfectly round.
   P: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 0), BOWL(SL + 78, VT + 68, 96, 68)),
+      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(SL + 78, VT + 68, 96, 68)),
       Rect(SL, VT, SW, VH, 34),
     )],
     [Hole(SL + 106, VT + 68, HOLE_R)],
@@ -260,7 +281,7 @@ const LETTERS = {
   // which made the left one look short.
   R: g(
     [Both(
-      Union(Rect(SL, VT, 60, VH, 0), BOWL(SL + 76, VT + 66, 96, 66)),
+      Union(Union(Rect(SL, VT, 60, VH - 30, 0), E(SL + 30, VB - 30, 30, 30)), BOWL(SL + 76, VT + 66, 96, 66)),
       Rect(SL, VT, SW, VH, 34),
     ),
      Pt(34, [SL + 52, VT + 136], [VR - 40, VB - 34])],
