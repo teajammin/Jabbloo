@@ -26,7 +26,8 @@ export const CONTROL_HELP: Record<string, ControlHelp> = {
   filled: { icon: 'Filled', name: 'Filled shapes', what: 'Switches shapes between outline and solid.' },
 
   upload: { icon: '🖼️', name: 'Add a photo', what: 'Bring in a picture from your camera or library. Five per drawing.' },
-  cutout: { icon: '✂️', name: 'Photo options', what: 'Hold a photo you have placed (or right-click it) to crop it or drop its background.' },
+  cutout: { icon: '✂️', name: 'Photo options', what: 'Hold a placed photo (or right-click it) to resize, crop, cut out its background, place it or throw it away.' },
+  resize: { icon: '⬚', name: 'Resize and crop', what: 'Corners resize the photo and keep its shape. Edges trim that side away.' },
   smaller: { icon: '－', name: 'Shrink', what: 'Makes the photo you are placing smaller.' },
   bigger: { icon: '＋', name: 'Enlarge', what: 'Makes the photo you are placing bigger.' },
 

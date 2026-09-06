@@ -13,6 +13,10 @@ export interface PhotoMenuItem {
   icon: string;
   label: string;
   onPick: () => void;
+  /** Renders as a heavier confirm, or a quieter destructive action. */
+  tone?: 'confirm' | 'danger';
+  /** Draws a divider above this item. */
+  separated?: boolean;
 }
 
 export interface PhotoMenu {
@@ -28,7 +32,10 @@ export function photoMenu(items: PhotoMenuItem[]): PhotoMenu {
   menu.hidden = true;
 
   for (const item of items) {
-    const node = el('button', { class: 'photo-menu-item', type: 'button' },
+    const classes = ['photo-menu-item'];
+    if (item.tone) classes.push(`is-${item.tone}`);
+    if (item.separated) classes.push('is-separated');
+    const node = el('button', { class: classes.join(' '), type: 'button' },
       el('span', { class: 'photo-menu-icon' }, item.icon),
       el('span', {}, item.label),
     );

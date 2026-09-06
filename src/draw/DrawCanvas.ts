@@ -601,11 +601,15 @@ export class DrawCanvas {
   }
 
   /**
-   * Moves whichever edge or corner is held.
+   * Moves whichever handle is held.
    *
-   * The frame is clamped to the layer's bounds — cropping can only ever take
-   * away, so a handle dragged outside the photo would reveal nothing — and to
-   * a minimum size, so it cannot be collapsed to a line and lost.
+   * Corners RESIZE the photo, keeping its proportions — dragging a corner is
+   * how people expect to scale a picture. Edges CROP, trimming that one side
+   * away. Doing both from one frame means a photo can be sized and trimmed
+   * without swapping modes.
+   *
+   * The crop frame is clamped to the photo's bounds, since cropping can only
+   * take away, and to a minimum size so it cannot collapse to a line.
    */
   dragCrop(at: Point): void {
     const r = this.cropRect;
@@ -613,36 +617,66 @@ export class DrawCanvas {
     if (!r || !f || !this.activeHandle) return;
 
     const MIN = 40;
+    const handle = this.activeHandle;
+
+    // --- corners resize the photo ---------------------------------------
+    if (handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw') {
+      const aspect = f.w / f.h;
+      // Anchor is the corner opposite the one being dragged; it stays put.
+      const anchorX = handle === 'nw' || handle === 'sw' ? f.x + f.w : f.x;
+      const anchorY = handle === 'nw' || handle === 'ne' ? f.y + f.h : f.y;
+
+      const newW = Math.max(MIN, Math.abs(at.x - anchorX));
+      const newH = Math.max(MIN / aspect, newW / aspect);
+      const scale = newW / f.w;
+
+      const newX = handle === 'nw' || handle === 'sw' ? anchorX - newW : anchorX;
+      const newY = handle === 'nw' || handle === 'ne' ? anchorY - newH : anchorY;
+
+      // The crop travels with the photo, scaled about the same anchor, so a
+      // trim already made is not thrown away by resizing.
+      this.cropRect = {
+        x: newX + (r.x - f.x) * scale,
+        y: newY + (r.y - f.y) * scale,
+        w: r.w * scale,
+        h: r.h * scale,
+      };
+
+      f.x = newX;
+      f.y = newY;
+      f.w = newW;
+      f.h = newH;
+      this.drawOverlay();
+      return;
+    }
+
+    // --- edges crop ------------------------------------------------------
     const left = f.x, top = f.y, right = f.x + f.w, bottom = f.y + f.h;
     let { x, y, w, h } = r;
 
-    const setLeft = (nx: number) => {
-      const clamped = Math.min(Math.max(left, nx), x + w - MIN);
-      w += x - clamped;
-      x = clamped;
-    };
-    const setTop = (ny: number) => {
-      const clamped = Math.min(Math.max(top, ny), y + h - MIN);
-      h += y - clamped;
-      y = clamped;
-    };
-    const setRight = (nx: number) => { w = Math.min(Math.max(MIN, nx - x), right - x); };
-    const setBottom = (ny: number) => { h = Math.min(Math.max(MIN, ny - y), bottom - y); };
-
-    switch (this.activeHandle) {
-      case 'nw': setLeft(at.x); setTop(at.y); break;
-      case 'n': setTop(at.y); break;
-      case 'ne': setRight(at.x); setTop(at.y); break;
-      case 'e': setRight(at.x); break;
-      case 'se': setRight(at.x); setBottom(at.y); break;
-      case 's': setBottom(at.y); break;
-      case 'sw': setLeft(at.x); setBottom(at.y); break;
-      case 'w': setLeft(at.x); break;
-      case 'move': {
+    switch (handle) {
+      case 'w': {
+        const nx = Math.min(Math.max(left, at.x), x + w - MIN);
+        w += x - nx;
+        x = nx;
+        break;
+      }
+      case 'n': {
+        const ny = Math.min(Math.max(top, at.y), y + h - MIN);
+        h += y - ny;
+        y = ny;
+        break;
+      }
+      case 'e':
+        w = Math.min(Math.max(MIN, at.x - x), right - x);
+        break;
+      case 's':
+        h = Math.min(Math.max(MIN, at.y - y), bottom - y);
+        break;
+      case 'move':
         x = Math.min(Math.max(left, at.x - this.cropGrabOffset.x), right - w);
         y = Math.min(Math.max(top, at.y - this.cropGrabOffset.y), bottom - h);
         break;
-      }
     }
 
     this.cropRect = { x, y, w, h };
@@ -839,16 +873,33 @@ export class DrawCanvas {
     const d = DrawCanvas.HANDLE_DRAW;
     const midX = r.x + r.w / 2;
     const midY = r.y + r.h / 2;
-    const spots: [number, number][] = [
-      [r.x, r.y], [midX, r.y], [r.x + r.w, r.y],
-      [r.x + r.w, midY], [r.x + r.w, r.y + r.h],
-      [midX, r.y + r.h], [r.x, r.y + r.h], [r.x, midY],
+    // Corners are round because they resize; edges are bars because they trim.
+    // The shape is the only cue on a phone, where there is no hover state.
+    const corners: [number, number][] = [
+      [r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h],
     ];
-    for (const [hx, hy] of spots) {
+    for (const [hx, hy] of corners) {
+      ctx.beginPath();
+      ctx.arc(hx, hy, d / 2 + 3, 0, Math.PI * 2);
       ctx.fillStyle = '#4a4458';
-      ctx.fillRect(hx - d / 2 - 3, hy - d / 2 - 3, d + 6, d + 6);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(hx, hy, d / 2, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(hx - d / 2, hy - d / 2, d, d);
+      ctx.fill();
+    }
+
+    const edges: [number, number, number, number][] = [
+      [midX, r.y, d * 1.5, d * 0.6],
+      [r.x + r.w, midY, d * 0.6, d * 1.5],
+      [midX, r.y + r.h, d * 1.5, d * 0.6],
+      [r.x, midY, d * 0.6, d * 1.5],
+    ];
+    for (const [hx, hy, bw, bh] of edges) {
+      ctx.fillStyle = '#4a4458';
+      ctx.fillRect(hx - bw / 2 - 3, hy - bh / 2 - 3, bw + 6, bh + 6);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(hx - bw / 2, hy - bh / 2, bw, bh);
     }
 
     ctx.restore();

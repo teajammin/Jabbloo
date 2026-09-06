@@ -399,20 +399,35 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         },
       },
       {
-        icon: '⬚', label: 'Crop', onPick: () => {
+        icon: '⬚', label: 'Resize and crop', onPick: () => {
           if (!canvas.beginCrop()) return;
           updateCropBar();
-          say('Drag the edges and corners · ✓ keeps the crop, ✕ cancels');
+          say('Corners resize the photo · edges trim it · ✓ keeps it, ✕ cancels');
         },
       },
       { icon: '⭕', label: 'Crop to a circle', onPick: shape('circle') },
       { icon: '🔺', label: 'Crop to a triangle', onPick: shape('triangle') },
       { icon: '⭐', label: 'Crop to a star', onPick: shape('star') },
       { icon: '💗', label: 'Crop to a heart', onPick: shape('heart') },
-      { icon: '🗑️', label: 'Remove the photo', onPick: () => {
-        canvas.cancelFloating();
-        say('Photo removed');
-      } },
+      {
+        icon: '✓', label: 'Place it here', tone: 'confirm', separated: true,
+        onPick: () => {
+          canvas.commitFloating();
+          say('Photo placed — ← undoes it');
+        },
+      },
+      {
+        icon: '↩︎', label: 'Undo last change', onPick: () => {
+          canvas.undo();
+          say('Undone');
+        },
+      },
+      {
+        icon: '🗑️', label: 'Throw the photo away', tone: 'danger', onPick: () => {
+          canvas.cancelFloating();
+          say('Photo removed');
+        },
+      },
     ]);
 
     // --- history and clipboard ---------------------------------------------
