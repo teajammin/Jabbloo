@@ -914,3 +914,27 @@ input[type='text'] {
 @media (min-width: 900px) {
   .ground-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* ------------------------------------------------------------------ battle */
+
+.screen-battle {
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  height: 100dvh;
+}
+
+.battle-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.battle-stage canvas {
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(74, 68, 88, 0.16);
+  max-width: 100%;
+  max-height: 100%;
+}

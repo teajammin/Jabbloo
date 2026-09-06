@@ -1,6 +1,7 @@
 import { el, type Screen } from './screens';
 import { countdown } from './timer';
 import { bubbleText } from './bubbleText';
+import { battleScreen } from './battle';
 import type { RoomConnection } from '../net/room';
 import {
   REVEAL_SECONDS, VOTE_SECONDS, battlegrounds, voters, type RoomState,
@@ -16,7 +17,7 @@ import { toCss } from '../engine/theme';
  * ignoring the vote.
  */
 export function battlegroundScreen(connection: RoomConnection, isHost: boolean): Screen {
-  return (root) => {
+  return (root, go) => {
     const clock = countdown();
     const heading = el('div', { class: 'ground-heading' });
     const grid = el('div', { class: 'ground-grid' });
@@ -110,6 +111,11 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
 
     connection.on({
       onState: (state) => {
+        if (state.phase === 'battle') {
+          clock.stop();
+          go(battleScreen(connection, isHost));
+          return;
+        }
         if (state.phase !== 'battleground') return;
         renderVotes(state);
         if (state.chosen && !revealing) {

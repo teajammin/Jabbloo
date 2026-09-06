@@ -108,6 +108,9 @@ export default class Room implements Party.Server {
       case 'voteBattleground':
         this.onVote(message.id, sender);
         break;
+      case 'requestArt':
+        this.onRequestArt(sender);
+        break;
       default:
         this.send(sender, { type: 'error', reason: 'Unknown message' });
     }
@@ -344,6 +347,33 @@ export default class Room implements Party.Server {
 
   private send(connection: Party.Connection, message: ServerMessage): void {
     connection.send(JSON.stringify(message));
+  }
+
+  /**
+   * Hands the artwork over, to the host only.
+   *
+   * Sent on request rather than broadcast: this is megabytes of PNG, and only
+   * the shared screen draws with it. Phones never need it and would pay for it
+   * in memory and bandwidth.
+   */
+  private onRequestArt(sender: Party.Connection): void {
+    if (!this.isHost(sender)) return;
+
+    const art = creators(this.state).map((player) => {
+      const pieces = this.creationsFor(player.id);
+      const character = pieces.find((p) => p.slot === 'character');
+      const weapons = pieces
+        .filter((p) => p.slot.startsWith('weapon'))
+        .sort((a, b) => a.slot.localeCompare(b.slot))
+        .map((w) => ({ png: w.png, name: w.name }));
+      return {
+        playerId: player.id,
+        character: character ? { png: character.png, name: character.name } : null,
+        weapons,
+      };
+    });
+
+    this.send(sender, { type: 'art', art });
   }
 
   /** Everything one player made, for the battle to draw with. */

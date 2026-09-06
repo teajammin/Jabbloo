@@ -1,5 +1,7 @@
 import PartySocket from 'partysocket';
-import type { ClientMessage, RoomState, ServerMessage } from '../shared/protocol';
+import type {
+  ClientMessage, PlayerArt, RoomState, ServerMessage,
+} from '../shared/protocol';
 
 /**
  * Client-side room connection.
@@ -12,6 +14,7 @@ import type { ClientMessage, RoomState, ServerMessage } from '../shared/protocol
 const PARTY_HOST = import.meta.env['VITE_PARTYKIT_HOST'] ?? 'localhost:1999';
 
 export interface RoomHandlers {
+  onArt?: (art: PlayerArt[]) => void;
   onState?: (state: RoomState) => void;
   onWelcome?: (playerId: string, state: RoomState) => void;
   onError?: (reason: string) => void;
@@ -47,6 +50,9 @@ export class RoomConnection {
         case 'state':
           this.state = message.state;
           this.handlers.onState?.(message.state);
+          break;
+        case 'art':
+          this.handlers.onArt?.(message.art);
           break;
         case 'error':
           this.handlers.onError?.(message.reason);

@@ -19,7 +19,8 @@
     "gen:effects": "node scripts/generate-effects.mjs",
     "gen:sheet": "node scripts/letters-tracing-sheet.mjs",
     "test:creation": "node test/creation.test.mjs",
-    "test:battleground": "node test/battleground.test.mjs"
+    "test:battleground": "node test/battleground.test.mjs",
+    "test:battle": "node test/battle.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

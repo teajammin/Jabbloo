@@ -109,11 +109,21 @@ export type ClientMessage =
   | { type: 'submitName'; slot: string; name: string }
   /** Done early; the step advances once everyone has said so. */
   | { type: 'ready' }
-  | { type: 'voteBattleground'; id: string };
+  | { type: 'voteBattleground'; id: string }
+  /** The host asks for everyone's artwork once the battle starts. */
+  | { type: 'requestArt' };
 
 // --------------------------------------------------------------- server -> client
 
+/** One player's finished work, sent only when the battle needs it. */
+export interface PlayerArt {
+  playerId: string;
+  character: { png: string; name: string } | null;
+  weapons: { png: string; name: string }[];
+}
+
 export type ServerMessage =
+  | { type: 'art'; art: PlayerArt[] }
   | { type: 'state'; state: RoomState }
   | { type: 'welcome'; playerId: string; state: RoomState }
   | { type: 'error'; reason: string };
