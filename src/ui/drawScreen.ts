@@ -1,6 +1,7 @@
 import { el, button, type Screen } from './screens';
 import { DrawCanvas } from '../draw/DrawCanvas';
 import { THICKNESSES, type ToolName } from '../draw/types';
+import { MAX_UPLOADS, cutSubject, importFile, placeOnCanvas } from '../draw/images';
 
 /**
  * The drawing screen.
@@ -216,6 +217,69 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     const clearButton = button('Clear', () => canvas.clear(), 'tool wide ghost');
     const doneButton = button('Done', () => options.onDone?.(canvas.toDataURL()), 'big primary');
 
+    // --- image upload ------------------------------------------------------
+
+    let uploadsUsed = 0;
+
+    const fileInput = el('input', { type: 'file', accept: 'image/*', class: 'sr-only' });
+    fileInput.multiple = true;
+
+    const status = el('p', { class: 'draw-hint' });
+    status.setAttribute('role', 'status');
+
+    const uploadButton = button('🖼️', () => fileInput.click(), 'tool');
+    uploadButton.setAttribute('aria-label', 'Add a photo');
+    uploadButton.title = `Add a photo (${MAX_UPLOADS} max)`;
+
+    /** Cuts the background out of whatever is floating. */
+    const cutoutButton = button('✂️', async () => {
+      const layer = canvas.floatingLayer;
+      if (!layer) return;
+      cutoutButton.disabled = true;
+      status.textContent = 'Cutting out…';
+      try {
+        const cut = await cutSubject({ data: layer.data, w: layer.w, h: layer.h });
+        canvas.replaceFloating(cut.data);
+        status.textContent = 'Cut out — drag to place, Enter to keep';
+      } catch {
+        status.textContent = 'Could not cut that one out';
+      } finally {
+        cutoutButton.disabled = !canvas.hasFloating;
+      }
+    }, 'tool');
+    cutoutButton.setAttribute('aria-label', 'Remove background');
+    cutoutButton.title = 'Remove the background from the placed photo';
+    cutoutButton.disabled = true;
+
+    const biggerButton = button('＋', () => canvas.scaleFloating(1.15), 'tool');
+    biggerButton.setAttribute('aria-label', 'Enlarge placed photo');
+    const smallerButton = button('－', () => canvas.scaleFloating(1 / 1.15), 'tool');
+    smallerButton.setAttribute('aria-label', 'Shrink placed photo');
+    biggerButton.disabled = true;
+    smallerButton.disabled = true;
+
+    fileInput.addEventListener('change', async () => {
+      const files = [...(fileInput.files ?? [])];
+      fileInput.value = '';
+      for (const file of files) {
+        if (uploadsUsed >= MAX_UPLOADS) {
+          status.textContent = `That's all ${MAX_UPLOADS} photos`;
+          break;
+        }
+        status.textContent = 'Loading photo…';
+        try {
+          const image = await importFile(file);
+          const spot = placeOnCanvas(image);
+          canvas.placeImage(image.data, spot.x, spot.y, spot.w, spot.h);
+          uploadsUsed++;
+          selectTool('select');
+          status.textContent = 'Drag to place · ✂️ removes the background · Enter to keep';
+        } catch {
+          status.textContent = 'Could not read that image';
+        }
+      }
+    });
+
     // --- keyboard ----------------------------------------------------------
 
     /**
@@ -280,6 +344,10 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       doneButton.disabled = canvas.isEmpty;
       copyButton.disabled = !canvas.hasSelection;
       pasteButton.disabled = !canvas.hasClipboard;
+      cutoutButton.disabled = !canvas.hasFloating;
+      biggerButton.disabled = !canvas.hasFloating;
+      smallerButton.disabled = !canvas.hasFloating;
+      uploadButton.disabled = uploadsUsed >= MAX_UPLOADS;
     });
     undoButton.disabled = true;
     redoButton.disabled = true;
@@ -297,7 +365,11 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
           sizeRow,
           colourRow,
           el('div', { class: 'tool-row' },
+            uploadButton, cutoutButton, smallerButton, biggerButton),
+          el('div', { class: 'tool-row' },
             undoButton, redoButton, copyButton, pasteButton, clearButton, doneButton),
+          fileInput,
+          status,
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { choreograph } from './choreographer';
+import { cutout, cutoutAvailable } from './cutout';
 import type { FightContext } from './prompt';
 
 /**
@@ -12,7 +13,8 @@ import type { FightContext } from './prompt';
  */
 
 const app = express();
-app.use(express.json({ limit: '16kb' }));
+// Choreography prompts are tiny; uploaded images are not.
+app.use(express.json({ limit: '16mb' }));
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -34,6 +36,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     keyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+    cutout: cutoutAvailable(),
     model: process.env.CHOREOGRAPHER_MODEL ?? 'claude-haiku-4-5',
     fallback: process.env.CHOREOGRAPHER_FALLBACK_MODEL ?? 'claude-sonnet-5',
   });
@@ -67,6 +70,8 @@ app.post('/api/choreograph', async (req, res) => {
     ms: result.ms,
   });
 });
+
+app.post('/api/cutout', cutout);
 
 app.listen(PORT, () => {
   const keyed = process.env.ANTHROPIC_API_KEY ? 'key loaded' : 'NO KEY — set ANTHROPIC_API_KEY in .env';

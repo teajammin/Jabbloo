@@ -457,6 +457,49 @@ export class DrawCanvas {
     return true;
   }
 
+  /**
+   * Drops an image in as a floating layer, so it can be positioned before it
+   * lands — the same path a paste takes, for the same reason.
+   */
+  placeImage(data: string, x: number, y: number, w: number, h: number): void {
+    this.commitFloating();
+    this.floating = { kind: 'image', tool: 'select', data, x, y, w, h };
+    this.floatingImage = new Image();
+    this.floatingImage.addEventListener('load', () => this.drawOverlay());
+    this.floatingImage.src = data;
+    this.selection = null;
+    this.drawOverlay();
+    this.onChange?.();
+  }
+
+  /** The floating layer, for tools that need to resize or replace it. */
+  get floatingLayer(): { data: string; x: number; y: number; w: number; h: number } | null {
+    return this.floating ? { ...this.floating } : null;
+  }
+
+  /** Rescales the floating layer about its centre. */
+  scaleFloating(factor: number): void {
+    const f = this.floating;
+    if (!f) return;
+    const cx = f.x + f.w / 2;
+    const cy = f.y + f.h / 2;
+    f.w = Math.max(24, f.w * factor);
+    f.h = Math.max(24, f.h * factor);
+    f.x = cx - f.w / 2;
+    f.y = cy - f.h / 2;
+    this.drawOverlay();
+  }
+
+  /** Swaps the floating layer's picture, keeping its position and size. */
+  replaceFloating(data: string): void {
+    if (!this.floating) return;
+    this.floating.data = data;
+    this.floatingImage = new Image();
+    this.floatingImage.addEventListener('load', () => this.drawOverlay());
+    this.floatingImage.src = data;
+    this.onChange?.();
+  }
+
   selectAll(): void {
     this.selection = { x: 0, y: 0, w: CANVAS_W, h: CANVAS_H };
     this.drawOverlay();
