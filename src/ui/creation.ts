@@ -1,6 +1,7 @@
 import { el, button, type Screen } from './screens';
 import { countdown } from './timer';
 import { drawScreen } from './drawScreen';
+import { battlegroundScreen } from './battleground';
 import type { RoomConnection } from '../net/room';
 import {
   CREATION_STEPS, creators, currentStep, type RoomState,
@@ -148,8 +149,12 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
 
     connection.on({
       onState: (state) => {
+        if (state.phase === 'battleground') {
+          clock.stop();
+          go(battlegroundScreen(connection, isHost));
+          return;
+        }
         if (state.phase !== 'creating') {
-          // The phase moved on; the next screen takes over.
           clock.stop();
           return;
         }

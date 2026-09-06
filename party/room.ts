@@ -2,8 +2,13 @@ import type * as Party from 'partykit/server';
 import {
   CREATION_STEPS,
   MAX_PLAYERS,
+  REVEAL_SECONDS,
+  VOTE_SECONDS,
+  battlegrounds,
   canStart,
   creators,
+  drawBattleground,
+  voters,
   type ClientMessage,
   type Player,
   type Role,
@@ -42,6 +47,8 @@ export default class Room implements Party.Server {
       teamNames: { teamA: 'Team One', teamB: 'Team Two' },
       step: -1,
       stepEndsAt: 0,
+      votes: {},
+      chosen: null,
     };
   }
 
@@ -97,6 +104,9 @@ export default class Room implements Party.Server {
         break;
       case 'ready':
         this.onReady(sender);
+        break;
+      case 'voteBattleground':
+        this.onVote(message.id, sender);
         break;
       default:
         this.send(sender, { type: 'error', reason: 'Unknown message' });
@@ -221,10 +231,7 @@ export default class Room implements Party.Server {
 
     const step = CREATION_STEPS[index];
     if (!step) {
-      this.state.phase = 'battleground';
-      this.state.step = -1;
-      this.state.stepEndsAt = 0;
-      this.broadcastState();
+      this.beginVote();
       return;
     }
 
@@ -241,6 +248,58 @@ export default class Room implements Party.Server {
     const active = creators(this.state).filter((p) => p.connected);
     if (active.length === 0 || !active.every((p) => p.progress.ready)) return;
     this.beginStep(this.state.step + 1);
+  }
+
+  // -------------------------------------------------------------- battleground
+
+  /** Opens the vote, on the same server-held clock the creation steps use. */
+  private beginVote(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    this.state.phase = 'battleground';
+    this.state.step = -1;
+    this.state.votes = {};
+    this.state.chosen = null;
+    this.state.stepEndsAt = Date.now() + VOTE_SECONDS * 1000;
+    this.stepTimer = setTimeout(() => this.closeVote(), VOTE_SECONDS * 1000);
+    this.broadcastState();
+  }
+
+  private onVote(id: string, sender: Party.Connection): void {
+    if (this.state.phase !== 'battleground' || this.state.chosen) return;
+    const player = this.state.players.find((p) => p.id === sender.id && !p.isHost);
+    if (!player) return;
+    if (!battlegrounds.some((b) => b.id === id)) return;
+
+    this.state.votes[player.id] = id;
+    this.broadcastState();
+
+    // Close as soon as everyone has picked; nobody should sit out the clock.
+    const waiting = voters(this.state).filter((p) => p.connected && !this.state.votes[p.id]);
+    if (waiting.length === 0) this.closeVote();
+  }
+
+  /**
+   * Draws the ground and holds the result on screen before the battle.
+   *
+   * The pause is the point of the Mario Kart rule: the draw has to be seen to
+   * be a draw, or it reads as the game ignoring the vote.
+   */
+  private closeVote(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    if (this.state.chosen) return;
+
+    this.state.chosen = drawBattleground(
+      this.state.votes,
+      battlegrounds.map((b) => b.id),
+    );
+    this.state.stepEndsAt = Date.now() + REVEAL_SECONDS * 1000;
+    this.broadcastState();
+
+    this.stepTimer = setTimeout(() => {
+      this.state.phase = 'battle';
+      this.state.stepEndsAt = 0;
+      this.broadcastState();
+    }, REVEAL_SECONDS * 1000);
   }
 
   private onSubmitDrawing(slot: string, png: string, sender: Party.Connection): void {

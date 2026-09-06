@@ -832,3 +832,72 @@ input[type='text'] {
 
 .waiting { font-size: 18px; }
 .player.is-ready { background: var(--mint); }
+
+/* ---------------------------------------------------------- battleground */
+
+.screen-ground { gap: 16px; justify-content: center; }
+.ground-heading { display: flex; justify-content: center; }
+
+.ground-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  width: min(680px, 100%);
+}
+
+.ground-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow);
+  min-height: 0;
+}
+
+.ground-swatch {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 18px;
+}
+
+.ground-name { font-weight: 700; font-size: 16px; }
+
+.ground-voters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  min-height: 26px;
+}
+
+.ground-voter {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--butter);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ground-card.is-mine { box-shadow: 0 0 0 3px var(--ink), var(--shadow); }
+
+/* The draw's spotlight. Scale only — moving cards would shift the grid. */
+.ground-card.is-spotlight {
+  transform: scale(1.04);
+  box-shadow: 0 0 0 4px var(--coral), var(--shadow);
+}
+
+.ground-card.is-winner { box-shadow: 0 0 0 5px var(--mint), 0 10px 30px rgba(74, 68, 88, 0.24); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ground-card.is-spotlight { transform: none; }
+}
+
+@media (min-width: 900px) {
+  .ground-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

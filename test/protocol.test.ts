@@ -30,6 +30,8 @@ const room = (players: Player[]): RoomState => ({
   teamNames: { teamA: 'A', teamB: 'B' },
   step: -1,
   stepEndsAt: 0,
+  votes: {},
+  chosen: null,
 });
 
 const host = player('Host', 'unassigned', true);
@@ -81,6 +83,37 @@ const code = makeRoomCode();
 check('code is the right length', code.length === ROOM_CODE_LENGTH, code);
 check('code has no vowels', !/[AEIOU]/.test(code), code);
 check('code is uppercase letters', /^[A-Z]+$/.test(code), code);
+
+// --- the battleground draw -------------------------------------------------
+// Every vote is a ticket, so a ground with more votes is likelier but never
+// certain. These pin down that behaviour, including the empty-room case.
+
+import { drawBattleground } from '../src/shared/protocol';
+
+const GROUNDS = ['meadow', 'sky', 'blossom', 'butter'];
+
+check('draws the only voted ground',
+  drawBattleground({ a: 'sky', b: 'sky' }, GROUNDS) === 'sky');
+
+check('with no votes it still draws something',
+  GROUNDS.includes(drawBattleground({}, GROUNDS)));
+
+check('ignores votes for grounds that do not exist',
+  drawBattleground({ a: 'lava', b: 'meadow' }, GROUNDS) === 'meadow');
+
+// A tie must be able to go either way — never fixed to the first entry.
+const seen = new Set<string>();
+for (let i = 0; i < 200; i++) {
+  seen.add(drawBattleground({ a: 'sky', b: 'butter' }, GROUNDS));
+}
+check('a tie can go either way', seen.size === 2, [...seen].join());
+
+// More votes should win more often, without being guaranteed.
+let skyWins = 0;
+for (let i = 0; i < 2000; i++) {
+  if (drawBattleground({ a: 'sky', b: 'sky', c: 'sky', d: 'butter' }, GROUNDS) === 'sky') skyWins++;
+}
+check('more votes means likelier, near 75%', skyWins > 1350 && skyWins < 1650, String(skyWins));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

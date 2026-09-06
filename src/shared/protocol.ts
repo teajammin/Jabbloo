@@ -5,6 +5,16 @@
  * rather than surfacing as a silent runtime mismatch between host and phone.
  */
 
+// The battleground list lives in the engine's theme, which has no imports of
+// its own, so both the server and the canvas can share one definition rather
+// than keeping two lists that drift apart.
+export { battlegrounds, type BattlegroundId } from '../engine/theme';
+
+/** How long everyone has to pick a battleground. */
+export const VOTE_SECONDS = 20;
+/** How long the draw is shown before the battle starts. */
+export const REVEAL_SECONDS = 4;
+
 export const MAX_PLAYERS = 6;
 export const MIN_PLAYERS = 2;
 export const ROOM_CODE_LENGTH = 4;
@@ -73,6 +83,10 @@ export interface RoomState {
   teamNames: { teamA: string; teamB: string };
   /** Index into CREATION_STEPS while creating, else -1. */
   step: number;
+  /** Battleground picks, by player id. Everyone votes, judges included. */
+  votes: Record<string, string>;
+  /** The drawn battleground, once the vote has closed. */
+  chosen: string | null;
   /**
    * When the current step ends, as an epoch millisecond.
    *
@@ -94,7 +108,8 @@ export type ClientMessage =
   | { type: 'submitDrawing'; slot: string; png: string }
   | { type: 'submitName'; slot: string; name: string }
   /** Done early; the step advances once everyone has said so. */
-  | { type: 'ready' };
+  | { type: 'ready' }
+  | { type: 'voteBattleground'; id: string };
 
 // --------------------------------------------------------------- server -> client
 
@@ -112,6 +127,29 @@ export type ServerMessage =
  * Kept here rather than in the server so the host's Start button and the
  * server's validation cannot drift apart — one is the UI for the other.
  */
+/** Everyone with a vote: fighters and judges alike, but not the host screen. */
+export function voters(state: RoomState): Player[] {
+  return state.players.filter((p) => !p.isHost && p.role !== 'unassigned');
+}
+
+/**
+ * Draws a battleground from the votes.
+ *
+ * Every vote is one ticket and one ticket is pulled, so a ground with more
+ * votes is likelier but never certain — which is the point of the Mario Kart
+ * rule the brief asks for. Majority-wins would make three of the four grounds
+ * unreachable in most rooms.
+ */
+export function drawBattleground(
+  votes: Record<string, string>,
+  ids: readonly string[],
+  random: () => number = Math.random,
+): string {
+  const tickets = Object.values(votes).filter((id) => ids.includes(id));
+  const pool = tickets.length > 0 ? tickets : ids;
+  return pool[Math.floor(random() * pool.length)] ?? ids[0]!;
+}
+
 /** Players who actually create things. Judges sit the creation phase out. */
 export function creators(state: RoomState): Player[] {
   return state.players.filter((p) => !p.isHost && p.role !== 'judge' && p.role !== 'unassigned');
