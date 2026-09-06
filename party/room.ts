@@ -2,8 +2,13 @@ import type * as Party from 'partykit/server';
 import {
   CREATION_STEPS,
   MAX_PLAYERS,
+  MOVE_SECONDS,
   REVEAL_SECONDS,
+  ROUNDS_EACH,
+  STARTING_HEALTH,
   VOTE_SECONDS,
+  availableFighters,
+  trimPrompt,
   battlegrounds,
   canStart,
   creators,
@@ -49,6 +54,7 @@ export default class Room implements Party.Server {
       stepEndsAt: 0,
       votes: {},
       chosen: null,
+      turn: null,
     };
   }
 
@@ -111,6 +117,13 @@ export default class Room implements Party.Server {
       case 'requestArt':
         this.onRequestArt(sender);
         break;
+      case 'submitMove':
+        this.onSubmitMove(message.weapon, message.prompt, sender);
+        break;
+      case 'turnDone':
+        // Only the host knows when the animation has finished playing.
+        if (this.isHost(sender)) this.endTurn();
+        break;
       default:
         this.send(sender, { type: 'error', reason: 'Unknown message' });
     }
@@ -147,6 +160,10 @@ export default class Room implements Party.Server {
       connected: true,
       isHost: true,
       progress: { drawn: [], named: [], ready: false },
+      health: STARTING_HEALTH,
+      fights: 0,
+      characterName: '',
+      weaponNames: [],
     };
     this.state.players.push(host);
     this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
@@ -185,6 +202,10 @@ export default class Room implements Party.Server {
       connected: true,
       isHost: false,
       progress: { drawn: [], named: [], ready: false },
+      health: STARTING_HEALTH,
+      fights: 0,
+      characterName: '',
+      weaponNames: [],
     });
 
     this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
@@ -298,11 +319,103 @@ export default class Room implements Party.Server {
     this.state.stepEndsAt = Date.now() + REVEAL_SECONDS * 1000;
     this.broadcastState();
 
-    this.stepTimer = setTimeout(() => {
-      this.state.phase = 'battle';
+    this.stepTimer = setTimeout(() => this.beginBattle(), REVEAL_SECONDS * 1000);
+  }
+
+  // --------------------------------------------------------------------- battle
+
+  private beginBattle(): void {
+    this.state.phase = 'battle';
+    for (const player of this.state.players) {
+      player.health = STARTING_HEALTH;
+      player.fights = 0;
+    }
+    this.beginTurn();
+  }
+
+  /**
+   * Brings a fighter on from each side.
+   *
+   * Chosen at random among those still standing and still owed rounds, which
+   * is the brief's tag-team rule; in a 1v1 there is only ever one candidate,
+   * so the same code covers both.
+   */
+  private beginTurn(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+
+    const left = availableFighters(this.state, 'teamA');
+    const right = availableFighters(this.state, 'teamB');
+
+    // A side with nobody left to fight ends the battle.
+    if (left.length === 0 || right.length === 0) {
+      this.state.turn = null;
+      this.state.phase = 'results';
       this.state.stepEndsAt = 0;
       this.broadcastState();
-    }, REVEAL_SECONDS * 1000);
+      return;
+    }
+
+    const a = left[Math.floor(Math.random() * left.length)]!;
+    const b = right[Math.floor(Math.random() * right.length)]!;
+
+    this.state.turn = {
+      fighters: [a.id, b.id],
+      moves: {},
+      first: null,
+      phase: 'picking',
+    };
+    this.state.stepEndsAt = Date.now() + MOVE_SECONDS * 1000;
+    this.stepTimer = setTimeout(() => this.closeMoves(), MOVE_SECONDS * 1000);
+    this.broadcastState();
+  }
+
+  private onSubmitMove(weapon: number, prompt: string, sender: Party.Connection): void {
+    const turn = this.state.turn;
+    if (!turn || turn.phase !== 'picking') return;
+    if (!turn.fighters.includes(sender.id)) return;
+
+    turn.moves[sender.id] = {
+      weapon: Math.max(0, Math.min(2, Math.floor(weapon) || 0)),
+      prompt: trimPrompt(prompt),
+    };
+    this.broadcastState();
+
+    if (turn.fighters.every((id) => turn.moves[id])) this.closeMoves();
+  }
+
+  /**
+   * Locks the moves in and draws who strikes first.
+   *
+   * Drawn only once both are in, so submitting early buys nothing — a player
+   * who could win the first strike by being quick would be racing rather than
+   * writing.
+   */
+  private closeMoves(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    const turn = this.state.turn;
+    if (!turn || turn.phase !== 'picking') return;
+
+    // Anyone who wrote nothing still fights; the brief says an unusable
+    // request just swings the weapon like an axe.
+    for (const id of turn.fighters) {
+      if (!turn.moves[id]) turn.moves[id] = { weapon: 0, prompt: '' };
+    }
+
+    turn.first = turn.fighters[Math.floor(Math.random() * 2)]!;
+    turn.phase = 'playing';
+    this.state.stepEndsAt = 0;
+    this.broadcastState();
+  }
+
+  /** The host reports a finished exchange; the next turn is set up. */
+  private endTurn(): void {
+    const turn = this.state.turn;
+    if (!turn) return;
+    for (const id of turn.fighters) {
+      const player = this.state.players.find((p) => p.id === id);
+      if (player) player.fights += 1;
+    }
+    this.beginTurn();
   }
 
   private onSubmitDrawing(slot: string, png: string, sender: Party.Connection): void {
@@ -325,6 +438,14 @@ export default class Room implements Party.Server {
     // a player who runs out of time should not stall the whole room.
     const clean = (typeof name === 'string' ? name : '').trim().slice(0, 24) || defaultName(slot);
     this.names.set(`${player.id}:${slot}`, clean);
+
+    // Mirrored onto the player so every screen has them without asking.
+    if (slot === 'character') player.characterName = clean;
+    else {
+      const index = Number(slot.replace('weapon', ''));
+      if (Number.isInteger(index)) player.weaponNames[index] = clean;
+    }
+
     if (!player.progress.named.includes(slot)) player.progress.named.push(slot);
     player.progress.ready = true;
     this.broadcastState();

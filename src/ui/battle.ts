@@ -1,5 +1,6 @@
 import { el, type Screen } from './screens';
 import type { RoomConnection } from '../net/room';
+import { moveScreen } from './move';
 import {
   creators, type BattlegroundId, type PlayerArt, type RoomState,
 } from '../shared/protocol';
@@ -13,17 +14,36 @@ import {
  * prompt box should never download it.
  */
 export function battleScreen(connection: RoomConnection, isHost: boolean): Screen {
-  return (root) => {
+  return (root, go) => {
     let disposed = false;
     let teardownStage: (() => void) | null = null;
 
     if (!isHost) {
-      root.append(
-        el('main', { class: 'screen' },
-          el('h1', { class: 'creation-title' }, 'Watch the big screen'),
-          el('p', { class: 'lede' }, 'Your turn will appear here when it comes.'),
-        ),
+      const waiting = el('main', { class: 'screen' },
+        el('h1', { class: 'creation-title' }, 'Watch the big screen'),
+        el('p', { class: 'lede' }, 'Your turn will appear here when it comes.'),
       );
+      root.append(waiting);
+
+      let showingMove = false;
+      connection.on({
+        onState: (state) => {
+          const turn = state.turn;
+          const me = state.players.find((p) => p.id === connection.playerId);
+          const mine = Boolean(turn && me && turn.fighters.includes(me.id));
+
+          // Swap in only on the way into a turn, so a state update mid-typing
+          // never rebuilds the screen and wipes what has been written.
+          if (mine && turn?.phase === 'picking' && !showingMove && me) {
+            showingMove = true;
+            const weapons = (me.weaponNames.length
+              ? me.weaponNames
+              : ['Sword', 'Axe', 'Hammer']
+            ).map((name) => ({ name: name || 'Weapon' }));
+            go(moveScreen(connection, weapons, me.characterName || me.name));
+          }
+        },
+      });
       return;
     }
 

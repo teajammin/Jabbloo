@@ -10,6 +10,15 @@
 // than keeping two lists that drift apart.
 export { battlegrounds, type BattlegroundId } from '../engine/theme';
 
+/** The brief's cap on how much a player may write for one move. */
+export const MAX_PROMPT_WORDS = 50;
+/** How long a player has to choose a weapon and describe the move. */
+export const MOVE_SECONDS = 60;
+/** Rounds each character fights. */
+export const ROUNDS_EACH = 3;
+/** Everyone starts here; a fighter at zero is knocked out. */
+export const STARTING_HEALTH = 100;
+
 /** How long everyone has to pick a battleground. */
 export const VOTE_SECONDS = 20;
 /** How long the draw is shown before the battle starts. */
@@ -32,6 +41,17 @@ export interface Player {
   /** The host runs the shared screen; everyone else is on a phone. */
   isHost: boolean;
   progress: CreationProgress;
+  health: number;
+  /** Rounds fought, so nobody fights a fourth time. */
+  fights: number;
+  /**
+   * Names only — the artwork stays on the server.
+   *
+   * A few short strings are cheap to broadcast and every screen needs them:
+   * the phone to label its weapon buttons, the host to caption the fight.
+   */
+  characterName: string;
+  weaponNames: string[];
 }
 
 export type Phase = 'lobby' | 'creating' | 'battleground' | 'battle' | 'results';
@@ -64,6 +84,30 @@ export const CREATION_STEPS: CreationStep[] = [
   ]).flat(),
 ];
 
+/** One player's move for the current turn. */
+export interface Move {
+  /** Index into their three weapons. */
+  weapon: number;
+  prompt: string;
+}
+
+/** What is happening on the battle stage right now. */
+export type TurnPhase = 'entering' | 'picking' | 'playing' | 'judging' | 'over';
+
+export interface Turn {
+  /** The two players on stage: team A's fighter, then team B's. */
+  fighters: [string, string];
+  moves: Record<string, Move>;
+  /**
+   * Who strikes first, drawn once both moves are in.
+   *
+   * The brief has the AI pick at random, so neither player gains anything by
+   * submitting first — which they otherwise would, having seen nothing.
+   */
+  first: string | null;
+  phase: TurnPhase;
+}
+
 /** What a player has finished so far. Artwork itself stays on the server. */
 export interface CreationProgress {
   /** Slots with a drawing submitted. */
@@ -87,6 +131,8 @@ export interface RoomState {
   votes: Record<string, string>;
   /** The drawn battleground, once the vote has closed. */
   chosen: string | null;
+  /** The turn being fought, or null outside the battle. */
+  turn: Turn | null;
   /**
    * When the current step ends, as an epoch millisecond.
    *
@@ -111,7 +157,10 @@ export type ClientMessage =
   | { type: 'ready' }
   | { type: 'voteBattleground'; id: string }
   /** The host asks for everyone's artwork once the battle starts. */
-  | { type: 'requestArt' };
+  | { type: 'requestArt' }
+  | { type: 'submitMove'; weapon: number; prompt: string }
+  /** The host reports that the exchange has finished playing. */
+  | { type: 'turnDone' };
 
 // --------------------------------------------------------------- server -> client
 
@@ -137,6 +186,27 @@ export type ServerMessage =
  * Kept here rather than in the server so the host's Start button and the
  * server's validation cannot drift apart — one is the UI for the other.
  */
+/**
+ * Trims a written move to the brief's limit.
+ *
+ * Counting words rather than characters, since that is what the brief asks
+ * for and what a player is thinking in.
+ */
+export function trimPrompt(text: string, max = MAX_PROMPT_WORDS): string {
+  return String(text ?? '').trim().split(/\s+/).filter(Boolean).slice(0, max).join(' ');
+}
+
+export function wordCount(text: string): number {
+  return String(text ?? '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Fighters still standing and still owed rounds. */
+export function availableFighters(state: RoomState, team: Role): Player[] {
+  return state.players.filter(
+    (p) => p.role === team && p.health > 0 && p.fights < ROUNDS_EACH,
+  );
+}
+
 /** Everyone with a vote: fighters and judges alike, but not the host screen. */
 export function voters(state: RoomState): Player[] {
   return state.players.filter((p) => !p.isHost && p.role !== 'unassigned');

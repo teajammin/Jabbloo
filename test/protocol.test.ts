@@ -20,6 +20,10 @@ const check = (name: string, cond: boolean, detail = '') => {
 const player = (name: string, role: Player['role'], isHost = false): Player => ({
   id: name, name, role, connected: true, isHost,
   progress: { drawn: [], named: [], ready: false },
+  health: 100,
+  fights: 0,
+  characterName: name,
+  weaponNames: [],
 });
 
 const room = (players: Player[]): RoomState => ({
@@ -32,6 +36,7 @@ const room = (players: Player[]): RoomState => ({
   stepEndsAt: 0,
   votes: {},
   chosen: null,
+  turn: null,
 });
 
 const host = player('Host', 'unassigned', true);
@@ -114,6 +119,20 @@ for (let i = 0; i < 2000; i++) {
   if (drawBattleground({ a: 'sky', b: 'sky', c: 'sky', d: 'butter' }, GROUNDS) === 'sky') skyWins++;
 }
 check('more votes means likelier, near 75%', skyWins > 1350 && skyWins < 1650, String(skyWins));
+
+// --- written moves ---------------------------------------------------------
+
+import { trimPrompt, wordCount, MAX_PROMPT_WORDS } from '../src/shared/protocol';
+
+check('counts words, not characters', wordCount('spin the sword overhead') === 4);
+check('ignores extra spacing', wordCount('  spin   the   sword  ') === 3);
+check('an empty prompt is zero', wordCount('   ') === 0);
+
+const long = Array.from({ length: 80 }, (_, i) => `w${i}`).join(' ');
+check(`trims to ${MAX_PROMPT_WORDS} words`, wordCount(trimPrompt(long)) === MAX_PROMPT_WORDS);
+check('keeps the opening words', trimPrompt(long).startsWith('w0 w1 w2'));
+check('a short prompt is untouched', trimPrompt('bonk them') === 'bonk them');
+check('collapses whitespace', trimPrompt(' bonk\n  them ') === 'bonk them');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
