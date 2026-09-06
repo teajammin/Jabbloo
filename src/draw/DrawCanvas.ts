@@ -383,6 +383,80 @@ export class DrawCanvas {
   /** The element that receives pointer events — the overlay sits on top. */
   get surface(): HTMLCanvasElement { return this.overlay; }
 
+  /** Throws away the stroke in progress without committing it to history. */
+  abortStroke(): void {
+    if (!this.live) return;
+    this.live = null;
+    this.repaint();
+  }
+
+  /**
+   * Selects the connected shape under a point — the "subject" a player means
+   * when they hold a finger on something.
+   *
+   * Floods outward across pixels that are drawn on at all, then takes the
+   * bounding box of what it reached. Colour is deliberately ignored: a drawing
+   * is usually many colours but one object, and matching on colour would grab
+   * only part of it.
+   *
+   * Returns false when the point is on empty canvas.
+   */
+  selectSubjectAt(at: Point): boolean {
+    const x0 = Math.floor(at.x);
+    const y0 = Math.floor(at.y);
+    if (x0 < 0 || y0 < 0 || x0 >= CANVAS_W || y0 >= CANVAS_H) return false;
+
+    const { data } = this.ctx.getImageData(0, 0, CANVAS_W, CANVAS_H);
+    const solid = (x: number, y: number) => data[(y * CANVAS_W + x) * 4 + 3]! > 16;
+    if (!solid(x0, y0)) return false;
+
+    const seen = new Uint8Array(CANVAS_W * CANVAS_H);
+    const stack = [x0, y0];
+    let minX = x0, maxX = x0, minY = y0, maxY = y0;
+
+    // Scanline flood: per-pixel queues are far too slow at this size on a phone.
+    while (stack.length) {
+      const y = stack.pop()!;
+      let x = stack.pop()!;
+      while (x >= 0 && solid(x, y) && !seen[y * CANVAS_W + x]) x--;
+      x++;
+
+      let spanAbove = false;
+      let spanBelow = false;
+      while (x < CANVAS_W && solid(x, y) && !seen[y * CANVAS_W + x]) {
+        seen[y * CANVAS_W + x] = 1;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+
+        if (y > 0) {
+          const above = solid(x, y - 1) && !seen[(y - 1) * CANVAS_W + x];
+          if (above && !spanAbove) { stack.push(x, y - 1); spanAbove = true; }
+          else if (!above) spanAbove = false;
+        }
+        if (y < CANVAS_H - 1) {
+          const below = solid(x, y + 1) && !seen[(y + 1) * CANVAS_W + x];
+          if (below && !spanBelow) { stack.push(x, y + 1); spanBelow = true; }
+          else if (!below) spanBelow = false;
+        }
+        x++;
+      }
+    }
+
+    // A little padding so anti-aliased edges are not clipped off.
+    const pad = 3;
+    this.selection = {
+      x: Math.max(0, minX - pad),
+      y: Math.max(0, minY - pad),
+      w: Math.min(CANVAS_W, maxX + pad) - Math.max(0, minX - pad) + 1,
+      h: Math.min(CANVAS_H, maxY + pad) - Math.max(0, minY - pad) + 1,
+    };
+    this.drawOverlay();
+    this.onChange?.();
+    return true;
+  }
+
   selectAll(): void {
     this.selection = { x: 0, y: 0, w: CANVAS_W, h: CANVAS_H };
     this.drawOverlay();

@@ -37,23 +37,69 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     let drawing = false;
 
+    /**
+     * Hold-to-grab.
+     *
+     * Holding still on a shape selects it, copies it, and drops a floating copy
+     * ready to drag — the touch equivalent of right-click, and the brief's
+     * "copy and paste any object".
+     *
+     * Guarded so it cannot fire mid-drawing: it needs a near-motionless hold,
+     * and it aborts if the stroke has actually gone anywhere. A slow deliberate
+     * line should never turn into a copy.
+     */
+    const HOLD_MS = 500;
+    const HOLD_SLOP = 10;
+    let holdTimer: number | null = null;
+    let holdStart: { x: number; y: number } | null = null;
+
+    const cancelHold = () => {
+      if (holdTimer !== null) { clearTimeout(holdTimer); holdTimer = null; }
+      holdStart = null;
+    };
+
+    const grabSubject = (at: { x: number; y: number; p: number }) => {
+      canvas.abortStroke();
+      drawing = false;
+      if (!canvas.selectSubjectAt(at)) return;
+      canvas.copy();
+      canvas.paste();
+      selectTool('select');
+      // A short buzz confirms the grab, since there is no cursor to show it.
+      navigator.vibrate?.(18);
+    };
+
     const onDown = (event: PointerEvent) => {
       if (!event.isPrimary) return;
       event.preventDefault();
       surface.setPointerCapture(event.pointerId);
       drawing = true;
-      canvas.beginStroke(tool, colour, size, canvas.toCanvas(event), filled);
+      const at = canvas.toCanvas(event);
+      canvas.beginStroke(tool, colour, size, at, filled);
+
+      holdStart = { x: event.clientX, y: event.clientY };
+      holdTimer = window.setTimeout(() => {
+        holdTimer = null;
+        grabSubject(at);
+      }, HOLD_MS);
     };
 
     const onMove = (event: PointerEvent) => {
       if (!drawing) return;
       event.preventDefault();
+
+      if (holdStart && Math.hypot(
+        event.clientX - holdStart.x, event.clientY - holdStart.y,
+      ) > HOLD_SLOP) {
+        cancelHold();
+      }
       // Coalesced events keep fast strokes smooth without flooding the model.
       const events = event.getCoalescedEvents?.() ?? [event];
       for (const e of events) canvas.extendStroke(canvas.toCanvas(e));
     };
 
     const onUp = (event: PointerEvent) => {
+      cancelHold();
       if (!drawing) return;
       drawing = false;
       canvas.endStroke();
@@ -244,6 +290,8 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       el('main', { class: 'screen screen-draw' },
         el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),
         stage,
+        el('p', { class: 'draw-hint' },
+          'Hold on a shape to copy it · drag the copy to place it'),
         el('div', { class: 'toolbar' },
           toolRow,
           sizeRow,

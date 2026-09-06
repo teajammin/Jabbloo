@@ -408,7 +408,11 @@ input[type='text'] {
   height: 100dvh;
   justify-content: flex-start;
   gap: 8px;
-  padding: 8px 8px 12px;
+  /* Clears the home indicator and notch on a phone. */
+  padding: max(8px, env(safe-area-inset-top)) 8px
+           max(12px, env(safe-area-inset-bottom)) 8px;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .draw-title { margin: 0; font-size: 15px; }
@@ -453,9 +457,24 @@ input[type='text'] {
 
 .tool-row {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
+  /* Scrolls sideways rather than wrapping: a wrapping row changes height
+     unpredictably, and every wrap steals height from the canvas. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.tool-row::-webkit-scrollbar { display: none; }
+.tool-row > * { flex: 0 0 auto; }
+
+.draw-hint {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.55;
+  text-align: center;
 }
 
 /* Every control clears the 44px minimum tap target. */
@@ -498,8 +517,19 @@ input[type='text'] {
 .swatch[aria-pressed='true'] { box-shadow: 0 0 0 3px var(--ink), var(--shadow); }
 .swatch.custom { padding: 2px; background: #fff; }
 
-@media (max-width: 420px) {
-  .tool { min-width: 46px; min-height: 46px; font-size: 18px; }
+/* On a phone the toolbar is trimmed so the canvas keeps as much height as
+   possible, while every control stays at a comfortable tap size. */
+@media (max-width: 480px) {
+  .screen-draw { gap: 6px; }
+  .draw-title { display: none; }
+  .tool { min-width: 46px; min-height: 46px; font-size: 18px; padding: 6px 8px; }
+  .tool.wide { min-width: 70px; font-size: 14px; }
   .size { width: 46px; height: 46px; }
   .swatch { width: 34px; height: 34px; min-height: 34px; }
+  .toolbar { gap: 6px; }
+}
+
+/* Short screens (landscape phones) drop the hint too. */
+@media (max-height: 560px) {
+  .draw-hint { display: none; }
 }
