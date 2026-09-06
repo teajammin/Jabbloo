@@ -800,9 +800,22 @@ input[type='text'] {
   display: flex;
 }
 
-.creation-canvas .screen-draw {
+/* Embedded, it fills its slot rather than claiming the viewport. */
+.screen-draw.is-embedded {
   height: 100%;
+  width: 100%;
   padding: 0;
+}
+
+/*
+ * On a phone the heading, subheading and timer sit above a tool that already
+ * needs every pixel. The timer stays — it is the one thing a player cannot
+ * infer — and the rest gives way.
+ */
+@media (max-width: 480px) {
+  .screen-creation { gap: 8px; }
+  .creation-title { font-size: 17px; }
+  .screen-creation > .lede { display: none; }
 }
 
 .creation-preview {

@@ -29,6 +29,13 @@ const SWATCHES = [
 export interface DrawScreenOptions {
   title?: string;
   onDone?: (png: string) => void;
+  /**
+   * Rendered inside another screen rather than as one.
+   *
+   * Nesting a <main> inside a <main> is invalid and leaves a screen reader
+   * with two competing landmarks, so an embedded tool is a <section>.
+   */
+  embedded?: boolean;
 }
 
 export function drawScreen(options: DrawScreenOptions = {}): Screen {
@@ -636,10 +643,13 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     };
     window.addEventListener('keydown', onKey);
 
-    root.append(
-      el('main', { class: 'screen screen-draw' },
-        el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),
-        area,
+    const shell = options.embedded
+      ? el('section', { class: 'screen screen-draw is-embedded' })
+      : el('main', { class: 'screen screen-draw' });
+
+    shell.append(
+      el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),
+      area,
         el('div', { class: 'toolbar' },
           toolRow,
           sizeRow,
@@ -652,10 +662,9 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
           fileInput,
           status,
         ),
-      ),
-      helpDialog,
-      tip,
     );
+
+    root.append(shell, helpDialog, tip);
 
     return () => {
       surface.removeEventListener('pointerdown', onDown);

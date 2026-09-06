@@ -45,6 +45,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       // drawScreen is a Screen, so it mounts into a host element of its own.
       const teardown = drawScreen({
         title: prompt,
+        embedded: true,
         onDone: (png) => {
           submitDrawing(png, slot);
           showWaiting('Saved — waiting for everyone else');
@@ -82,6 +83,10 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     }
 
     function showWaiting(message: string): void {
+      // Tear down whatever was showing first. Replacing the DOM alone leaves
+      // the drawing tool's window listener bound and its menu in document.body
+      // — once per drawing step, so four by the end of the flow.
+      for (const fn of cleanups.splice(0)) fn();
       body.replaceChildren(
         el('p', { class: 'lede waiting' }, message),
         roster,
@@ -147,6 +152,10 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       else showName(step.slot);
     }
 
+    root.append(
+      el('main', { class: 'screen screen-creation' }, heading, subheading, clock.root, body),
+    );
+
     connection.on({
       onState: (state) => {
         if (state.phase === 'battleground') {
@@ -163,10 +172,6 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     });
 
     if (connection.state) render(connection.state);
-
-    root.append(
-      el('main', { class: 'screen screen-creation' }, heading, subheading, clock.root, body),
-    );
 
     return () => {
       clock.stop();
