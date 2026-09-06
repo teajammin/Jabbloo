@@ -1,7 +1,10 @@
 import { el, button, type Screen } from './screens';
 import { DrawCanvas } from '../draw/DrawCanvas';
 import { THICKNESSES, type ToolName } from '../draw/types';
-import { MAX_UPLOADS, cutSubject, importFile, placeOnCanvas } from '../draw/images';
+import {
+  MAX_UPLOADS, cropImage, cutSubject, importFile, maskImage, placeOnCanvas,
+  type MaskShape,
+} from '../draw/images';
 import { CONTROL_HELP, drawHelpDialog } from './drawHelp';
 
 /**
@@ -253,9 +256,12 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     const fileInput = el('input', { type: 'file', accept: 'image/*', class: 'sr-only' });
 
     const uploadButton = control('upload', () => fileInput.click());
+
+    // Deliberately never disabled: a greyed-out button with no explanation is
+    // what made this one unreadable. It now says what it needs instead.
     const cutoutButton = control('cutout', async () => {
       const layer = canvas.floatingLayer;
-      if (!layer) { say('Add a photo first, then cut it out'); return; }
+      if (!layer) { say('Add a photo with 🖼️ first, then ✂️ removes its background'); return; }
       cutoutButton.disabled = true;
       say('Cutting out…');
       try {
@@ -270,6 +276,35 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     });
     const biggerButton = control('bigger', () => canvas.scaleFloating(1.15));
     const smallerButton = control('smaller', () => canvas.scaleFloating(1 / 1.15));
+
+    // --- cropping ----------------------------------------------------------
+
+    const cropButton = control('crop', async () => {
+      if (!canvas.hasFloating) { say('Add a photo with 🖼️ first'); return; }
+      if (!canvas.hasSelection) {
+        selectTool('select');
+        say('Drag a box over the photo, then tap ⬚✂ again to trim it');
+        return;
+      }
+      const cropped = await canvas.cropFloatingToSelection(cropImage);
+      say(cropped ? 'Trimmed — drag it into place' : 'Draw the box over the photo');
+    });
+
+    const shapeButton = (key: MaskShape) => control(key, async () => {
+      const layer = canvas.floatingLayer;
+      if (!layer) { say('Add a photo with 🖼️ first, then pick a shape'); return; }
+      say('Cutting the shape…');
+      try {
+        canvas.replaceFloating(await maskImage(layer.data, key));
+        say('Shaped — drag it into place, then pick another tool to keep it');
+      } catch {
+        say('Could not cut that shape');
+      }
+    });
+    const circleButton = shapeButton('circle');
+    const triangleButton = shapeButton('triangle');
+    const starButton = shapeButton('star');
+    const heartButton = shapeButton('heart');
 
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files?.[0];
@@ -328,13 +363,12 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       doneButton.disabled = canvas.isEmpty;
       copyButton.disabled = !canvas.hasSelection;
       pasteButton.disabled = !canvas.hasClipboard;
-      cutoutButton.disabled = !canvas.hasFloating;
       biggerButton.disabled = !canvas.hasFloating;
       smallerButton.disabled = !canvas.hasFloating;
       uploadButton.disabled = uploadsUsed >= MAX_UPLOADS;
     });
     for (const node of [undoButton, redoButton, clearButton, doneButton, copyButton,
-      pasteButton, cutoutButton, biggerButton, smallerButton]) {
+      pasteButton, biggerButton, smallerButton]) {
       node.disabled = true;
     }
 
@@ -405,7 +439,10 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
           sizeRow,
           colourRow,
           el('div', { class: 'tool-row' },
-            uploadButton, cutoutButton, smallerButton, biggerButton,
+            uploadButton, cutoutButton, cropButton, smallerButton, biggerButton),
+          el('div', { class: 'tool-row' },
+            circleButton, triangleButton, starButton, heartButton),
+          el('div', { class: 'tool-row' },
             undoButton, redoButton, copyButton, pasteButton),
           el('div', { class: 'tool-row' }, helpButton, clearButton, doneButton),
           fileInput,

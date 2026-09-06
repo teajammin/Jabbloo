@@ -26,7 +26,12 @@ export const CONTROL_HELP: Record<string, ControlHelp> = {
   filled: { icon: 'Filled', name: 'Filled shapes', what: 'Switches shapes between outline and solid.' },
 
   upload: { icon: '🖼️', name: 'Add a photo', what: 'Bring in a picture from your camera or library. Five per drawing.' },
-  cutout: { icon: '✂️', name: 'Remove background', what: 'Cuts the subject out of the photo you just placed.' },
+  cutout: { icon: '✂️', name: 'Remove background', what: 'Rubs out the background of a photo you have placed, leaving just the subject.' },
+  crop: { icon: '⬚✂', name: 'Crop to box', what: 'Drag a box over a placed photo, then tap this to trim it to that box.' },
+  circle: { icon: '⭕', name: 'Crop to circle', what: 'Cuts a placed photo into a circle.' },
+  triangle: { icon: '🔺', name: 'Crop to triangle', what: 'Cuts a placed photo into a triangle.' },
+  star: { icon: '⭐', name: 'Crop to star', what: 'Cuts a placed photo into a star.' },
+  heart: { icon: '💗', name: 'Crop to heart', what: 'Cuts a placed photo into a heart.' },
   smaller: { icon: '－', name: 'Shrink', what: 'Makes the photo you are placing smaller.' },
   bigger: { icon: '＋', name: 'Enlarge', what: 'Makes the photo you are placing bigger.' },
 

@@ -500,6 +500,38 @@ export class DrawCanvas {
     this.onChange?.();
   }
 
+  /**
+   * Crops the floating layer to the marquee.
+   *
+   * Both rectangles are in canvas coordinates; the overlap between them is
+   * converted to fractions of the layer so the source image's own resolution
+   * stays out of it.
+   */
+  async cropFloatingToSelection(
+    crop: (data: string, fx: number, fy: number, fw: number, fh: number) => Promise<string>,
+  ): Promise<boolean> {
+    const f = this.floating;
+    const area = this.normalisedSelection();
+    if (!f || !area) return false;
+
+    const x = Math.max(area.x, f.x);
+    const y = Math.max(area.y, f.y);
+    const x2 = Math.min(area.x + area.w, f.x + f.w);
+    const y2 = Math.min(area.y + area.h, f.y + f.h);
+    if (x2 - x < 4 || y2 - y < 4) return false;
+
+    const data = await crop(f.data, (x - f.x) / f.w, (y - f.y) / f.h, (x2 - x) / f.w, (y2 - y) / f.h);
+
+    this.floating = { ...f, data, x, y, w: x2 - x, h: y2 - y };
+    this.floatingImage = new Image();
+    this.floatingImage.addEventListener('load', () => this.drawOverlay());
+    this.floatingImage.src = data;
+    this.selection = null;
+    this.drawOverlay();
+    this.onChange?.();
+    return true;
+  }
+
   selectAll(): void {
     this.selection = { x: 0, y: 0, w: CANVAS_W, h: CANVAS_H };
     this.drawOverlay();
