@@ -157,6 +157,8 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     /** True while a crop handle is being dragged, so drawing stays suppressed. */
     let croppingDrag = false;
+    /** True while a placed photo is being moved or scaled. */
+    let transformDrag = false;
 
     const onDown = (event: PointerEvent) => {
       if (!event.isPrimary) return;
@@ -173,26 +175,36 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         return;
       }
 
+      // A placed photo is a modal thing: touching it moves or scales it,
+      // whichever tool is selected. Touching away from it places it and
+      // carries on drawing, which is what tapping elsewhere already meant.
+      if (canvas.hasFloating) {
+        const handle = canvas.transformHandleAt(at);
+        if (handle) {
+          canvas.beginTransformDrag(handle, at);
+          transformDrag = true;
+          holdStart = { x: event.clientX, y: event.clientY };
+          const { clientX, clientY } = event;
+          holdTimer = window.setTimeout(() => {
+            holdTimer = null;
+            canvas.endTransformDrag();
+            transformDrag = false;
+            menu.open(clientX, clientY);
+            navigator.vibrate?.(14);
+          }, HOLD_MS);
+          return;
+        }
+        canvas.commitFloating();
+        say('Photo placed');
+      }
+
       drawing = true;
       canvas.beginStroke(tool, colour, size, at, filled);
 
       holdStart = { x: event.clientX, y: event.clientY };
-      const overPhoto = canvas.hasFloating && canvas.isOverFloating(at);
-      const { clientX, clientY } = event;
       holdTimer = window.setTimeout(() => {
         holdTimer = null;
-        if (overPhoto) {
-          // Holding a placed photo offers its options, the way a phone
-          // surfaces actions on a picture.
-          canvas.abortStroke();
-          drawing = false;
-          menu.open(clientX, clientY);
-          navigator.vibrate?.(14);
-          return;
-        }
-        // Positioning a paste also means holding still, so a grab must not
-        // fire and replace what is being placed.
-        if (!canvas.hasFloating) grabSubject(at);
+        grabSubject(at);
       }, HOLD_MS);
     };
 
@@ -200,6 +212,16 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       if (croppingDrag) {
         event.preventDefault();
         canvas.dragCrop(canvas.toCanvas(event));
+        return;
+      }
+      if (transformDrag) {
+        event.preventDefault();
+        if (holdStart && Math.hypot(
+          event.clientX - holdStart.x, event.clientY - holdStart.y,
+        ) > HOLD_SLOP) {
+          cancelHold();
+        }
+        canvas.dragTransform(canvas.toCanvas(event));
         return;
       }
       if (!drawing) return;
@@ -215,9 +237,11 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     const onUp = (event: PointerEvent) => {
       cancelHold();
-      if (croppingDrag) {
+      if (croppingDrag || transformDrag) {
         croppingDrag = false;
+        transformDrag = false;
         canvas.endCropDrag();
+        canvas.endTransformDrag();
         if (surface.hasPointerCapture(event.pointerId)) {
           surface.releasePointerCapture(event.pointerId);
         }
@@ -356,7 +380,14 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         canvas.placeImage(image.data, spot.x, spot.y, spot.w, spot.h);
         uploadsUsed++;
         selectTool('select');
-        say(`Hold the photo for crop and background options · ${MAX_UPLOADS - uploadsUsed} left`);
+        say(`Drag to move · corners resize · ${MAX_UPLOADS - uploadsUsed} photos left`);
+
+        // On touch there is no right-click to discover, so the options open
+        // themselves the first time a photo lands.
+        if (!window.matchMedia('(hover: hover)').matches) {
+          const rect = surface.getBoundingClientRect();
+          menu.open(rect.left + rect.width / 2, rect.top + rect.height * 0.42);
+        }
       } catch {
         say('Could not read that image');
       }
@@ -412,6 +443,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       {
         icon: '✓', label: 'Place it here', tone: 'confirm', separated: true,
         onPick: () => {
+          menu.close();
           canvas.commitFloating();
           say('Photo placed — ← undoes it');
         },

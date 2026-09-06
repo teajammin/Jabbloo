@@ -43,6 +43,8 @@ export class DrawCanvas {
   private cropRect: Selection | null = null;
   private activeHandle: CropHandle | null = null;
   private cropGrabOffset = { x: 0, y: 0 };
+  /** Handle held while moving or scaling a placed photo, outside crop mode. */
+  private transformHandle: CropHandle | null = null;
   /** Overlay for the marquee and floating paste, kept off the drawing itself. */
   private readonly overlay: HTMLCanvasElement;
   private readonly overlayCtx: CanvasRenderingContext2D;
@@ -538,6 +540,66 @@ export class DrawCanvas {
     return true;
   }
 
+  // --------------------------------------------------------------- transform
+
+  /**
+   * What a touch on a placed photo would do, outside crop mode.
+   *
+   * Corners scale it, anywhere inside moves it. Edges are deliberately absent:
+   * trimming is a decision, and offering it on every accidental touch would
+   * mean people cut their photo by mistake. Cropping is reached from the menu.
+   */
+  transformHandleAt(at: Point): CropHandle | null {
+    const f = this.floating;
+    if (!f || this.cropRect) return null;
+    const hit = DrawCanvas.HANDLE_HIT / 2;
+    const corners: [CropHandle, number, number][] = [
+      ['nw', f.x, f.y], ['ne', f.x + f.w, f.y],
+      ['se', f.x + f.w, f.y + f.h], ['sw', f.x, f.y + f.h],
+    ];
+    for (const [name, hx, hy] of corners) {
+      if (Math.abs(at.x - hx) <= hit && Math.abs(at.y - hy) <= hit) return name;
+    }
+    return this.hitsFloating(at) ? 'move' : null;
+  }
+
+  beginTransformDrag(handle: CropHandle, at: Point): void {
+    const f = this.floating;
+    if (!f) return;
+    this.transformHandle = handle;
+    this.cropGrabOffset = { x: at.x - f.x, y: at.y - f.y };
+  }
+
+  /** Scales about the opposite corner, or moves; proportions are preserved. */
+  dragTransform(at: Point): void {
+    const f = this.floating;
+    const handle = this.transformHandle;
+    if (!f || !handle) return;
+
+    if (handle === 'move') {
+      f.x = at.x - this.cropGrabOffset.x;
+      f.y = at.y - this.cropGrabOffset.y;
+      this.drawOverlay();
+      return;
+    }
+
+    const MIN = 40;
+    const aspect = f.w / f.h;
+    const anchorX = handle === 'nw' || handle === 'sw' ? f.x + f.w : f.x;
+    const anchorY = handle === 'nw' || handle === 'ne' ? f.y + f.h : f.y;
+
+    const newW = Math.max(MIN, Math.abs(at.x - anchorX));
+    const newH = newW / aspect;
+
+    f.x = handle === 'nw' || handle === 'sw' ? anchorX - newW : anchorX;
+    f.y = handle === 'nw' || handle === 'ne' ? anchorY - newH : anchorY;
+    f.w = newW;
+    f.h = newH;
+    this.drawOverlay();
+  }
+
+  endTransformDrag(): void { this.transformHandle = null; }
+
   // -------------------------------------------------------------------- crop
 
   /**
@@ -831,12 +893,37 @@ export class DrawCanvas {
         this.strokeCropFrame(ctx, this.cropRect, f);
       } else {
         this.strokeMarquee(ctx, f.x, f.y, f.w, f.h);
+        // Corner grips only: a photo can be moved and scaled by touch, but
+        // trimming stays behind the menu so it cannot happen by accident.
+        this.strokeCorners(ctx, f);
       }
       return;
     }
 
     const area = this.normalisedSelection();
     if (area) this.strokeMarquee(ctx, area.x, area.y, area.w, area.h);
+  }
+
+  /** Round grips at each corner of a placed photo. */
+  private strokeCorners(
+    ctx: CanvasRenderingContext2D, f: { x: number; y: number; w: number; h: number },
+  ): void {
+    const d = DrawCanvas.HANDLE_DRAW;
+    const corners: [number, number][] = [
+      [f.x, f.y], [f.x + f.w, f.y], [f.x + f.w, f.y + f.h], [f.x, f.y + f.h],
+    ];
+    ctx.save();
+    for (const [hx, hy] of corners) {
+      ctx.beginPath();
+      ctx.arc(hx, hy, d / 2 + 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#4a4458';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(hx, hy, d / 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   /**
