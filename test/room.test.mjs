@@ -12,7 +12,10 @@
  */
 // Drives the PartyKit room over raw WebSockets: host opens, two phones join,
 // host assigns teams, host starts.
-const ROOM = 'TSTX';
+// A fresh room per run: PartyKit keeps a room alive between runs, so a fixed
+// id means the second run meets a room that already has a host and every
+// assertion after that cascades.
+const ROOM = 'TSTX' + Math.floor(Math.random() * 900 + 100);
 const URL = `ws://127.0.0.1:1999/parties/main/${ROOM}`;
 
 const open = (label) => new Promise((resolve, reject) => {
@@ -78,9 +81,9 @@ host.send(JSON.stringify({ type: 'setRole', playerId: ids[2], role: 'judge' }));
 await wait(250);
 host.send(JSON.stringify({ type: 'start' }));
 await wait(250);
-check('phase advances on start', last(host, 'state').state.phase === 'characters',
+check('phase advances on start', last(host, 'state').state.phase === 'creating',
   last(host, 'state').state.phase);
-check('phones see the phase change', last(a, 'state').state.phase === 'characters');
+check('phones see the phase change', last(a, 'state').state.phase === 'creating');
 
 // A phone dropping in the lobby frees its seat.
 c.close();
