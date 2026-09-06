@@ -23,6 +23,14 @@
 
 * { box-sizing: border-box; }
 
+/*
+ * The browser's own [hidden] rule is just `display: none`, so any class that
+ * sets a display — .photo-menu is flex, .tool-row is flex — silently beats it
+ * and the element stays on screen with `hidden` set. This makes the attribute
+ * mean what it says, everywhere.
+ */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   min-height: 100%;
@@ -710,7 +718,6 @@ input[type='text'] {
 .photo-menu-icon { font-size: 19px; width: 24px; text-align: center; }
 
 /* Apply / cancel for cropping. Hidden unless a crop frame is up. */
-.crop-bar[hidden] { display: none; }
 .crop-bar { gap: 10px; }
 
 .photo-menu-item.is-separated {
