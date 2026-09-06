@@ -430,14 +430,24 @@ input[type='text'] {
 
 .draw-title { margin: 0; font-size: 15px; }
 
-.draw-stage {
-  /* Grows into the space the toolbar does not use, keeping the canvas'
-     aspect ratio so drawn coordinates are never stretched. */
+.draw-area {
+  /* Takes the space the toolbar does not use, and centres the square in it. */
   flex: 1 1 auto;
   min-height: 0;
-  max-width: min(560px, 100%);
-  margin-inline: auto;
-  aspect-ratio: 1024 / 1280;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.draw-stage {
+  /* Fits the wrapper on whichever axis runs out first. Both max- rules are
+     needed: width alone overflows a short window, height alone a narrow one. */
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1;
   border-radius: var(--radius);
   background: #fff;
   box-shadow: var(--shadow);
@@ -551,40 +561,32 @@ input[type='text'] {
 /* --------------------------------------------------- desktop drawing layout */
 
 /*
- * A laptop has width to spare and little height, which is the opposite of a
- * phone. The toolbar moves to a column beside the canvas so the drawing can
- * use the full height of the window rather than sharing it with five rows of
- * controls.
+ * A laptop has width to spare and little height, the opposite of a phone. The
+ * toolbar becomes a column down the left and the canvas takes the rest, so the
+ * drawing uses the full height of the window instead of sharing it with five
+ * rows of controls.
  */
 @media (min-width: 900px) {
   .screen-draw {
     flex-direction: row;
     align-items: stretch;
-    justify-content: center;
     gap: 20px;
     padding: 20px;
   }
 
   .draw-title {
     position: absolute;
-    top: 14px;
-    left: 24px;
+    top: 16px;
+    right: 24px;
     font-size: 16px;
   }
 
-  .draw-stage {
-    /* Height-driven: the width follows from the aspect ratio. */
-    height: 100%;
-    width: auto;
-    max-width: none;
-    max-height: none;
-    flex: 0 1 auto;
-    margin: 0;
-  }
-
   .toolbar {
-    flex: 0 0 320px;
-    width: 320px;
+    /* Left, ahead of the canvas, without reordering the markup — the canvas
+       should still come first for a screen reader. */
+    order: -1;
+    flex: 0 0 300px;
+    width: 300px;
     justify-content: center;
     gap: 12px;
     overflow-y: auto;
@@ -597,7 +599,7 @@ input[type='text'] {
   }
 
   .tool { min-width: 60px; min-height: 60px; font-size: 22px; }
-  .tool.wide { min-width: 100px; font-size: 16px; }
+  .tool.wide { min-width: 110px; font-size: 16px; }
   .size { width: 60px; height: 60px; }
   .swatch { width: 44px; height: 44px; min-height: 44px; }
   .draw-hint { font-size: 13px; }

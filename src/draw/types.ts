@@ -76,9 +76,9 @@ export type Stroke = FreehandStroke | ShapeStroke | FillStroke | ImageStroke;
 /**
  * The canvas' logical size. Drawings are stored at this resolution.
  *
- * Portrait rather than square: a phone has far more height than width to give,
- * and characters are taller than they are wide anyway.
+ * Square, so the drawing area reads the same on a phone and a laptop. The
+ * display size is always derived from this ratio, so drawn coordinates are
+ * never stretched on either.
  */
 export const CANVAS_W = 1024;
-export const CANVAS_H = 1280;
-export const CANVAS_RATIO = `${CANVAS_W} / ${CANVAS_H}`;
+export const CANVAS_H = 1024;

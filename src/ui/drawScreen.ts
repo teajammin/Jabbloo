@@ -35,7 +35,11 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     let filled = false;
     let uploadsUsed = 0;
 
+    // The stage sits in its own centring wrapper. A square that has to fit
+    // both a width and a height cannot size itself as a flex item directly.
+    const area = el('div', { class: 'draw-area' });
     const stage = el('div', { class: 'draw-stage' });
+    area.appendChild(stage);
     const canvas = new DrawCanvas(stage);
     const surface = canvas.surface;
 
@@ -395,7 +399,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     root.append(
       el('main', { class: 'screen screen-draw' },
         el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),
-        stage,
+        area,
         el('div', { class: 'toolbar' },
           toolRow,
           sizeRow,
