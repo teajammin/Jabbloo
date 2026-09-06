@@ -2,17 +2,21 @@ import { el, button, type Screen } from './screens';
 import { DrawCanvas } from '../draw/DrawCanvas';
 import { THICKNESSES, type ToolName } from '../draw/types';
 import { MAX_UPLOADS, cutSubject, importFile, placeOnCanvas } from '../draw/images';
+import { CONTROL_HELP, drawHelpDialog } from './drawHelp';
 
 /**
  * The drawing screen.
  *
- * Built phone-first: the canvas takes the space it can get, the toolbar sits
- * under it within thumb reach, and everything is a large tap target. Pointer
- * events cover finger, stylus and mouse from one code path, so the brief's
- * "no stylus needed" requirement costs nothing extra.
+ * Phone-first: the canvas takes whatever height the toolbar leaves, controls
+ * are large tap targets, and pointer events cover finger, stylus and mouse from
+ * one path — so the brief's "no stylus needed" costs nothing extra.
+ *
+ * Every control carries its label three ways, because a phone has none of the
+ * usual affordances: an aria-label for screen readers, a `title` for hover on a
+ * desktop, and a press-and-hold that prints the description into the status
+ * line for touch. The ? sheet lists them all.
  */
 
-/** Colours offered by default. Any colour is still reachable via the picker. */
 const SWATCHES = [
   '#4a4458', '#ffffff', '#f4796f', '#fbd268', '#a8de9b', '#8fb8f0',
   '#cbb2ed', '#f79bb8', '#7fcfc4', '#ffc49b', '#b5533a', '#2f7d5e',
@@ -20,7 +24,6 @@ const SWATCHES = [
 
 export interface DrawScreenOptions {
   title?: string;
-  /** Called with a transparent PNG data URL when the player is done. */
   onDone?: (png: string) => void;
 }
 
@@ -30,25 +33,64 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     let colour = SWATCHES[0]!;
     let size: number = THICKNESSES[2]!;
     let filled = false;
+    let uploadsUsed = 0;
 
     const stage = el('div', { class: 'draw-stage' });
     const canvas = new DrawCanvas(stage);
+    const surface = canvas.surface;
+
+    const status = el('p', { class: 'draw-hint' });
+    status.setAttribute('role', 'status');
+    const say = (message: string) => { status.textContent = message; };
+    say('Hold on a shape to copy it · tap ? if you get stuck');
+
+    // --- control factory ---------------------------------------------------
+
+    /**
+     * Builds a labelled control.
+     *
+     * Press-and-hold prints the description rather than firing the action, so
+     * a phone user can find out what an emoji means without triggering it.
+     */
+    function control(
+      helpKey: keyof typeof CONTROL_HELP,
+      onClick: () => void,
+      className = 'tool',
+    ): HTMLButtonElement {
+      const help = CONTROL_HELP[helpKey]!;
+      const node = button(help.icon, () => {}, className);
+      node.setAttribute('aria-label', help.name);
+      node.title = help.key ? `${help.name} (${help.key}) — ${help.what}` : `${help.name} — ${help.what}`;
+
+      let held = false;
+      let timer: number | null = null;
+      const stop = () => { if (timer !== null) { clearTimeout(timer); timer = null; } };
+
+      node.addEventListener('pointerdown', () => {
+        held = false;
+        timer = window.setTimeout(() => {
+          held = true;
+          say(`${help.name} — ${help.what}`);
+          navigator.vibrate?.(12);
+        }, 450);
+      });
+      node.addEventListener('pointerup', stop);
+      node.addEventListener('pointerleave', stop);
+      node.addEventListener('pointercancel', stop);
+      node.addEventListener('click', () => {
+        stop();
+        // A hold explained the button; it should not also press it.
+        if (held) { held = false; return; }
+        onClick();
+      });
+
+      return node;
+    }
 
     // --- pointer handling --------------------------------------------------
 
     let drawing = false;
 
-    /**
-     * Hold-to-grab.
-     *
-     * Holding still on a shape selects it, copies it, and drops a floating copy
-     * ready to drag — the touch equivalent of right-click, and the brief's
-     * "copy and paste any object".
-     *
-     * Guarded so it cannot fire mid-drawing: it needs a near-motionless hold,
-     * and it aborts if the stroke has actually gone anywhere. A slow deliberate
-     * line should never turn into a copy.
-     */
     const HOLD_MS = 500;
     const HOLD_SLOP = 10;
     let holdTimer: number | null = null;
@@ -62,11 +104,14 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     const grabSubject = (at: { x: number; y: number; p: number }) => {
       canvas.abortStroke();
       drawing = false;
-      if (!canvas.selectSubjectAt(at)) return;
+      if (!canvas.selectSubjectAt(at)) {
+        say('Nothing to grab there — hold on something you have drawn');
+        return;
+      }
       canvas.copy();
       canvas.paste();
       selectTool('select');
-      // A short buzz confirms the grab, since there is no cursor to show it.
+      say('Copied — drag it where you want, then press Done or pick another tool');
       navigator.vibrate?.(18);
     };
 
@@ -78,45 +123,50 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       const at = canvas.toCanvas(event);
       canvas.beginStroke(tool, colour, size, at, filled);
 
-      holdStart = { x: event.clientX, y: event.clientY };
-      holdTimer = window.setTimeout(() => {
-        holdTimer = null;
-        grabSubject(at);
-      }, HOLD_MS);
+      // Not while something is floating: positioning a paste means holding
+      // still, which would otherwise re-trigger the grab and replace it.
+      if (!canvas.hasFloating) {
+        holdStart = { x: event.clientX, y: event.clientY };
+        holdTimer = window.setTimeout(() => {
+          holdTimer = null;
+          grabSubject(at);
+        }, HOLD_MS);
+      }
     };
 
     const onMove = (event: PointerEvent) => {
       if (!drawing) return;
       event.preventDefault();
-
       if (holdStart && Math.hypot(
         event.clientX - holdStart.x, event.clientY - holdStart.y,
       ) > HOLD_SLOP) {
         cancelHold();
       }
-      // Coalesced events keep fast strokes smooth without flooding the model.
       const events = event.getCoalescedEvents?.() ?? [event];
       for (const e of events) canvas.extendStroke(canvas.toCanvas(e));
     };
 
     const onUp = (event: PointerEvent) => {
       cancelHold();
-      if (!drawing) return;
-      drawing = false;
-      canvas.endStroke();
+      // Release capture even when the hold already ended the stroke, or the
+      // surface keeps it until the next pointerdown.
       if (surface.hasPointerCapture(event.pointerId)) {
         surface.releasePointerCapture(event.pointerId);
       }
+      if (!drawing) return;
+      drawing = false;
+      canvas.endStroke();
+      if (tool === 'select' && canvas.hasSelection) {
+        say('Selected — tap ⧉ to copy it');
+      }
     };
 
-    // The overlay sits above the artwork, so it is what receives the pointer.
-    const surface = canvas.surface;
     surface.addEventListener('pointerdown', onDown);
     surface.addEventListener('pointermove', onMove);
     surface.addEventListener('pointerup', onUp);
     surface.addEventListener('pointercancel', onUp);
 
-    // --- toolbar -----------------------------------------------------------
+    // --- tools -------------------------------------------------------------
 
     const toolButtons = new Map<ToolName, HTMLButtonElement>();
     const selectTool = (next: ToolName) => {
@@ -128,36 +178,30 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     };
 
     const toolRow = el('div', { class: 'tool-row' });
-    for (const [name, label, aria] of [
-      ['select', '⬚', 'Select'],
-      ['pen', '✏️', 'Pen'],
-      ['eraser', '🩹', 'Eraser'],
-      ['fill', '🪣', 'Fill'],
-      ['line', '╱', 'Line'],
-      ['rect', '▭', 'Rectangle'],
-      ['ellipse', '◯', 'Ellipse'],
-    ] as const) {
-      const node = button(label, () => selectTool(name), 'tool');
-      node.setAttribute('aria-label', aria);
+    for (const name of ['select', 'pen', 'eraser', 'fill', 'line', 'rect', 'ellipse'] as const) {
+      const node = control(name, () => selectTool(name));
       node.setAttribute('aria-pressed', String(name === tool));
       toolButtons.set(name, node);
       toolRow.appendChild(node);
     }
 
-    const shapeFill = button('Filled', () => {
+    const shapeFill = control('filled', () => {
       filled = !filled;
       shapeFill.setAttribute('aria-pressed', String(filled));
+      say(filled ? 'Shapes are solid' : 'Shapes are outlines');
     }, 'tool wide');
     shapeFill.setAttribute('aria-pressed', 'false');
     shapeFill.hidden = true;
     toolRow.appendChild(shapeFill);
 
-    // Thicknesses, shown as dots at their true relative size.
+    // --- sizes and colours -------------------------------------------------
+
     const sizeRow = el('div', { class: 'tool-row' });
     const sizeButtons: HTMLButtonElement[] = [];
     for (const t of THICKNESSES) {
       const node = el('button', { class: 'size', type: 'button' });
       node.setAttribute('aria-label', `Brush size ${t}`);
+      node.title = `Brush size ${t}`;
       node.setAttribute('aria-pressed', String(t === size));
       const dot = el('span', { class: 'size-dot' });
       dot.style.width = `${Math.max(4, t * 0.55)}px`;
@@ -173,7 +217,6 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       sizeRow.appendChild(node);
     }
 
-    // Colours, plus a native picker for anything not on the palette.
     const colourRow = el('div', { class: 'tool-row' });
     const swatchButtons: HTMLButtonElement[] = [];
     const pickColour = (next: string, node?: HTMLElement) => {
@@ -186,6 +229,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       const node = el('button', { class: 'swatch', type: 'button' });
       node.style.background = value;
       node.setAttribute('aria-label', `Colour ${value}`);
+      node.title = `Colour ${value}`;
       node.setAttribute('aria-pressed', String(value === colour));
       node.addEventListener('click', () => pickColour(value, node));
       swatchButtons.push(node);
@@ -194,98 +238,104 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     const custom = el('input', { type: 'color', class: 'swatch custom', value: '#ff6699' });
     custom.setAttribute('aria-label', 'Pick any colour');
+    custom.title = 'Pick any colour';
     custom.addEventListener('input', () => pickColour(custom.value));
     colourRow.appendChild(custom);
 
-    // --- history -----------------------------------------------------------
+    // --- photos ------------------------------------------------------------
 
-    const copyButton = button('⧉', () => canvas.copy(), 'tool');
-    copyButton.setAttribute('aria-label', 'Copy selection');
-    copyButton.title = 'Copy selection (⌘C)';
-    const pasteButton = button('📋', () => { canvas.paste(); selectTool('select'); }, 'tool');
-    pasteButton.setAttribute('aria-label', 'Paste');
-    pasteButton.title = 'Paste (⌘V)';
-    copyButton.disabled = true;
-    pasteButton.disabled = true;
-
-    const undoButton = button('↶', () => canvas.undo(), 'tool');
-    undoButton.setAttribute('aria-label', 'Undo');
-    undoButton.title = 'Undo (⌘Z)';
-    const redoButton = button('↷', () => canvas.redo(), 'tool');
-    redoButton.setAttribute('aria-label', 'Redo');
-    redoButton.title = 'Redo (⇧⌘Z)';
-    const clearButton = button('Clear', () => canvas.clear(), 'tool wide ghost');
-    const doneButton = button('Done', () => options.onDone?.(canvas.toDataURL()), 'big primary');
-
-    // --- image upload ------------------------------------------------------
-
-    let uploadsUsed = 0;
-
+    // One at a time: a multi-select picker plus a repeatable button reads as
+    // two different ways to do the same thing.
     const fileInput = el('input', { type: 'file', accept: 'image/*', class: 'sr-only' });
-    fileInput.multiple = true;
 
-    const status = el('p', { class: 'draw-hint' });
-    status.setAttribute('role', 'status');
-
-    const uploadButton = button('🖼️', () => fileInput.click(), 'tool');
-    uploadButton.setAttribute('aria-label', 'Add a photo');
-    uploadButton.title = `Add a photo (${MAX_UPLOADS} max)`;
-
-    /** Cuts the background out of whatever is floating. */
-    const cutoutButton = button('✂️', async () => {
+    const uploadButton = control('upload', () => fileInput.click());
+    const cutoutButton = control('cutout', async () => {
       const layer = canvas.floatingLayer;
-      if (!layer) return;
+      if (!layer) { say('Add a photo first, then cut it out'); return; }
       cutoutButton.disabled = true;
-      status.textContent = 'Cutting out…';
+      say('Cutting out…');
       try {
         const cut = await cutSubject({ data: layer.data, w: layer.w, h: layer.h });
         canvas.replaceFloating(cut.data);
-        status.textContent = 'Cut out — drag to place, Enter to keep';
+        say('Cut out — drag it into place, then pick another tool to keep it');
       } catch {
-        status.textContent = 'Could not cut that one out';
+        say('Could not cut that one out');
       } finally {
         cutoutButton.disabled = !canvas.hasFloating;
       }
-    }, 'tool');
-    cutoutButton.setAttribute('aria-label', 'Remove background');
-    cutoutButton.title = 'Remove the background from the placed photo';
-    cutoutButton.disabled = true;
-
-    const biggerButton = button('＋', () => canvas.scaleFloating(1.15), 'tool');
-    biggerButton.setAttribute('aria-label', 'Enlarge placed photo');
-    const smallerButton = button('－', () => canvas.scaleFloating(1 / 1.15), 'tool');
-    smallerButton.setAttribute('aria-label', 'Shrink placed photo');
-    biggerButton.disabled = true;
-    smallerButton.disabled = true;
+    });
+    const biggerButton = control('bigger', () => canvas.scaleFloating(1.15));
+    const smallerButton = control('smaller', () => canvas.scaleFloating(1 / 1.15));
 
     fileInput.addEventListener('change', async () => {
-      const files = [...(fileInput.files ?? [])];
+      const file = fileInput.files?.[0];
       fileInput.value = '';
-      for (const file of files) {
-        if (uploadsUsed >= MAX_UPLOADS) {
-          status.textContent = `That's all ${MAX_UPLOADS} photos`;
-          break;
-        }
-        status.textContent = 'Loading photo…';
-        try {
-          const image = await importFile(file);
-          const spot = placeOnCanvas(image);
-          canvas.placeImage(image.data, spot.x, spot.y, spot.w, spot.h);
-          uploadsUsed++;
-          selectTool('select');
-          status.textContent = 'Drag to place · ✂️ removes the background · Enter to keep';
-        } catch {
-          status.textContent = 'Could not read that image';
-        }
+      if (!file) return;
+      if (uploadsUsed >= MAX_UPLOADS) {
+        say(`That's all ${MAX_UPLOADS} photos`);
+        return;
+      }
+      say('Loading photo…');
+      try {
+        const image = await importFile(file);
+        const spot = placeOnCanvas(image);
+        canvas.placeImage(image.data, spot.x, spot.y, spot.w, spot.h);
+        uploadsUsed++;
+        selectTool('select');
+        say(`Drag it into place · ✂️ removes the background · ${MAX_UPLOADS - uploadsUsed} photos left`);
+      } catch {
+        say('Could not read that image');
       }
     });
 
+    // --- history and clipboard ---------------------------------------------
+
+    const undoButton = control('undo', () => canvas.undo());
+    const redoButton = control('redo', () => canvas.redo());
+
+    // Copy on its own leaves nothing on screen, which reads as a dead button.
+    // It now says what happened and points at the next step.
+    const copyButton = control('copy', () => {
+      canvas.copy();
+      say('Copied — tap 📋 to place a copy');
+    });
+    const pasteButton = control('paste', () => {
+      canvas.paste();
+      selectTool('select');
+      say('Drag the copy where you want it, then pick another tool to keep it');
+    });
+
+    const clearButton = control('clear', () => {
+      canvas.clear();
+      say('Cleared — ↶ brings it back');
+    }, 'tool wide ghost');
+
+    const doneButton = control('done', () => options.onDone?.(canvas.toDataURL()), 'tool wide primary');
+
+    const helpDialog = drawHelpDialog();
+    const helpButton = button('?', () => helpDialog.showModal(), 'tool');
+    helpButton.setAttribute('aria-label', 'What the buttons do');
+    helpButton.title = 'What the buttons do';
+
+    canvas.onChanged(() => {
+      undoButton.disabled = !canvas.canUndo;
+      redoButton.disabled = !canvas.canRedo;
+      clearButton.disabled = canvas.isEmpty;
+      doneButton.disabled = canvas.isEmpty;
+      copyButton.disabled = !canvas.hasSelection;
+      pasteButton.disabled = !canvas.hasClipboard;
+      cutoutButton.disabled = !canvas.hasFloating;
+      biggerButton.disabled = !canvas.hasFloating;
+      smallerButton.disabled = !canvas.hasFloating;
+      uploadButton.disabled = uploadsUsed >= MAX_UPLOADS;
+    });
+    for (const node of [undoButton, redoButton, clearButton, doneButton, copyButton,
+      pasteButton, cutoutButton, biggerButton, smallerButton]) {
+      node.disabled = true;
+    }
+
     // --- keyboard ----------------------------------------------------------
 
-    /**
-     * Cmd on macOS, Ctrl elsewhere. Shortcuts are skipped while a text field
-     * has focus, so typing a character name never triggers a canvas action.
-     */
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
@@ -299,12 +349,18 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         return;
       }
       if (mod && key === 'y') { event.preventDefault(); canvas.redo(); return; }
-      if (mod && key === 'c') { event.preventDefault(); canvas.copy(); return; }
-      if (mod && key === 'x') { event.preventDefault(); canvas.cut(); return; }
+      if (mod && key === 'c') {
+        event.preventDefault();
+        canvas.copy();
+        say('Copied — ⌘V to place a copy');
+        return;
+      }
+      if (mod && key === 'x') { event.preventDefault(); canvas.cut(); say('Cut'); return; }
       if (mod && key === 'v') {
         event.preventDefault();
         canvas.paste();
-        selectTool('select');   // so the paste can be dragged immediately
+        selectTool('select');
+        say('Drag the copy into place, then Enter');
         return;
       }
       if (mod && key === 'a') {
@@ -325,7 +381,6 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         return;
       }
 
-      // Single keys for tools, the way most drawing apps behave.
       const shortcuts: Record<string, ToolName> = {
         v: 'select', b: 'pen', e: 'eraser', g: 'fill',
         l: 'line', r: 'rect', o: 'ellipse',
@@ -337,41 +392,23 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     };
     window.addEventListener('keydown', onKey);
 
-    canvas.onChanged(() => {
-      undoButton.disabled = !canvas.canUndo;
-      redoButton.disabled = !canvas.canRedo;
-      clearButton.disabled = canvas.isEmpty;
-      doneButton.disabled = canvas.isEmpty;
-      copyButton.disabled = !canvas.hasSelection;
-      pasteButton.disabled = !canvas.hasClipboard;
-      cutoutButton.disabled = !canvas.hasFloating;
-      biggerButton.disabled = !canvas.hasFloating;
-      smallerButton.disabled = !canvas.hasFloating;
-      uploadButton.disabled = uploadsUsed >= MAX_UPLOADS;
-    });
-    undoButton.disabled = true;
-    redoButton.disabled = true;
-    clearButton.disabled = true;
-    doneButton.disabled = true;
-
     root.append(
       el('main', { class: 'screen screen-draw' },
         el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),
         stage,
-        el('p', { class: 'draw-hint' },
-          'Hold on a shape to copy it · drag the copy to place it'),
         el('div', { class: 'toolbar' },
           toolRow,
           sizeRow,
           colourRow,
           el('div', { class: 'tool-row' },
-            uploadButton, cutoutButton, smallerButton, biggerButton),
-          el('div', { class: 'tool-row' },
-            undoButton, redoButton, copyButton, pasteButton, clearButton, doneButton),
+            uploadButton, cutoutButton, smallerButton, biggerButton,
+            undoButton, redoButton, copyButton, pasteButton),
+          el('div', { class: 'tool-row' }, helpButton, clearButton, doneButton),
           fileInput,
           status,
         ),
       ),
+      helpDialog,
     );
 
     return () => {
@@ -380,6 +417,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       surface.removeEventListener('pointerup', onUp);
       surface.removeEventListener('pointercancel', onUp);
       window.removeEventListener('keydown', onKey);
+      cancelHold();
     };
   };
 }
