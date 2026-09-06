@@ -636,3 +636,68 @@ input[type='text'] {
   border-radius: 8px;
   background: rgba(74, 68, 88, 0.08);
 }
+
+/* ------------------------------------------------------- pointer tooltip */
+
+/*
+ * The native `title` waits a beat, lands in a corner, and never shows on a
+ * phone. This appears immediately beside the pointer.
+ */
+.tool-tip {
+  position: fixed;
+  z-index: 1200;
+  max-width: 260px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(74, 68, 88, 0.28);
+}
+
+/* ------------------------------------------------------ rainbow colour well */
+
+.swatch.rainbow {
+  display: grid;
+  place-items: center;
+  background: conic-gradient(
+    #f4796f, #fbd268, #a8de9b, #7fcfc4, #8fb8f0, #cbb2ed, #f79bb8, #f4796f
+  );
+}
+
+/* ---------------------------------------------------------- photo menu */
+
+.photo-menu {
+  position: fixed;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 20px;
+  background: var(--cream);
+  box-shadow: 0 12px 36px rgba(74, 68, 88, 0.26);
+  min-width: 216px;
+}
+
+.photo-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  justify-content: flex-start;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.photo-menu-item:hover { background: rgba(74, 68, 88, 0.07); transform: none; box-shadow: none; }
+.photo-menu-item:active { transform: none; box-shadow: none; }
+.photo-menu-icon { font-size: 19px; width: 24px; text-align: center; }

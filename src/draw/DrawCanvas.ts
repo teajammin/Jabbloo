@@ -629,6 +629,11 @@ export class DrawCanvas {
     this.onChange?.();
   }
 
+  /** Whether a point lands on the floating layer. */
+  isOverFloating(at: Point): boolean {
+    return this.hitsFloating(at);
+  }
+
   private hitsFloating(at: Point): boolean {
     const f = this.floating;
     if (!f) return false;

@@ -6,6 +6,7 @@ import {
   type MaskShape,
 } from '../draw/images';
 import { CONTROL_HELP, drawHelpDialog } from './drawHelp';
+import { photoMenu } from './photoMenu';
 
 /**
  * The drawing screen.
@@ -46,6 +47,27 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     const canvas = new DrawCanvas(stage);
     const surface = canvas.surface;
 
+    /**
+     * A tooltip that follows the pointer.
+     *
+     * The native `title` only appears after a delay, in the corner of the
+     * element, and never on a phone. This shows immediately beside the cursor,
+     * and the same text is what a press-and-hold prints on touch.
+     */
+    const tip = el('div', { class: 'tool-tip' });
+    tip.hidden = true;
+    tip.setAttribute('aria-hidden', 'true');
+
+    const showTip = (text: string, x: number, y: number) => {
+      tip.textContent = text;
+      tip.hidden = false;
+      const rect = tip.getBoundingClientRect();
+      const pad = 8;
+      tip.style.left = `${Math.min(Math.max(pad, x + 14), window.innerWidth - rect.width - pad)}px`;
+      tip.style.top = `${Math.max(pad, y - rect.height - 12)}px`;
+    };
+    const hideTip = () => { tip.hidden = true; };
+
     const status = el('p', { class: 'draw-hint' });
     status.setAttribute('role', 'status');
     const say = (message: string) => { status.textContent = message; };
@@ -67,7 +89,18 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       const help = CONTROL_HELP[helpKey]!;
       const node = button(help.icon, () => {}, className);
       node.setAttribute('aria-label', help.name);
-      node.title = help.key ? `${help.name} (${help.key}) — ${help.what}` : `${help.name} — ${help.what}`;
+      const description = help.key
+        ? `${help.name} (${help.key}) — ${help.what}`
+        : `${help.name} — ${help.what}`;
+
+      // Only on devices with a real pointer: on touch a hover tooltip would
+      // flash on every tap, and press-and-hold covers it instead.
+      if (window.matchMedia('(hover: hover)').matches) {
+        node.addEventListener('pointerenter', (e) => showTip(description, e.clientX, e.clientY));
+        node.addEventListener('pointermove', (e) => showTip(description, e.clientX, e.clientY));
+        node.addEventListener('pointerleave', hideTip);
+        node.addEventListener('click', hideTip);
+      }
 
       let held = false;
       let timer: number | null = null;
@@ -130,15 +163,24 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       const at = canvas.toCanvas(event);
       canvas.beginStroke(tool, colour, size, at, filled);
 
-      // Not while something is floating: positioning a paste means holding
-      // still, which would otherwise re-trigger the grab and replace it.
-      if (!canvas.hasFloating) {
-        holdStart = { x: event.clientX, y: event.clientY };
-        holdTimer = window.setTimeout(() => {
-          holdTimer = null;
-          grabSubject(at);
-        }, HOLD_MS);
-      }
+      holdStart = { x: event.clientX, y: event.clientY };
+      const overPhoto = canvas.hasFloating && canvas.isOverFloating(at);
+      const { clientX, clientY } = event;
+      holdTimer = window.setTimeout(() => {
+        holdTimer = null;
+        if (overPhoto) {
+          // Holding a placed photo offers its options, the way a phone
+          // surfaces actions on a picture.
+          canvas.abortStroke();
+          drawing = false;
+          menu.open(clientX, clientY);
+          navigator.vibrate?.(14);
+          return;
+        }
+        // Positioning a paste also means holding still, so a grab must not
+        // fire and replace what is being placed.
+        if (!canvas.hasFloating) grabSubject(at);
+      }, HOLD_MS);
     };
 
     const onMove = (event: PointerEvent) => {
@@ -167,6 +209,16 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         say('Selected — tap ⧉ to copy it');
       }
     };
+
+    // Right-click is the desktop equivalent of the hold.
+    const onContext = (event: MouseEvent) => {
+      if (!canvas.hasFloating) return;
+      const at = canvas.toCanvas(event as unknown as PointerEvent);
+      if (!canvas.isOverFloating(at)) return;
+      event.preventDefault();
+      menu.open(event.clientX, event.clientY);
+    };
+    surface.addEventListener('contextmenu', onContext);
 
     surface.addEventListener('pointerdown', onDown);
     surface.addEventListener('pointermove', onMove);
@@ -243,68 +295,25 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       colourRow.appendChild(node);
     }
 
-    const custom = el('input', { type: 'color', class: 'swatch custom', value: '#ff6699' });
+    // A rainbow well rather than a swatch showing the current colour: it has to
+    // read as "any colour", not as one more preset.
+    const custom = el('input', { type: 'color', class: 'sr-only', value: '#ff6699' });
     custom.setAttribute('aria-label', 'Pick any colour');
-    custom.title = 'Pick any colour';
+    const customWell = el('label', { class: 'swatch rainbow' }, custom);
+    customWell.title = 'Pick any colour';
+    if (window.matchMedia('(hover: hover)').matches) {
+      customWell.addEventListener('pointerenter', (e) => showTip('Pick any colour', e.clientX, e.clientY));
+      customWell.addEventListener('pointermove', (e) => showTip('Pick any colour', e.clientX, e.clientY));
+      customWell.addEventListener('pointerleave', hideTip);
+    }
     custom.addEventListener('input', () => pickColour(custom.value));
-    colourRow.appendChild(custom);
+    colourRow.appendChild(customWell);
 
     // --- photos ------------------------------------------------------------
 
     // One at a time: a multi-select picker plus a repeatable button reads as
     // two different ways to do the same thing.
     const fileInput = el('input', { type: 'file', accept: 'image/*', class: 'sr-only' });
-
-    const uploadButton = control('upload', () => fileInput.click());
-
-    // Deliberately never disabled: a greyed-out button with no explanation is
-    // what made this one unreadable. It now says what it needs instead.
-    const cutoutButton = control('cutout', async () => {
-      const layer = canvas.floatingLayer;
-      if (!layer) { say('Add a photo with 🖼️ first, then ✂️ removes its background'); return; }
-      cutoutButton.disabled = true;
-      say('Cutting out…');
-      try {
-        const cut = await cutSubject({ data: layer.data, w: layer.w, h: layer.h });
-        canvas.replaceFloating(cut.data);
-        say('Cut out — drag it into place, then pick another tool to keep it');
-      } catch {
-        say('Could not cut that one out');
-      } finally {
-        cutoutButton.disabled = !canvas.hasFloating;
-      }
-    });
-    const biggerButton = control('bigger', () => canvas.scaleFloating(1.15));
-    const smallerButton = control('smaller', () => canvas.scaleFloating(1 / 1.15));
-
-    // --- cropping ----------------------------------------------------------
-
-    const cropButton = control('crop', async () => {
-      if (!canvas.hasFloating) { say('Add a photo with 🖼️ first'); return; }
-      if (!canvas.hasSelection) {
-        selectTool('select');
-        say('Drag a box over the photo, then tap ⬚✂ again to trim it');
-        return;
-      }
-      const cropped = await canvas.cropFloatingToSelection(cropImage);
-      say(cropped ? 'Trimmed — drag it into place' : 'Draw the box over the photo');
-    });
-
-    const shapeButton = (key: MaskShape) => control(key, async () => {
-      const layer = canvas.floatingLayer;
-      if (!layer) { say('Add a photo with 🖼️ first, then pick a shape'); return; }
-      say('Cutting the shape…');
-      try {
-        canvas.replaceFloating(await maskImage(layer.data, key));
-        say('Shaped — drag it into place, then pick another tool to keep it');
-      } catch {
-        say('Could not cut that shape');
-      }
-    });
-    const circleButton = shapeButton('circle');
-    const triangleButton = shapeButton('triangle');
-    const starButton = shapeButton('star');
-    const heartButton = shapeButton('heart');
 
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files?.[0];
@@ -321,11 +330,68 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         canvas.placeImage(image.data, spot.x, spot.y, spot.w, spot.h);
         uploadsUsed++;
         selectTool('select');
-        say(`Drag it into place · ✂️ removes the background · ${MAX_UPLOADS - uploadsUsed} photos left`);
+        say(`Hold the photo for crop and background options · ${MAX_UPLOADS - uploadsUsed} left`);
       } catch {
         say('Could not read that image');
       }
     });
+
+    const uploadButton = control('upload', () => fileInput.click());
+    const biggerButton = control('bigger', () => canvas.scaleFloating(1.15));
+    const smallerButton = control('smaller', () => canvas.scaleFloating(1 / 1.15));
+
+    // --- photo options menu ------------------------------------------------
+    //
+    // Crop shapes only mean anything once a photo is placed, so they live on
+    // the photo rather than in the toolbar: hold it, or right-click it.
+
+    const shape = (key: MaskShape) => async () => {
+      const layer = canvas.floatingLayer;
+      if (!layer) return;
+      say('Cutting the shape…');
+      try {
+        canvas.replaceFloating(await maskImage(layer.data, key));
+        say('Shaped — drag it into place, then pick another tool to keep it');
+      } catch {
+        say('Could not cut that shape');
+      }
+    };
+
+    const menu = photoMenu([
+      {
+        icon: '✂️', label: 'Remove background', onPick: async () => {
+          const layer = canvas.floatingLayer;
+          if (!layer) return;
+          say('Cutting out…');
+          try {
+            const cut = await cutSubject({ data: layer.data, w: layer.w, h: layer.h });
+            canvas.replaceFloating(cut.data);
+            say('Background gone — drag it into place');
+          } catch {
+            say('Could not cut that one out');
+          }
+        },
+      },
+      {
+        icon: '⬚', label: 'Crop to a box', onPick: async () => {
+          if (canvas.hasSelection) {
+            const cropped = await canvas.cropFloatingToSelection(cropImage);
+            say(cropped ? 'Trimmed — drag it into place' : 'Draw the box over the photo');
+            return;
+          }
+          selectTool('select');
+          say('Drag a box over the photo, then hold it again and pick Crop to a box');
+        },
+      },
+      { icon: '⭕', label: 'Crop to a circle', onPick: shape('circle') },
+      { icon: '🔺', label: 'Crop to a triangle', onPick: shape('triangle') },
+      { icon: '⭐', label: 'Crop to a star', onPick: shape('star') },
+      { icon: '💗', label: 'Crop to a heart', onPick: shape('heart') },
+      { icon: '🗑️', label: 'Remove the photo', onPick: () => {
+        canvas.cancelFloating();
+        say('Photo removed');
+      } },
+    ]);
 
     // --- history and clipboard ---------------------------------------------
 
@@ -439,10 +505,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
           sizeRow,
           colourRow,
           el('div', { class: 'tool-row' },
-            uploadButton, cutoutButton, cropButton, smallerButton, biggerButton),
-          el('div', { class: 'tool-row' },
-            circleButton, triangleButton, starButton, heartButton),
-          el('div', { class: 'tool-row' },
+            uploadButton, smallerButton, biggerButton,
             undoButton, redoButton, copyButton, pasteButton),
           el('div', { class: 'tool-row' }, helpButton, clearButton, doneButton),
           fileInput,
@@ -450,6 +513,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         ),
       ),
       helpDialog,
+      tip,
     );
 
     return () => {
@@ -457,7 +521,9 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       surface.removeEventListener('pointermove', onMove);
       surface.removeEventListener('pointerup', onUp);
       surface.removeEventListener('pointercancel', onUp);
+      surface.removeEventListener('contextmenu', onContext);
       window.removeEventListener('keydown', onKey);
+      menu.destroy();
       cancelHold();
     };
   };
