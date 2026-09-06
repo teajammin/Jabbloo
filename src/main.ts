@@ -7,14 +7,12 @@
 
 import './styles.css';
 import { mount, setHome } from './ui/screens';
-import { initAxeCursor } from './ui/cursor';
 import { launchScreen } from './ui/launch';
 import { joinRoomScreen } from './ui/joinRoom';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('#app missing');
 
-initAxeCursor();
 setHome(launchScreen);
 const go = mount(root);
 

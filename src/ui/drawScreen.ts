@@ -40,7 +40,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     const onDown = (event: PointerEvent) => {
       if (!event.isPrimary) return;
       event.preventDefault();
-      canvas.canvas.setPointerCapture(event.pointerId);
+      surface.setPointerCapture(event.pointerId);
       drawing = true;
       canvas.beginStroke(tool, colour, size, canvas.toCanvas(event), filled);
     };
@@ -57,15 +57,17 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       if (!drawing) return;
       drawing = false;
       canvas.endStroke();
-      if (canvas.canvas.hasPointerCapture(event.pointerId)) {
-        canvas.canvas.releasePointerCapture(event.pointerId);
+      if (surface.hasPointerCapture(event.pointerId)) {
+        surface.releasePointerCapture(event.pointerId);
       }
     };
 
-    canvas.canvas.addEventListener('pointerdown', onDown);
-    canvas.canvas.addEventListener('pointermove', onMove);
-    canvas.canvas.addEventListener('pointerup', onUp);
-    canvas.canvas.addEventListener('pointercancel', onUp);
+    // The overlay sits above the artwork, so it is what receives the pointer.
+    const surface = canvas.surface;
+    surface.addEventListener('pointerdown', onDown);
+    surface.addEventListener('pointermove', onMove);
+    surface.addEventListener('pointerup', onUp);
+    surface.addEventListener('pointercancel', onUp);
 
     // --- toolbar -----------------------------------------------------------
 
@@ -80,6 +82,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     const toolRow = el('div', { class: 'tool-row' });
     for (const [name, label, aria] of [
+      ['select', '⬚', 'Select'],
       ['pen', '✏️', 'Pen'],
       ['eraser', '🩹', 'Eraser'],
       ['fill', '🪣', 'Fill'],
@@ -149,18 +152,88 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     // --- history -----------------------------------------------------------
 
+    const copyButton = button('⧉', () => canvas.copy(), 'tool');
+    copyButton.setAttribute('aria-label', 'Copy selection');
+    copyButton.title = 'Copy selection (⌘C)';
+    const pasteButton = button('📋', () => { canvas.paste(); selectTool('select'); }, 'tool');
+    pasteButton.setAttribute('aria-label', 'Paste');
+    pasteButton.title = 'Paste (⌘V)';
+    copyButton.disabled = true;
+    pasteButton.disabled = true;
+
     const undoButton = button('↶', () => canvas.undo(), 'tool');
     undoButton.setAttribute('aria-label', 'Undo');
+    undoButton.title = 'Undo (⌘Z)';
     const redoButton = button('↷', () => canvas.redo(), 'tool');
     redoButton.setAttribute('aria-label', 'Redo');
+    redoButton.title = 'Redo (⇧⌘Z)';
     const clearButton = button('Clear', () => canvas.clear(), 'tool wide ghost');
     const doneButton = button('Done', () => options.onDone?.(canvas.toDataURL()), 'big primary');
+
+    // --- keyboard ----------------------------------------------------------
+
+    /**
+     * Cmd on macOS, Ctrl elsewhere. Shortcuts are skipped while a text field
+     * has focus, so typing a character name never triggers a canvas action.
+     */
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
+
+      const mod = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+
+      if (mod && key === 'z') {
+        event.preventDefault();
+        event.shiftKey ? canvas.redo() : canvas.undo();
+        return;
+      }
+      if (mod && key === 'y') { event.preventDefault(); canvas.redo(); return; }
+      if (mod && key === 'c') { event.preventDefault(); canvas.copy(); return; }
+      if (mod && key === 'x') { event.preventDefault(); canvas.cut(); return; }
+      if (mod && key === 'v') {
+        event.preventDefault();
+        canvas.paste();
+        selectTool('select');   // so the paste can be dragged immediately
+        return;
+      }
+      if (mod && key === 'a') {
+        event.preventDefault();
+        canvas.selectAll();
+        selectTool('select');
+        return;
+      }
+      if (key === 'delete' || key === 'backspace') {
+        if (!canvas.hasSelection) return;
+        event.preventDefault();
+        canvas.deleteSelection();
+        return;
+      }
+      if (key === 'enter') { canvas.commitFloating(); return; }
+      if (key === 'escape') {
+        canvas.hasFloating ? canvas.cancelFloating() : canvas.clearSelection();
+        return;
+      }
+
+      // Single keys for tools, the way most drawing apps behave.
+      const shortcuts: Record<string, ToolName> = {
+        v: 'select', b: 'pen', e: 'eraser', g: 'fill',
+        l: 'line', r: 'rect', o: 'ellipse',
+      };
+      if (!mod && shortcuts[key]) {
+        event.preventDefault();
+        selectTool(shortcuts[key]!);
+      }
+    };
+    window.addEventListener('keydown', onKey);
 
     canvas.onChanged(() => {
       undoButton.disabled = !canvas.canUndo;
       redoButton.disabled = !canvas.canRedo;
       clearButton.disabled = canvas.isEmpty;
       doneButton.disabled = canvas.isEmpty;
+      copyButton.disabled = !canvas.hasSelection;
+      pasteButton.disabled = !canvas.hasClipboard;
     });
     undoButton.disabled = true;
     redoButton.disabled = true;
@@ -175,16 +248,18 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
           toolRow,
           sizeRow,
           colourRow,
-          el('div', { class: 'tool-row' }, undoButton, redoButton, clearButton, doneButton),
+          el('div', { class: 'tool-row' },
+            undoButton, redoButton, copyButton, pasteButton, clearButton, doneButton),
         ),
       ),
     );
 
     return () => {
-      canvas.canvas.removeEventListener('pointerdown', onDown);
-      canvas.canvas.removeEventListener('pointermove', onMove);
-      canvas.canvas.removeEventListener('pointerup', onUp);
-      canvas.canvas.removeEventListener('pointercancel', onUp);
+      surface.removeEventListener('pointerdown', onDown);
+      surface.removeEventListener('pointermove', onMove);
+      surface.removeEventListener('pointerup', onUp);
+      surface.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('keydown', onKey);
     };
   };
 }

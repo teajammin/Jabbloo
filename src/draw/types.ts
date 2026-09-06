@@ -6,7 +6,7 @@
  * sent over the network as JSON rather than a bitmap.
  */
 
-export type ToolName = 'pen' | 'eraser' | 'fill' | 'rect' | 'ellipse' | 'line';
+export type ToolName = 'pen' | 'eraser' | 'fill' | 'rect' | 'ellipse' | 'line' | 'select';
 
 /** The six thicknesses the brief calls for, in CSS pixels at 1x. */
 export const THICKNESSES = [2, 5, 10, 18, 30, 48] as const;
@@ -35,6 +35,8 @@ export interface ShapeStroke {
   filled: boolean;
   from: Point;
   to: Point;
+  /** Set when the rectangle is a deleted selection: it cuts rather than paints. */
+  erase?: boolean;
 }
 
 export interface FillStroke {
@@ -44,8 +46,39 @@ export interface FillStroke {
   at: Point;
 }
 
-export type Stroke = FreehandStroke | ShapeStroke | FillStroke;
+/**
+ * A pasted or stamped image.
+ *
+ * Pasting has to be a stroke like any other, or it would sit outside the
+ * history and undo would step straight past it.
+ */
+export interface ImageStroke {
+  kind: 'image';
+  tool: 'select';
+  /** PNG data URL. */
+  data: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
-/** The canvas' logical size. Drawings are stored at this resolution. */
+/** A rectangular marquee, in canvas coordinates. */
+export interface Selection {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export type Stroke = FreehandStroke | ShapeStroke | FillStroke | ImageStroke;
+
+/**
+ * The canvas' logical size. Drawings are stored at this resolution.
+ *
+ * Portrait rather than square: a phone has far more height than width to give,
+ * and characters are taller than they are wide anyway.
+ */
 export const CANVAS_W = 1024;
-export const CANVAS_H = 1024;
+export const CANVAS_H = 1280;
+export const CANVAS_RATIO = `${CANVAS_W} / ${CANVAS_H}`;

@@ -1,5 +1,4 @@
 import { el } from './screens';
-import { reparentCursor } from './cursor';
 
 /**
  * The how-to-play panel, reachable from the "?" on every screen.
@@ -14,8 +13,6 @@ export function helpDialog(): HTMLDialogElement {
   close.setAttribute('aria-label', 'Close help');
   close.addEventListener('click', () => dialog.close());
 
-  // The modal sits in the top layer, so the cursor has to come with it.
-  dialog.addEventListener('close', () => reparentCursor(null));
 
   dialog.append(
     close,
@@ -39,9 +36,6 @@ export function helpDialog(): HTMLDialogElement {
 export function helpButton(dialog: HTMLDialogElement): HTMLButtonElement {
   const node = el('button', { class: 'help-open', type: 'button' }, '?');
   node.setAttribute('aria-label', 'How to play');
-  node.addEventListener('click', () => {
-    dialog.showModal();
-    reparentCursor(dialog);
-  });
+  node.addEventListener('click', () => dialog.showModal());
   return node;
 }

@@ -33,47 +33,7 @@ body {
   color: var(--ink);
   font-family: 'Baloo 2', 'Quicksand', ui-rounded, system-ui, -apple-system, sans-serif;
   font-size: 17px;
-  /* Fallback for before the animated follower mounts. Hotspot is the grip. */
-  cursor: url('/cursor-axe.png') 31 31, auto;
 }
-
-/* Touch devices have no cursor, and a custom one costs a needless request. */
-@media (hover: none) {
-  body { cursor: auto; }
-}
-
-/* ------------------------------------------------------------- axe cursor */
-
-/* Only once the follower exists — otherwise a JS failure leaves no pointer. */
-.axe-cursor-on,
-.axe-cursor-on body,
-.axe-cursor-on button,
-.axe-cursor-on a,
-.axe-cursor-on input,
-.axe-cursor-on label,
-.axe-cursor-on .card,
-.axe-cursor-on dialog,
-.axe-cursor-on .help,
-.axe-cursor-on .help * {
-  cursor: none;
-}
-
-/* Text fields keep a real caret — an axe gives no idea where you are typing. */
-.axe-cursor-on input[type='text'] { cursor: text; }
-
-.axe-cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0;
-  will-change: transform;
-}
-
-.axe-cursor img { display: block; }
-
-button, a, input, label { cursor: inherit; }
 
 #app {
   min-height: 100vh;
@@ -444,31 +404,45 @@ input[type='text'] {
 /* ------------------------------------------------------------ drawing screen */
 
 .screen-draw {
+  /* Fills the viewport so the canvas can claim whatever the toolbar leaves. */
+  height: 100dvh;
   justify-content: flex-start;
-  gap: 10px;
-  padding: 12px 12px 20px;
+  gap: 8px;
+  padding: 8px 8px 12px;
 }
 
 .draw-title { margin: 0; font-size: 15px; }
 
 .draw-stage {
-  width: min(560px, 100%);
-  aspect-ratio: 1;
+  /* Grows into the space the toolbar does not use, keeping the canvas'
+     aspect ratio so drawn coordinates are never stretched. */
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: min(560px, 100%);
+  margin-inline: auto;
+  aspect-ratio: 1024 / 1280;
   border-radius: var(--radius);
   background: #fff;
   box-shadow: var(--shadow);
   overflow: hidden;
+  /* The marquee lives on a second canvas stacked over the artwork. */
+  position: relative;
   /* Stops the browser panning or zooming the page while drawing. */
   touch-action: none;
 }
 
-.draw-canvas {
+.draw-canvas,
+.draw-overlay {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  /* A pen icon would fight the axe follower; the axe reads fine here. */
   touch-action: none;
 }
+
+/* The overlay is on top, so it takes the pointer for both layers. */
+.draw-overlay { cursor: crosshair; }
 
 .toolbar {
   display: flex;
@@ -522,7 +496,7 @@ input[type='text'] {
 }
 
 .swatch[aria-pressed='true'] { box-shadow: 0 0 0 3px var(--ink), var(--shadow); }
-.swatch.custom { padding: 2px; background: #fff; cursor: inherit; }
+.swatch.custom { padding: 2px; background: #fff; }
 
 @media (max-width: 420px) {
   .tool { min-width: 46px; min-height: 46px; font-size: 18px; }

@@ -1,6 +1,6 @@
 import {
-  CANVAS_H, CANVAS_W, type FillStroke, type FreehandStroke, type Point,
-  type ShapeStroke, type Stroke, type ToolName,
+  CANVAS_H, CANVAS_W, type FillStroke, type FreehandStroke, type ImageStroke,
+  type Point, type Selection, type ShapeStroke, type Stroke, type ToolName,
 } from './types';
 
 /**
@@ -26,6 +26,21 @@ export class DrawCanvas {
 
   private onChange: (() => void) | undefined;
 
+  /** The marquee, if the select tool has one. Drawn as an overlay, not a stroke. */
+  selection: Selection | null = null;
+  /** What was last copied or cut, as a PNG data URL, with its size. */
+  private clipboard: { data: string; w: number; h: number } | null = null;
+  /** A pasted image being positioned, not yet committed to history. */
+  private floating: ImageStroke | null = null;
+  private floatingImage: HTMLImageElement | null = null;
+  /** Offset from the pointer to the floating paste's corner while dragging. */
+  private dragOrigin: { x: number; y: number } | null = null;
+  /** Decoded pastes, keyed by data URL, so a repaint does not re-decode. */
+  private readonly imageCache = new Map<string, HTMLImageElement>();
+  /** Overlay for the marquee and floating paste, kept off the drawing itself. */
+  private readonly overlay: HTMLCanvasElement;
+  private readonly overlayCtx: CanvasRenderingContext2D;
+
   constructor(parent: HTMLElement) {
     this.canvas = document.createElement('canvas');
     this.canvas.width = CANVAS_W;
@@ -33,9 +48,19 @@ export class DrawCanvas {
     this.canvas.className = 'draw-canvas';
     parent.appendChild(this.canvas);
 
+    // The marquee and any floating paste live on a second canvas, so they can
+    // be redrawn every frame without touching the artwork underneath.
+    this.overlay = document.createElement('canvas');
+    this.overlay.width = CANVAS_W;
+    this.overlay.height = CANVAS_H;
+    this.overlay.className = 'draw-overlay';
+    parent.appendChild(this.overlay);
+
     const ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) throw new Error('2D canvas unavailable');
+    const overlayCtx = this.overlay.getContext('2d');
+    if (!ctx || !overlayCtx) throw new Error('2D canvas unavailable');
     this.ctx = ctx;
+    this.overlayCtx = overlayCtx;
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
     this.clearSurface();
@@ -43,7 +68,7 @@ export class DrawCanvas {
 
   /** Converts a pointer event to canvas coordinates. */
   toCanvas(event: PointerEvent): Point {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this.overlay.getBoundingClientRect();
     return {
       x: ((event.clientX - rect.left) / rect.width) * CANVAS_W,
       y: ((event.clientY - rect.top) / rect.height) * CANVAS_H,
@@ -55,6 +80,19 @@ export class DrawCanvas {
   // ------------------------------------------------------------------ drawing
 
   beginStroke(tool: ToolName, colour: string, size: number, at: Point, filled: boolean): void {
+    // Starting anything else commits a paste that is still being positioned.
+    if (tool !== 'select') this.commitFloating();
+
+    if (tool === 'select') {
+      if (this.floating && this.hitsFloating(at)) {
+        this.dragOrigin = { x: at.x - this.floating.x, y: at.y - this.floating.y };
+        return;
+      }
+      this.selection = { x: at.x, y: at.y, w: 0, h: 0 };
+      this.drawOverlay();
+      return;
+    }
+
     this.redoStack = [];
 
     if (tool === 'fill') {
@@ -71,6 +109,18 @@ export class DrawCanvas {
   }
 
   extendStroke(at: Point): void {
+    if (this.dragOrigin && this.floating) {
+      this.floating.x = at.x - this.dragOrigin.x;
+      this.floating.y = at.y - this.dragOrigin.y;
+      this.drawOverlay();
+      return;
+    }
+    if (this.selection && !this.live) {
+      this.selection.w = at.x - this.selection.x;
+      this.selection.h = at.y - this.selection.y;
+      this.drawOverlay();
+      return;
+    }
     if (!this.live) return;
     if (this.live.kind === 'freehand') {
       const last = this.live.points[this.live.points.length - 1]!;
@@ -90,6 +140,16 @@ export class DrawCanvas {
   }
 
   endStroke(): void {
+    if (this.dragOrigin) { this.dragOrigin = null; return; }
+    if (this.selection && !this.live) {
+      // A click with no drag clears the marquee rather than leaving a sliver.
+      if (Math.abs(this.selection.w) < 4 || Math.abs(this.selection.h) < 4) {
+        this.selection = null;
+        this.drawOverlay();
+      }
+      this.onChange?.();
+      return;
+    }
     if (!this.live) return;
     if (this.live.kind === 'freehand' && this.live.points.length === 1) {
       // A tap should still leave a dot.
@@ -150,6 +210,11 @@ export class DrawCanvas {
     for (const stroke of this.strokes) this.paintStroke(stroke);
   }
 
+  /** Export must not include the marquee, so flatten any floating paste first. */
+  private flattenForExport(): void {
+    this.commitFloating();
+  }
+
   private paintStroke(stroke: Stroke): void {
     switch (stroke.kind) {
       case 'freehand':
@@ -163,7 +228,30 @@ export class DrawCanvas {
       case 'fill':
         this.paintFill(stroke);
         break;
+      case 'image':
+        this.paintImage(stroke);
+        break;
     }
+  }
+
+  /**
+   * Image strokes are drawn from a cached HTMLImageElement.
+   *
+   * Decoding a data URL is asynchronous, so on a repaint the image may not be
+   * ready yet; the cache is keyed by data URL and triggers one more repaint
+   * once it loads, rather than leaving a gap.
+   */
+  private paintImage(stroke: ImageStroke): void {
+    const cached = this.imageCache.get(stroke.data);
+    if (cached?.complete) {
+      this.ctx.drawImage(cached, stroke.x, stroke.y, stroke.w, stroke.h);
+      return;
+    }
+    if (cached) return;
+    const img = new Image();
+    this.imageCache.set(stroke.data, img);
+    img.addEventListener('load', () => this.repaint());
+    img.src = stroke.data;
   }
 
   private paintFreehandSegment(stroke: FreehandStroke, index: number): void {
@@ -189,6 +277,9 @@ export class DrawCanvas {
     const ctx = this.ctx;
     const { from, to } = stroke;
     ctx.save();
+    // A deleted selection is a filled rect that cuts transparency instead of
+    // painting, so it stays undoable like any other stroke.
+    if (stroke.erase) ctx.globalCompositeOperation = 'destination-out';
     ctx.strokeStyle = stroke.colour;
     ctx.fillStyle = stroke.colour;
     ctx.lineWidth = stroke.size;
@@ -272,10 +363,166 @@ export class DrawCanvas {
     data[i] = c[0]; data[i + 1] = c[1]; data[i + 2] = c[2]; data[i + 3] = c[3];
   }
 
+  // ---------------------------------------------------------------- selection
+
+  /** The marquee normalised so width and height are positive. */
+  private normalisedSelection(): Selection | null {
+    const s = this.selection;
+    if (!s) return null;
+    const x = Math.max(0, Math.min(s.x, s.x + s.w));
+    const y = Math.max(0, Math.min(s.y, s.y + s.h));
+    const w = Math.min(CANVAS_W - x, Math.abs(s.w));
+    const h = Math.min(CANVAS_H - y, Math.abs(s.h));
+    return w > 1 && h > 1 ? { x, y, w, h } : null;
+  }
+
+  get hasSelection(): boolean { return this.normalisedSelection() !== null; }
+  get hasClipboard(): boolean { return this.clipboard !== null; }
+  get hasFloating(): boolean { return this.floating !== null; }
+
+  /** The element that receives pointer events — the overlay sits on top. */
+  get surface(): HTMLCanvasElement { return this.overlay; }
+
+  selectAll(): void {
+    this.selection = { x: 0, y: 0, w: CANVAS_W, h: CANVAS_H };
+    this.drawOverlay();
+    this.onChange?.();
+  }
+
+  clearSelection(): void {
+    this.selection = null;
+    this.drawOverlay();
+    this.onChange?.();
+  }
+
+  /** Copies the marquee's contents. */
+  copy(): void {
+    const area = this.normalisedSelection();
+    if (!area) return;
+    const scratch = document.createElement('canvas');
+    scratch.width = Math.round(area.w);
+    scratch.height = Math.round(area.h);
+    const sctx = scratch.getContext('2d');
+    if (!sctx) return;
+    sctx.drawImage(
+      this.canvas, area.x, area.y, area.w, area.h, 0, 0, scratch.width, scratch.height,
+    );
+    this.clipboard = { data: scratch.toDataURL('image/png'), w: area.w, h: area.h };
+    this.onChange?.();
+  }
+
+  /** Copies, then erases what was copied. */
+  cut(): void {
+    const area = this.normalisedSelection();
+    if (!area) return;
+    this.copy();
+    this.deleteSelection();
+  }
+
+  /** Erases the marquee's contents as an undoable stroke. */
+  deleteSelection(): void {
+    const area = this.normalisedSelection();
+    if (!area) return;
+    this.strokes.push({
+      kind: 'shape', tool: 'rect', colour: '#000', size: 0, filled: true,
+      from: { x: area.x, y: area.y, p: 1 },
+      to: { x: area.x + area.w, y: area.y + area.h, p: 1 },
+      erase: true,
+    } as ShapeStroke);
+    this.redoStack = [];
+    this.repaint();
+    this.selection = null;
+    this.drawOverlay();
+    this.onChange?.();
+  }
+
+  /**
+   * Pastes as a FLOATING image the player can drag before it lands.
+   *
+   * Committing straight away would make positioning impossible on a phone,
+   * where there is no cursor to paste under.
+   */
+  paste(): void {
+    if (!this.clipboard) return;
+    const area = this.normalisedSelection();
+    const x = area ? area.x + 24 : (CANVAS_W - this.clipboard.w) / 2;
+    const y = area ? area.y + 24 : (CANVAS_H - this.clipboard.h) / 2;
+    this.floating = {
+      kind: 'image', tool: 'select', data: this.clipboard.data,
+      x, y, w: this.clipboard.w, h: this.clipboard.h,
+    };
+    this.floatingImage = new Image();
+    this.floatingImage.addEventListener('load', () => this.drawOverlay());
+    this.floatingImage.src = this.clipboard.data;
+    this.selection = null;
+    this.drawOverlay();
+    this.onChange?.();
+  }
+
+  /** Drops a floating paste onto the drawing, as an undoable stroke. */
+  commitFloating(): void {
+    if (!this.floating) return;
+    this.strokes.push(this.floating);
+    this.redoStack = [];
+    this.paintStroke(this.floating);
+    this.floating = null;
+    this.floatingImage = null;
+    this.drawOverlay();
+    this.onChange?.();
+  }
+
+  /** Throws away a floating paste without committing it. */
+  cancelFloating(): void {
+    if (!this.floating) return;
+    this.floating = null;
+    this.floatingImage = null;
+    this.drawOverlay();
+    this.onChange?.();
+  }
+
+  private hitsFloating(at: Point): boolean {
+    const f = this.floating;
+    if (!f) return false;
+    return at.x >= f.x && at.x <= f.x + f.w && at.y >= f.y && at.y <= f.y + f.h;
+  }
+
+  /** Repaints the marquee and floating paste. Never touches the artwork. */
+  private drawOverlay(): void {
+    const ctx = this.overlayCtx;
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+    if (this.floating && this.floatingImage?.complete) {
+      const f = this.floating;
+      ctx.globalAlpha = 0.92;
+      ctx.drawImage(this.floatingImage, f.x, f.y, f.w, f.h);
+      ctx.globalAlpha = 1;
+      this.strokeMarquee(ctx, f.x, f.y, f.w, f.h);
+      return;
+    }
+
+    const area = this.normalisedSelection();
+    if (area) this.strokeMarquee(ctx, area.x, area.y, area.w, area.h);
+  }
+
+  /** A marching-ants rectangle, readable over any artwork. */
+  private strokeMarquee(
+    ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  ): void {
+    ctx.save();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ffffff';
+    ctx.strokeRect(x, y, w, h);
+    ctx.strokeStyle = '#4a4458';
+    ctx.setLineDash([12, 10]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+  }
+
   // ------------------------------------------------------------------- export
 
   /** The drawing as a transparent PNG data URL. */
   toDataURL(): string {
+    this.flattenForExport();
     return this.canvas.toDataURL('image/png');
   }
 
