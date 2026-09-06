@@ -19,6 +19,7 @@ const check = (name: string, cond: boolean, detail = '') => {
 
 const player = (name: string, role: Player['role'], isHost = false): Player => ({
   id: name, name, role, connected: true, isHost,
+  progress: { drawn: [], named: [], ready: false },
 });
 
 const room = (players: Player[]): RoomState => ({
@@ -27,6 +28,8 @@ const room = (players: Player[]): RoomState => ({
   capacity: players.filter((p) => !p.isHost).length,
   players,
   teamNames: { teamA: 'A', teamB: 'B' },
+  step: -1,
+  stepEndsAt: 0,
 });
 
 const host = player('Host', 'unassigned', true);

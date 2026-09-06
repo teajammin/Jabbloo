@@ -21,9 +21,48 @@ export interface Player {
   connected: boolean;
   /** The host runs the shared screen; everyone else is on a phone. */
   isHost: boolean;
+  progress: CreationProgress;
 }
 
-export type Phase = 'lobby' | 'characters' | 'weapons' | 'battleground' | 'battle' | 'results';
+export type Phase = 'lobby' | 'creating' | 'battleground' | 'battle' | 'results';
+
+/** How many weapons each player makes, per the brief. */
+export const WEAPON_COUNT = 3;
+
+/**
+ * The creation timeline.
+ *
+ * One flat list rather than nested loops: the server only has to know which
+ * index it is on, and the client can render any step from its own definition.
+ */
+export type CreationKind = 'draw' | 'name';
+
+export interface CreationStep {
+  /** 'character' or 'weapon0'..'weapon2'. */
+  slot: string;
+  kind: CreationKind;
+  seconds: number;
+  prompt: string;
+}
+
+export const CREATION_STEPS: CreationStep[] = [
+  { slot: 'character', kind: 'draw', seconds: 90, prompt: 'Draw your character' },
+  { slot: 'character', kind: 'name', seconds: 20, prompt: 'Name your character' },
+  ...Array.from({ length: WEAPON_COUNT }, (_, i) => [
+    { slot: `weapon${i}`, kind: 'draw' as const, seconds: 45, prompt: `Draw weapon ${i + 1}` },
+    { slot: `weapon${i}`, kind: 'name' as const, seconds: 20, prompt: `Name weapon ${i + 1}` },
+  ]).flat(),
+];
+
+/** What a player has finished so far. Artwork itself stays on the server. */
+export interface CreationProgress {
+  /** Slots with a drawing submitted. */
+  drawn: string[];
+  /** Slots with a name submitted. */
+  named: string[];
+  /** True once they have finished the current step. */
+  ready: boolean;
+}
 
 export interface RoomState {
   code: string;
@@ -32,6 +71,15 @@ export interface RoomState {
   capacity: number;
   players: Player[];
   teamNames: { teamA: string; teamB: string };
+  /** Index into CREATION_STEPS while creating, else -1. */
+  step: number;
+  /**
+   * When the current step ends, as an epoch millisecond.
+   *
+   * The server owns the clock and everyone counts down to the same instant,
+   * so phones that joined late or slept do not drift out of step.
+   */
+  stepEndsAt: number;
 }
 
 // --------------------------------------------------------------- client -> server
@@ -41,7 +89,12 @@ export type ClientMessage =
   | { type: 'join'; name: string; photo?: string }
   | { type: 'setRole'; playerId: string; role: Role }
   | { type: 'setTeamName'; team: 'teamA' | 'teamB'; name: string }
-  | { type: 'start' };
+  | { type: 'start' }
+  /** A finished drawing for a slot, as a PNG data URL. */
+  | { type: 'submitDrawing'; slot: string; png: string }
+  | { type: 'submitName'; slot: string; name: string }
+  /** Done early; the step advances once everyone has said so. */
+  | { type: 'ready' };
 
 // --------------------------------------------------------------- server -> client
 
@@ -59,6 +112,16 @@ export type ServerMessage =
  * Kept here rather than in the server so the host's Start button and the
  * server's validation cannot drift apart — one is the UI for the other.
  */
+/** Players who actually create things. Judges sit the creation phase out. */
+export function creators(state: RoomState): Player[] {
+  return state.players.filter((p) => !p.isHost && p.role !== 'judge' && p.role !== 'unassigned');
+}
+
+/** The step being worked on, or null outside the creation phase. */
+export function currentStep(state: RoomState): CreationStep | null {
+  return state.phase === 'creating' ? CREATION_STEPS[state.step] ?? null : null;
+}
+
 export function startBlockedBecause(state: RoomState): string | null {
   const active = state.players.filter((p) => !p.isHost);
 

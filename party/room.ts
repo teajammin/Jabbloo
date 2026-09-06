@@ -1,7 +1,9 @@
 import type * as Party from 'partykit/server';
 import {
+  CREATION_STEPS,
   MAX_PLAYERS,
   canStart,
+  creators,
   type ClientMessage,
   type Player,
   type Role,
@@ -19,6 +21,15 @@ import {
  * back — never their own optimistic copy — so the host screen and every phone
  * always agree on who is in the room and what phase it is in.
  */
+/** Stand-in names, per the brief's rule for anything left unnamed. */
+const FALLBACK_WEAPONS = ['Sword', 'Axe', 'Hammer'];
+
+function defaultName(slot: string): string {
+  if (slot === 'character') return 'Nameless';
+  const index = Number(slot.replace('weapon', ''));
+  return FALLBACK_WEAPONS[index] ?? 'Weapon';
+}
+
 export default class Room implements Party.Server {
   private state: RoomState;
 
@@ -29,8 +40,23 @@ export default class Room implements Party.Server {
       capacity: 0,
       players: [],
       teamNames: { teamA: 'Team One', teamB: 'Team Two' },
+      step: -1,
+      stepEndsAt: 0,
     };
   }
+
+  /**
+   * Finished artwork, kept out of the broadcast state.
+   *
+   * A character PNG runs to hundreds of kilobytes; sending every player's
+   * artwork to every device on every state change would swamp a phone. Only
+   * progress flags are broadcast, and the art is handed over when the battle
+   * needs it.
+   */
+  private readonly art = new Map<string, string>();
+  private readonly names = new Map<string, string>();
+  /** Timer that ends the current creation step. */
+  private stepTimer: ReturnType<typeof setTimeout> | null = null;
 
   onConnect(connection: Party.Connection): void {
     // A connection is not yet a player: the host and joining phones both
@@ -62,6 +88,15 @@ export default class Room implements Party.Server {
         break;
       case 'start':
         this.onStart(sender);
+        break;
+      case 'submitDrawing':
+        this.onSubmitDrawing(message.slot, message.png, sender);
+        break;
+      case 'submitName':
+        this.onSubmitName(message.slot, message.name, sender);
+        break;
+      case 'ready':
+        this.onReady(sender);
         break;
       default:
         this.send(sender, { type: 'error', reason: 'Unknown message' });
@@ -98,6 +133,7 @@ export default class Room implements Party.Server {
       role: 'unassigned',
       connected: true,
       isHost: true,
+      progress: { drawn: [], named: [], ready: false },
     };
     this.state.players.push(host);
     this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
@@ -135,6 +171,7 @@ export default class Room implements Party.Server {
       role: 'unassigned',
       connected: true,
       isHost: false,
+      progress: { drawn: [], named: [], ready: false },
     });
 
     this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
@@ -166,8 +203,78 @@ export default class Room implements Party.Server {
       this.send(sender, { type: 'error', reason: 'Not everyone has a place yet' });
       return;
     }
-    this.state.phase = 'characters';
+    this.state.phase = 'creating';
+    this.beginStep(0);
+  }
+
+  // ------------------------------------------------------------------ creating
+
+  /**
+   * Starts a creation step and sets its deadline.
+   *
+   * The deadline is an absolute time rather than a duration, so a phone that
+   * slept or joined late lands on the same instant as everyone else instead of
+   * starting its own countdown.
+   */
+  private beginStep(index: number): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+
+    const step = CREATION_STEPS[index];
+    if (!step) {
+      this.state.phase = 'battleground';
+      this.state.step = -1;
+      this.state.stepEndsAt = 0;
+      this.broadcastState();
+      return;
+    }
+
+    this.state.step = index;
+    this.state.stepEndsAt = Date.now() + step.seconds * 1000;
+    for (const player of this.state.players) player.progress.ready = false;
+
+    this.stepTimer = setTimeout(() => this.beginStep(index + 1), step.seconds * 1000);
     this.broadcastState();
+  }
+
+  /** Moves on early once every creator has finished the current step. */
+  private advanceIfAllReady(): void {
+    const active = creators(this.state).filter((p) => p.connected);
+    if (active.length === 0 || !active.every((p) => p.progress.ready)) return;
+    this.beginStep(this.state.step + 1);
+  }
+
+  private onSubmitDrawing(slot: string, png: string, sender: Party.Connection): void {
+    const player = this.state.players.find((p) => p.id === sender.id);
+    if (!player || this.state.phase !== 'creating') return;
+    if (typeof png !== 'string' || !png.startsWith('data:image/png;base64,')) return;
+
+    this.art.set(`${player.id}:${slot}`, png);
+    if (!player.progress.drawn.includes(slot)) player.progress.drawn.push(slot);
+    player.progress.ready = true;
+    this.broadcastState();
+    this.advanceIfAllReady();
+  }
+
+  private onSubmitName(slot: string, name: string, sender: Party.Connection): void {
+    const player = this.state.players.find((p) => p.id === sender.id);
+    if (!player || this.state.phase !== 'creating') return;
+
+    // A blank name still counts: the brief says everything must be named, and
+    // a player who runs out of time should not stall the whole room.
+    const clean = (typeof name === 'string' ? name : '').trim().slice(0, 24) || defaultName(slot);
+    this.names.set(`${player.id}:${slot}`, clean);
+    if (!player.progress.named.includes(slot)) player.progress.named.push(slot);
+    player.progress.ready = true;
+    this.broadcastState();
+    this.advanceIfAllReady();
+  }
+
+  private onReady(sender: Party.Connection): void {
+    const player = this.state.players.find((p) => p.id === sender.id);
+    if (!player) return;
+    player.progress.ready = true;
+    this.broadcastState();
+    this.advanceIfAllReady();
   }
 
   // --------------------------------------------------------------------- utils
@@ -178,6 +285,17 @@ export default class Room implements Party.Server {
 
   private send(connection: Party.Connection, message: ServerMessage): void {
     connection.send(JSON.stringify(message));
+  }
+
+  /** Everything one player made, for the battle to draw with. */
+  creationsFor(playerId: string): { slot: string; png: string; name: string }[] {
+    const out: { slot: string; png: string; name: string }[] = [];
+    for (const [key, png] of this.art) {
+      const [owner, slot] = key.split(':');
+      if (owner !== playerId || !slot) continue;
+      out.push({ slot, png, name: this.names.get(key) ?? defaultName(slot) });
+    }
+    return out;
   }
 
   private broadcastState(): void {

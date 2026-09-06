@@ -1,6 +1,7 @@
 import { bubbleText } from './bubbleText';
 import { el, button, goHome, type Screen } from './screens';
 import { RoomConnection } from '../net/room';
+import { creationScreen } from './creation';
 import { startBlockedBecause, type Player, type RoomState } from '../shared/protocol';
 import { teamBoard } from './teams';
 
@@ -27,6 +28,7 @@ export function lobbyScreen(
 ): Screen {
   return (root, go) => {
     const connection = new RoomConnection(code);
+    let handedOver = false;
 
     const roster = el('ul', { class: 'roster' });
     const status = el('p', { class: 'lede' }, 'Connecting…');
@@ -77,6 +79,13 @@ export function lobbyScreen(
         startButton.disabled = reason !== null;
         blocked.textContent = reason ?? '';
 
+        if (state.phase === 'creating') {
+          // Hand the live connection over rather than reconnecting: a new
+          // socket would be a new player as far as the room is concerned.
+          handedOver = true;
+          go(creationScreen(connection, isHost));
+          return;
+        }
         if (state.phase !== 'lobby') {
           status.textContent = 'Starting…';
         }
@@ -134,7 +143,11 @@ export function lobbyScreen(
       ),
     );
 
-    return () => connection.close();
+    return () => {
+      // Only closed when leaving the room outright; a handover to the next
+      // screen keeps the same socket, and closing it would drop the player.
+      if (!handedOver) connection.close();
+    };
   };
 }
 
