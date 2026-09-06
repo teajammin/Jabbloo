@@ -430,7 +430,9 @@ input[type='text'] {
 
 .draw-title { margin: 0; font-size: 15px; }
 
+/* The canvas gives way to the toolbar rather than squeezing it off-screen. */
 .draw-area {
+  flex-shrink: 1;
   /* Takes the space the toolbar does not use, and centres the square in it. */
   flex: 1 1 auto;
   min-height: 0;
@@ -476,6 +478,11 @@ input[type='text'] {
   flex-direction: column;
   gap: 8px;
   width: min(560px, 100%);
+  /* On a short screen the rows can exceed what is left; scroll rather than
+     clipping controls off the bottom where they cannot be reached. */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .tool-row {

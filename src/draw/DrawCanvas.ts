@@ -849,6 +849,15 @@ export class DrawCanvas {
   /** Drops a floating paste onto the drawing, as an undoable stroke. */
   commitFloating(): void {
     if (!this.floating) return;
+
+    // Hand the already-decoded image to the cache before painting. Without
+    // this, painting starts a fresh async decode, and an export taken in the
+    // same tick — pressing Done right after placing a photo — would write the
+    // canvas out before the photo had been drawn onto it.
+    if (this.floatingImage?.complete) {
+      this.imageCache.set(this.floating.data, this.floatingImage);
+    }
+
     this.strokes.push(this.floating);
     this.redoStack = [];
     this.paintStroke(this.floating);

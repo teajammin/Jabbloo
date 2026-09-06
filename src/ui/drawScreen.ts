@@ -106,13 +106,21 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       let timer: number | null = null;
       const stop = () => { if (timer !== null) { clearTimeout(timer); timer = null; } };
 
-      node.addEventListener('pointerdown', () => {
+      let pressAt: { x: number; y: number } | null = null;
+      node.addEventListener('pointerdown', (event) => {
         held = false;
+        pressAt = { x: event.clientX, y: event.clientY };
         timer = window.setTimeout(() => {
           held = true;
           say(`${help.name} — ${help.what}`);
           navigator.vibrate?.(12);
         }, 450);
+      });
+      // A toolbar row scrolls sideways, and that scroll starts as a press on a
+      // button — without this the description fires mid-swipe.
+      node.addEventListener('pointermove', (event) => {
+        if (!pressAt) return;
+        if (Math.hypot(event.clientX - pressAt.x, event.clientY - pressAt.y) > 8) stop();
       });
       node.addEventListener('pointerup', stop);
       node.addEventListener('pointerleave', stop);
@@ -162,6 +170,9 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     const onDown = (event: PointerEvent) => {
       if (!event.isPrimary) return;
+      // Right and middle buttons must not draw, drag or place anything: the
+      // context menu handles them, and pointerdown fires first.
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
       surface.setPointerCapture(event.pointerId);
       const at = canvas.toCanvas(event);
@@ -488,23 +499,46 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     // Only visible while a crop frame is up: on a phone there is no Enter key
     // to confirm with, so the confirm has to be on screen.
-    const applyCropButton = button('✓', async () => {
-      const done = await canvas.applyCrop(cropImage);
+    const applyCropButton = button('✓ Keep', async () => {
+      if (canvas.isCropping) {
+        const done = await canvas.applyCrop(cropImage);
+        updateCropBar();
+        say(done ? 'Cropped — drag it into place, then ✓ again to place it' : 'Nothing to crop');
+        return;
+      }
+      canvas.commitFloating();
       updateCropBar();
-      say(done ? 'Cropped — drag it into place' : 'Nothing to crop');
+      say('Photo placed — ← undoes it');
     }, 'tool wide primary');
-    applyCropButton.setAttribute('aria-label', 'Keep this crop');
 
     const cancelCropButton = button('✕', () => {
-      canvas.cancelCrop();
+      if (canvas.isCropping) {
+        canvas.cancelCrop();
+        say('Crop cancelled');
+      } else {
+        canvas.cancelFloating();
+        say('Photo removed');
+      }
       updateCropBar();
-      say('Crop cancelled');
     }, 'tool wide ghost');
-    cancelCropButton.setAttribute('aria-label', 'Cancel cropping');
+    cancelCropButton.setAttribute('aria-label', 'Cancel');
 
     const cropBar = el('div', { class: 'tool-row crop-bar' }, cancelCropButton, applyCropButton);
+
+    /**
+     * The confirm bar covers a floating photo as well as a crop frame.
+     *
+     * A photo is placed at 80% of the canvas, so it can cover nearly all of it
+     * — leaving nowhere to tap "outside" to place it. Without an always-visible
+     * confirm, a player could be stuck with a photo they cannot put down.
+     */
     function updateCropBar(): void {
-      cropBar.hidden = !canvas.isCropping;
+      const active = canvas.isCropping || canvas.hasFloating;
+      cropBar.hidden = !active;
+      applyCropButton.textContent = canvas.isCropping ? '✓ Keep crop' : '✓ Place photo';
+      applyCropButton.setAttribute(
+        'aria-label', canvas.isCropping ? 'Keep this crop' : 'Place the photo',
+      );
     }
     cropBar.hidden = true;
 
@@ -583,6 +617,9 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         return;
       }
       if (key === 'escape') {
+        // The menu owns Escape while it is open, or one press would dismiss
+        // the menu and throw away the photo behind it.
+        if (menu.isOpen) return;
         if (canvas.isCropping) { canvas.cancelCrop(); updateCropBar(); return; }
         canvas.hasFloating ? canvas.cancelFloating() : canvas.clearSelection();
         return;
