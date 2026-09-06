@@ -1,6 +1,7 @@
 import {
-  CANVAS_H, CANVAS_W, type FillStroke, type FreehandStroke, type ImageStroke,
-  type Point, type Selection, type ShapeStroke, type Stroke, type ToolName,
+  CANVAS_H, CANVAS_W, type CropHandle, type FillStroke, type FreehandStroke,
+  type ImageStroke, type Point, type Selection, type ShapeStroke, type Stroke,
+  type ToolName,
 } from './types';
 
 /**
@@ -37,6 +38,11 @@ export class DrawCanvas {
   private dragOrigin: { x: number; y: number } | null = null;
   /** Decoded pastes, keyed by data URL, so a repaint does not re-decode. */
   private readonly imageCache = new Map<string, HTMLImageElement>();
+
+  /** The crop frame over the floating layer, while cropping. */
+  private cropRect: Selection | null = null;
+  private activeHandle: CropHandle | null = null;
+  private cropGrabOffset = { x: 0, y: 0 };
   /** Overlay for the marquee and floating paste, kept off the drawing itself. */
   private readonly overlay: HTMLCanvasElement;
   private readonly overlayCtx: CanvasRenderingContext2D;
@@ -532,6 +538,142 @@ export class DrawCanvas {
     return true;
   }
 
+  // -------------------------------------------------------------------- crop
+
+  /**
+   * Crop handles, sized in canvas units.
+   *
+   * The canvas is drawn far smaller than its 1024 logical pixels, so a handle
+   * that looks right in canvas space would be a few pixels on screen. These
+   * are deliberately large: the hit area is bigger again than the drawn one,
+   * which is what makes corners catchable with a finger.
+   */
+  static readonly HANDLE_DRAW = 26;
+  static readonly HANDLE_HIT = 52;
+
+  get isCropping(): boolean { return this.cropRect !== null; }
+
+  /** Starts cropping the floating layer, framed to its current bounds. */
+  beginCrop(): boolean {
+    const f = this.floating;
+    if (!f) return false;
+    this.cropRect = { x: f.x, y: f.y, w: f.w, h: f.h };
+    this.selection = null;
+    this.drawOverlay();
+    this.onChange?.();
+    return true;
+  }
+
+  cancelCrop(): void {
+    if (!this.cropRect) return;
+    this.cropRect = null;
+    this.activeHandle = null;
+    this.drawOverlay();
+    this.onChange?.();
+  }
+
+  /** Which handle, if any, is under a point. */
+  cropHandleAt(at: Point): CropHandle | null {
+    const r = this.cropRect;
+    if (!r) return null;
+    const hit = DrawCanvas.HANDLE_HIT / 2;
+    const midX = r.x + r.w / 2;
+    const midY = r.y + r.h / 2;
+
+    const spots: [CropHandle, number, number][] = [
+      ['nw', r.x, r.y], ['n', midX, r.y], ['ne', r.x + r.w, r.y],
+      ['e', r.x + r.w, midY], ['se', r.x + r.w, r.y + r.h],
+      ['s', midX, r.y + r.h], ['sw', r.x, r.y + r.h], ['w', r.x, midY],
+    ];
+    for (const [name, hx, hy] of spots) {
+      if (Math.abs(at.x - hx) <= hit && Math.abs(at.y - hy) <= hit) return name;
+    }
+    // Inside the frame drags the whole thing.
+    if (at.x > r.x && at.x < r.x + r.w && at.y > r.y && at.y < r.y + r.h) return 'move';
+    return null;
+  }
+
+  beginCropDrag(handle: CropHandle, at: Point): void {
+    this.activeHandle = handle;
+    if (this.cropRect) {
+      this.cropGrabOffset = { x: at.x - this.cropRect.x, y: at.y - this.cropRect.y };
+    }
+  }
+
+  /**
+   * Moves whichever edge or corner is held.
+   *
+   * The frame is clamped to the layer's bounds — cropping can only ever take
+   * away, so a handle dragged outside the photo would reveal nothing — and to
+   * a minimum size, so it cannot be collapsed to a line and lost.
+   */
+  dragCrop(at: Point): void {
+    const r = this.cropRect;
+    const f = this.floating;
+    if (!r || !f || !this.activeHandle) return;
+
+    const MIN = 40;
+    const left = f.x, top = f.y, right = f.x + f.w, bottom = f.y + f.h;
+    let { x, y, w, h } = r;
+
+    const setLeft = (nx: number) => {
+      const clamped = Math.min(Math.max(left, nx), x + w - MIN);
+      w += x - clamped;
+      x = clamped;
+    };
+    const setTop = (ny: number) => {
+      const clamped = Math.min(Math.max(top, ny), y + h - MIN);
+      h += y - clamped;
+      y = clamped;
+    };
+    const setRight = (nx: number) => { w = Math.min(Math.max(MIN, nx - x), right - x); };
+    const setBottom = (ny: number) => { h = Math.min(Math.max(MIN, ny - y), bottom - y); };
+
+    switch (this.activeHandle) {
+      case 'nw': setLeft(at.x); setTop(at.y); break;
+      case 'n': setTop(at.y); break;
+      case 'ne': setRight(at.x); setTop(at.y); break;
+      case 'e': setRight(at.x); break;
+      case 'se': setRight(at.x); setBottom(at.y); break;
+      case 's': setBottom(at.y); break;
+      case 'sw': setLeft(at.x); setBottom(at.y); break;
+      case 'w': setLeft(at.x); break;
+      case 'move': {
+        x = Math.min(Math.max(left, at.x - this.cropGrabOffset.x), right - w);
+        y = Math.min(Math.max(top, at.y - this.cropGrabOffset.y), bottom - h);
+        break;
+      }
+    }
+
+    this.cropRect = { x, y, w, h };
+    this.drawOverlay();
+  }
+
+  endCropDrag(): void { this.activeHandle = null; }
+
+  /** Applies the crop frame to the floating layer. */
+  async applyCrop(
+    crop: (data: string, fx: number, fy: number, fw: number, fh: number) => Promise<string>,
+  ): Promise<boolean> {
+    const r = this.cropRect;
+    const f = this.floating;
+    if (!r || !f) return false;
+
+    const data = await crop(
+      f.data, (r.x - f.x) / f.w, (r.y - f.y) / f.h, r.w / f.w, r.h / f.h,
+    );
+
+    this.floating = { ...f, data, x: r.x, y: r.y, w: r.w, h: r.h };
+    this.floatingImage = new Image();
+    this.floatingImage.addEventListener('load', () => this.drawOverlay());
+    this.floatingImage.src = data;
+    this.cropRect = null;
+    this.activeHandle = null;
+    this.drawOverlay();
+    this.onChange?.();
+    return true;
+  }
+
   selectAll(): void {
     this.selection = { x: 0, y: 0, w: CANVAS_W, h: CANVAS_H };
     this.drawOverlay();
@@ -650,12 +792,66 @@ export class DrawCanvas {
       ctx.globalAlpha = 0.92;
       ctx.drawImage(this.floatingImage, f.x, f.y, f.w, f.h);
       ctx.globalAlpha = 1;
-      this.strokeMarquee(ctx, f.x, f.y, f.w, f.h);
+
+      if (this.cropRect) {
+        this.strokeCropFrame(ctx, this.cropRect, f);
+      } else {
+        this.strokeMarquee(ctx, f.x, f.y, f.w, f.h);
+      }
       return;
     }
 
     const area = this.normalisedSelection();
     if (area) this.strokeMarquee(ctx, area.x, area.y, area.w, area.h);
+  }
+
+  /**
+   * The crop frame: what stays, framed in dashes, with everything being cut
+   * away dimmed so it is obvious what the crop will take.
+   */
+  private strokeCropFrame(
+    ctx: CanvasRenderingContext2D, r: Selection, f: { x: number; y: number; w: number; h: number },
+  ): void {
+    ctx.save();
+
+    // Dim the parts of the photo outside the frame.
+    ctx.fillStyle = 'rgba(30, 26, 36, 0.5)';
+    ctx.beginPath();
+    ctx.rect(f.x, f.y, f.w, f.h);
+    ctx.rect(r.x, r.y, r.w, r.h);
+    ctx.fill('evenodd');
+
+    // Thirds, the way a crop tool usually guides framing.
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 1; i < 3; i++) {
+      ctx.moveTo(r.x + (r.w * i) / 3, r.y);
+      ctx.lineTo(r.x + (r.w * i) / 3, r.y + r.h);
+      ctx.moveTo(r.x, r.y + (r.h * i) / 3);
+      ctx.lineTo(r.x + r.w, r.y + (r.h * i) / 3);
+    }
+    ctx.stroke();
+
+    this.strokeMarquee(ctx, r.x, r.y, r.w, r.h);
+
+    // Handles, drawn last so nothing overlaps them.
+    const d = DrawCanvas.HANDLE_DRAW;
+    const midX = r.x + r.w / 2;
+    const midY = r.y + r.h / 2;
+    const spots: [number, number][] = [
+      [r.x, r.y], [midX, r.y], [r.x + r.w, r.y],
+      [r.x + r.w, midY], [r.x + r.w, r.y + r.h],
+      [midX, r.y + r.h], [r.x, r.y + r.h], [r.x, midY],
+    ];
+    for (const [hx, hy] of spots) {
+      ctx.fillStyle = '#4a4458';
+      ctx.fillRect(hx - d / 2 - 3, hy - d / 2 - 3, d + 6, d + 6);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(hx - d / 2, hy - d / 2, d, d);
+    }
+
+    ctx.restore();
   }
 
   /** A marching-ants rectangle, readable over any artwork. */

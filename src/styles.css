@@ -701,3 +701,7 @@ input[type='text'] {
 .photo-menu-item:hover { background: rgba(74, 68, 88, 0.07); transform: none; box-shadow: none; }
 .photo-menu-item:active { transform: none; box-shadow: none; }
 .photo-menu-icon { font-size: 19px; width: 24px; text-align: center; }
+
+/* Apply / cancel for cropping. Hidden unless a crop frame is up. */
+.crop-bar[hidden] { display: none; }
+.crop-bar { gap: 10px; }

@@ -63,6 +63,10 @@ export interface ImageStroke {
   h: number;
 }
 
+/** Which part of a crop frame is being dragged. */
+export type CropHandle =
+  | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'move';
+
 /** A rectangular marquee, in canvas coordinates. */
 export interface Selection {
   x: number;

@@ -155,12 +155,25 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       navigator.vibrate?.(18);
     };
 
+    /** True while a crop handle is being dragged, so drawing stays suppressed. */
+    let croppingDrag = false;
+
     const onDown = (event: PointerEvent) => {
       if (!event.isPrimary) return;
       event.preventDefault();
       surface.setPointerCapture(event.pointerId);
-      drawing = true;
       const at = canvas.toCanvas(event);
+
+      if (canvas.isCropping) {
+        const handle = canvas.cropHandleAt(at);
+        if (handle) {
+          canvas.beginCropDrag(handle, at);
+          croppingDrag = true;
+        }
+        return;
+      }
+
+      drawing = true;
       canvas.beginStroke(tool, colour, size, at, filled);
 
       holdStart = { x: event.clientX, y: event.clientY };
@@ -184,6 +197,11 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     };
 
     const onMove = (event: PointerEvent) => {
+      if (croppingDrag) {
+        event.preventDefault();
+        canvas.dragCrop(canvas.toCanvas(event));
+        return;
+      }
       if (!drawing) return;
       event.preventDefault();
       if (holdStart && Math.hypot(
@@ -197,6 +215,14 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     const onUp = (event: PointerEvent) => {
       cancelHold();
+      if (croppingDrag) {
+        croppingDrag = false;
+        canvas.endCropDrag();
+        if (surface.hasPointerCapture(event.pointerId)) {
+          surface.releasePointerCapture(event.pointerId);
+        }
+        return;
+      }
       // Release capture even when the hold already ended the stroke, or the
       // surface keeps it until the next pointerdown.
       if (surface.hasPointerCapture(event.pointerId)) {
@@ -373,14 +399,10 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         },
       },
       {
-        icon: '⬚', label: 'Crop to a box', onPick: async () => {
-          if (canvas.hasSelection) {
-            const cropped = await canvas.cropFloatingToSelection(cropImage);
-            say(cropped ? 'Trimmed — drag it into place' : 'Draw the box over the photo');
-            return;
-          }
-          selectTool('select');
-          say('Drag a box over the photo, then hold it again and pick Crop to a box');
+        icon: '⬚', label: 'Crop', onPick: () => {
+          if (!canvas.beginCrop()) return;
+          updateCropBar();
+          say('Drag the edges and corners · ✓ keeps the crop, ✕ cancels');
         },
       },
       { icon: '⭕', label: 'Crop to a circle', onPick: shape('circle') },
@@ -417,12 +439,35 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     const doneButton = control('done', () => options.onDone?.(canvas.toDataURL()), 'tool wide primary');
 
+    // Only visible while a crop frame is up: on a phone there is no Enter key
+    // to confirm with, so the confirm has to be on screen.
+    const applyCropButton = button('✓', async () => {
+      const done = await canvas.applyCrop(cropImage);
+      updateCropBar();
+      say(done ? 'Cropped — drag it into place' : 'Nothing to crop');
+    }, 'tool wide primary');
+    applyCropButton.setAttribute('aria-label', 'Keep this crop');
+
+    const cancelCropButton = button('✕', () => {
+      canvas.cancelCrop();
+      updateCropBar();
+      say('Crop cancelled');
+    }, 'tool wide ghost');
+    cancelCropButton.setAttribute('aria-label', 'Cancel cropping');
+
+    const cropBar = el('div', { class: 'tool-row crop-bar' }, cancelCropButton, applyCropButton);
+    function updateCropBar(): void {
+      cropBar.hidden = !canvas.isCropping;
+    }
+    cropBar.hidden = true;
+
     const helpDialog = drawHelpDialog();
     const helpButton = button('?', () => helpDialog.showModal(), 'tool');
     helpButton.setAttribute('aria-label', 'What the buttons do');
     helpButton.title = 'What the buttons do';
 
     canvas.onChanged(() => {
+      updateCropBar();
       undoButton.disabled = !canvas.canUndo;
       redoButton.disabled = !canvas.canRedo;
       clearButton.disabled = canvas.isEmpty;
@@ -479,8 +524,19 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         canvas.deleteSelection();
         return;
       }
-      if (key === 'enter') { canvas.commitFloating(); return; }
+      if (key === 'enter') {
+        if (canvas.isCropping) {
+          void canvas.applyCrop(cropImage).then(() => {
+            updateCropBar();
+            say('Cropped — drag it into place');
+          });
+          return;
+        }
+        canvas.commitFloating();
+        return;
+      }
       if (key === 'escape') {
+        if (canvas.isCropping) { canvas.cancelCrop(); updateCropBar(); return; }
         canvas.hasFloating ? canvas.cancelFloating() : canvas.clearSelection();
         return;
       }
@@ -507,6 +563,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
           el('div', { class: 'tool-row' },
             uploadButton, smallerButton, biggerButton,
             undoButton, redoButton, copyButton, pasteButton),
+          cropBar,
           el('div', { class: 'tool-row' }, helpButton, clearButton, doneButton),
           fileInput,
           status,
