@@ -100,7 +100,14 @@ function fakeConnection(playerId = 'a', state = roomState()) {
 // --- the screens that need nothing ------------------------------------------
 
 setHome(ui.launchScreen);
-mounts('launch', ui.launchScreen);
+mounts('launch', ui.launchScreen, (root) => {
+  const phone = [...root.querySelectorAll('button')]
+    .find((b) => /phone/i.test(b.textContent ?? ''));
+  check('the launch screen offers a phone link', Boolean(phone));
+  phone?.click();
+  check('and it opens', document.querySelector('dialog.phone-link')?.open === true);
+  document.querySelector('dialog.phone-link')?.close();
+});
 mounts('create room', ui.createRoomScreen);
 mounts('join room', ui.joinRoomScreen);
 

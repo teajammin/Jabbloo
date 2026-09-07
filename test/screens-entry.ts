@@ -7,6 +7,7 @@
  */
 export { mount, setHome, goHome } from '../src/ui/screens';
 export { launchScreen } from '../src/ui/launch';
+export { phoneLink } from '../src/ui/phoneLink';
 export { createRoomScreen } from '../src/ui/createRoom';
 export { joinRoomScreen } from '../src/ui/joinRoom';
 export { drawScreen } from '../src/ui/drawScreen';
