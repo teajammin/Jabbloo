@@ -137,6 +137,11 @@ export default class Room implements Party.Server {
       case 'turnDone':
         if (this.isHost(sender)) this.endTurn();
         break;
+      case 'rematch':
+        // Same characters, same weapons, a fresh battleground vote — which is
+        // where the brief's rematch button leads.
+        if (this.isHost(sender)) this.beginVote();
+        break;
       default:
         this.send(sender, { type: 'error', reason: 'Unknown message' });
     }
@@ -177,6 +182,9 @@ export default class Room implements Party.Server {
       fights: 0,
       characterName: '',
       weaponNames: [],
+      damageDealt: 0,
+      damageTaken: 0,
+      best: null,
     };
     this.state.players.push(host);
     this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
@@ -219,6 +227,9 @@ export default class Room implements Party.Server {
       fights: 0,
       characterName: '',
       weaponNames: [],
+      damageDealt: 0,
+      damageTaken: 0,
+      best: null,
     });
 
     this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
@@ -487,9 +498,28 @@ export default class Room implements Party.Server {
     for (const attackerId of turn.fighters) {
       const dealt = averageScore(turn, attackerId);
       turn.damage[attackerId] = dealt;
+
+      const attacker = this.state.players.find((p) => p.id === attackerId);
       const defenderId = turn.fighters.find((id) => id !== attackerId);
       const defender = this.state.players.find((p) => p.id === defenderId);
-      if (defender) defender.health = Math.max(0, defender.health - dealt);
+
+      if (defender) {
+        defender.health = Math.max(0, defender.health - dealt);
+        defender.damageTaken += dealt;
+      }
+      if (attacker) {
+        attacker.damageDealt += dealt;
+        // Ties keep the earlier hit; the brief says pick any of them, and the
+        // first is as good a choice as a random one and easier to reason about.
+        if (!attacker.best || dealt > attacker.best.damage) {
+          const move = turn.moves[attackerId];
+          attacker.best = {
+            weapon: attacker.weaponNames[move?.weapon ?? 0] || 'their weapon',
+            prompt: move?.prompt ?? '',
+            damage: dealt,
+          };
+        }
+      }
     }
 
     turn.phase = 'over';

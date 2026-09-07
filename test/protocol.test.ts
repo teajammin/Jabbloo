@@ -24,6 +24,9 @@ const player = (name: string, role: Player['role'], isHost = false): Player => (
   fights: 0,
   characterName: name,
   weaponNames: [],
+  damageDealt: 0,
+  damageTaken: 0,
+  best: null,
 });
 
 const room = (players: Player[]): RoomState => ({
@@ -153,6 +156,25 @@ check('a judge who skipped one fighter is ignored for them',
   averageScore(turnWith({ j1: { ann: 20 }, j2: { bo: 10 } }), 'ann') === 20);
 check('nobody scored means no damage',
   averageScore(turnWith({}), 'ann') === 0);
+
+// --- who wins --------------------------------------------------------------
+
+import { teamDamage, winningTeam } from '../src/shared/protocol';
+
+const hurt = (p: Player, taken: number): Player => ({ ...p, damageTaken: taken });
+
+const fight = (aTaken: number, bTaken: number) => room([
+  host,
+  hurt(player('Ann', 'teamA'), aTaken),
+  hurt(player('Bo', 'teamB'), bTaken),
+]);
+
+check('team damage sums its players',
+  teamDamage(room([host, hurt(player('Ann', 'teamA'), 20), hurt(player('Az', 'teamA'), 15)]), 'teamA') === 35);
+check('least damage taken wins', winningTeam(fight(30, 60)) === 'teamA');
+check('and the other way round', winningTeam(fight(60, 30)) === 'teamB');
+check('level means no winner yet', winningTeam(fight(40, 40)) === null);
+check('nobody hurt is still level', winningTeam(fight(0, 0)) === null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

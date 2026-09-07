@@ -125,5 +125,48 @@ async function setup(withJudge) {
   for (const ws of [host, a, b, j]) ws.close();
 }
 
+// --- stats accumulate across the fight -------------------------------------
+{
+  const { host, a, b, ids } = await setup(false);
+  const prompts = [['a mighty slam', 'a poke'], ['a huge kick', 'a nudge'], ['the big one', 'a tap']];
+  const scores = [[20, 5], [10, 5], [25, 5]];
+
+  for (let round = 0; round < 3; round++) {
+    a.send(JSON.stringify({ type: 'submitMove', weapon: 1, prompt: prompts[round][0] }));
+    b.send(JSON.stringify({ type: 'submitMove', weapon: 0, prompt: prompts[round][1] }));
+    await wait(200);
+    host.send(JSON.stringify({ type: 'turnPlayed' }));
+    await wait(180);
+    host.send(JSON.stringify({ type: 'submitScore', attackerId: ids[0], score: scores[round][0] }));
+    host.send(JSON.stringify({ type: 'submitScore', attackerId: ids[1], score: scores[round][1] }));
+    await wait(220);
+    host.send(JSON.stringify({ type: 'turnDone' }));
+    await wait(200);
+  }
+
+  const s = state(host);
+  const ann = s.players.find((p) => p.id === ids[0]);
+  const bo = s.players.find((p) => p.id === ids[1]);
+
+  check('damage given adds up', ann.damageDealt === 55, String(ann.damageDealt));
+  check('damage taken adds up', ann.damageTaken === 15, String(ann.damageTaken));
+  check('the other side mirrors it', bo.damageTaken === 55, String(bo.damageTaken));
+  check('the best hit is the hardest one', ann.best?.damage === 25, JSON.stringify(ann.best));
+  check('the best hit quotes what was written',
+    ann.best?.prompt === 'the big one', ann.best?.prompt);
+  check('health never goes below zero', s.players.every((p) => p.health >= 0),
+    JSON.stringify(s.players.map((p) => p.health)));
+  check('the fight ends in results', s.phase === 'results', s.phase);
+
+  // Rematch returns to the vote with the same characters.
+  host.send(JSON.stringify({ type: 'rematch' }));
+  await wait(250);
+  check('rematch reopens the vote', state(host).phase === 'battleground', state(host).phase);
+  check('names survive a rematch',
+    state(host).players.find((p) => p.id === ids[0])?.weaponNames !== undefined);
+
+  for (const ws of [host, a, b]) ws.close();
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

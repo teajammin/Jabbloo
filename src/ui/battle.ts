@@ -247,7 +247,16 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
     connection.on({
       onArt: (next) => { art = next; void sync(); },
-      onState: (next) => { state = next; void sync(); },
+      onState: (next) => {
+        state = next;
+        if (next.phase === 'results') {
+          void import('./results').then(({ resultsScreen }) => {
+            go(resultsScreen(connection, true));
+          });
+          return;
+        }
+        void sync();
+      },
     });
 
     // The host pulls the artwork; it is far too large to broadcast.
@@ -281,6 +290,12 @@ function phoneView(
   let showing = false;
   connection.on({
     onState: (state) => {
+      if (state.phase === 'results') {
+        void import('./results').then(({ resultsScreen }) => {
+          go(resultsScreen(connection, false));
+        });
+        return;
+      }
       panel.update(state);
       waiting.hidden = !panel.root.hidden;
 

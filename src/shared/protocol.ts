@@ -56,6 +56,11 @@ export interface Player {
    */
   characterName: string;
   weaponNames: string[];
+  /** Totals for the stats screen, accumulated across the fight. */
+  damageDealt: number;
+  damageTaken: number;
+  /** Their hardest hit, kept whole so the screen can quote it. */
+  best: { weapon: string; prompt: string; damage: number } | null;
 }
 
 export type Phase = 'lobby' | 'creating' | 'battleground' | 'battle' | 'results';
@@ -179,7 +184,9 @@ export type ClientMessage =
   | { type: 'turnPlayed' }
   | { type: 'submitScore'; attackerId: string; score: number }
   | { type: 'submitNote'; attackerId: string; note: string }
-  | { type: 'turnDone' };
+  | { type: 'turnDone' }
+  /** Back to battleground selection, keeping the same characters. */
+  | { type: 'rematch' };
 
 // --------------------------------------------------------------- server -> client
 
@@ -224,6 +231,26 @@ export function availableFighters(state: RoomState, team: Role): Player[] {
   return state.players.filter(
     (p) => p.role === team && p.health > 0 && p.fights < ROUNDS_EACH,
   );
+}
+
+/**
+ * Total damage a team has taken.
+ *
+ * The brief's win condition is least damage taken, not most dealt — a team can
+ * hit hard and still lose by being hit harder.
+ */
+export function teamDamage(state: RoomState, team: Role): number {
+  return state.players
+    .filter((p) => p.role === team)
+    .reduce((sum, p) => sum + p.damageTaken, 0);
+}
+
+/** Which side won, or null when they are level and an ULT is owed. */
+export function winningTeam(state: RoomState): Role | null {
+  const a = teamDamage(state, 'teamA');
+  const b = teamDamage(state, 'teamB');
+  if (a === b) return null;
+  return a < b ? 'teamA' : 'teamB';
 }
 
 /** The players scoring this game. Empty in a two-player game, where AI judges. */
