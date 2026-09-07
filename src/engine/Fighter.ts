@@ -1,4 +1,5 @@
 import { Container, Sprite, Texture, Assets } from 'pixi.js';
+import gsap from 'gsap';
 import { Limb } from './Limb';
 import { sampleDominantColour } from './colour';
 import { detectLimbs, silhouetteOf } from './limbs';
@@ -269,6 +270,12 @@ export class Fighter {
   }
 
   destroy(): void {
+    // Tweens outlive the thing they animate: an entrance or a half-played move
+    // would go on writing positions into a destroyed sprite every frame.
+    gsap.killTweensOf([
+      this.root, this.body, this.hand, this.bodySprite, this.weaponSprite,
+      this.root.scale, this.body.scale, this.body.position, this.weaponSprite.scale,
+    ]);
     this.leg.destroy();
     this.arm.destroy();
     this.root.destroy({ children: true });

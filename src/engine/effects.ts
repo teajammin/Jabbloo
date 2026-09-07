@@ -85,6 +85,14 @@ export function spawnEffect(
 }
 
 /** Removes an effect and frees its display object. */
+/**
+ * Removes an effect sprite.
+ *
+ * Guarded because the callers are animation callbacks that can fire after the
+ * stage has gone — a turn ending, a rematch, a player quitting mid-move — and
+ * destroying a display object twice throws.
+ */
 export function despawnEffect(sprite: Sprite): void {
+  if (sprite.destroyed) return;
   sprite.destroy();
 }

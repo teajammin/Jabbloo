@@ -154,7 +154,13 @@ export class BattleStage {
     tl.to(text, { alpha: 0, duration: 0.3 }, `+=${Math.max(0.1, seconds - 0.75)}`);
 
     await new Promise<void>((resolve) => {
-      tl.eventCallback('onComplete', () => { text.destroy({ children: true }); resolve(); });
+      tl.eventCallback('onComplete', () => {
+        // The stage may have been torn down while this was on screen — a turn
+        // ending, a rematch, a player quitting — and destroying a display
+        // object twice throws.
+        if (!text.destroyed) text.destroy({ children: true });
+        resolve();
+      });
     });
   }
 

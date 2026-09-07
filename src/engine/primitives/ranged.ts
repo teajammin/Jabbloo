@@ -1,5 +1,5 @@
 import gsap from 'gsap';
-import { spawnEffect, type EffectKind } from '../effects';
+import { spawnEffect, despawnEffect, type EffectKind } from '../effects';
 import { clamp, burst, contactPoint, directionToEnemy, duration, handPoint } from './util';
 import { palette } from '../theme';
 import type {
@@ -50,7 +50,7 @@ export function projectile(ctx: PrimitiveContext, params: ProjectileParams = {})
       rotation: dir * Math.PI * 2,
       duration: flight,
       ease: 'none',
-      onComplete: () => sprite.destroy(),
+      onComplete: () => despawnEffect(sprite),
     });
   });
 
@@ -94,7 +94,7 @@ export function beam(ctx: PrimitiveContext, params: BeamParams = {}) {
       duration: charge,
       ease: 'power2.in',
     });
-    gsap.to(orb, { alpha: 0, duration: 0.2, delay: charge, onComplete: () => orb.destroy() });
+    gsap.to(orb, { alpha: 0, duration: 0.2, delay: charge, onComplete: () => despawnEffect(orb) });
   });
   tl.to(ctx.actor.body, { rotation: -dir * 0.1, scaleY: 1.06, duration: charge, ease: 'power2.in' });
 
@@ -117,7 +117,7 @@ export function beam(ctx: PrimitiveContext, params: BeamParams = {}) {
       alpha: 0,
       duration: hold * 0.35,
       delay: hold * 0.65,
-      onComplete: () => sprite.destroy(),
+      onComplete: () => despawnEffect(sprite),
     });
   });
 
@@ -173,7 +173,7 @@ export function shockwave(ctx: PrimitiveContext, params: ShockwaveParams = {}) {
       duration: travel,
       ease: 'power1.out',
     });
-    gsap.to(wave, { alpha: 0, duration: travel * 0.4, delay: travel * 0.6, onComplete: () => wave.destroy() });
+    gsap.to(wave, { alpha: 0, duration: travel * 0.4, delay: travel * 0.6, onComplete: () => despawnEffect(wave) });
   });
 
   tl.to(ctx.actor.body, {
@@ -226,7 +226,7 @@ export function summon(ctx: PrimitiveContext, params: SummonParams = {}) {
         alpha: 0,
         duration: 0.3,
         delay: seconds * 0.75,
-        onComplete: () => sprite.destroy(),
+        onComplete: () => despawnEffect(sprite),
       });
     } else {
       gsap.to(sprite, {
@@ -234,7 +234,7 @@ export function summon(ctx: PrimitiveContext, params: SummonParams = {}) {
         duration: seconds * 0.4,
         ease: 'power3.in',
         onComplete: () => {
-          gsap.to(sprite, { alpha: 0, duration: 0.25, delay: 0.12, onComplete: () => sprite.destroy() });
+          gsap.to(sprite, { alpha: 0, duration: 0.25, delay: 0.12, onComplete: () => despawnEffect(sprite) });
         },
       });
       gsap.to(sprite, { rotation: dir * 0.4, duration: seconds * 0.4, ease: 'none' });

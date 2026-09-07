@@ -1,5 +1,5 @@
 import gsap from 'gsap';
-import { spawnEffect } from '../effects';
+import { spawnEffect, despawnEffect } from '../effects';
 import {
   LimbDriver, burst, clamp, contactPoint, directionToEnemy, duration, fadeOut,
 } from './util';
@@ -100,7 +100,7 @@ export function teleport(ctx: PrimitiveContext, params: TeleportParams = {}) {
       flip: dir < 0,
       alpha: 0.9,
     });
-    gsap.to(whoosh, { alpha: 0, duration: 0.3, onComplete: () => whoosh.destroy() });
+    gsap.to(whoosh, { alpha: 0, duration: 0.3, onComplete: () => despawnEffect(whoosh) });
   });
 
   tl.to(ctx.actor.body, { scaleX: 0.3, scaleY: 1.25, duration: seconds * 0.25, ease: 'power2.in' });
@@ -179,7 +179,7 @@ export function taunt(ctx: PrimitiveContext, params: TauntParams = {}) {
       y: ctx.enemy.root.y - ctx.enemy.height,
       height: 90,
     });
-    gsap.to(spark, { alpha: 0, duration: 0.5, onComplete: () => spark.destroy() });
+    gsap.to(spark, { alpha: 0, duration: 0.5, onComplete: () => despawnEffect(spark) });
   });
   tl.to(ctx.actor.body, { rotation: 0, duration: seconds * 0.3, ease: 'power2.out' }, `+=${seconds * 0.2}`);
   arm.hide(tl, seconds * 0.2, '<');

@@ -131,7 +131,9 @@ export function burst(
         alpha: 0,
         duration: 0.3,
         delay: 0.14,
-        onComplete: () => sprite.destroy(),
+        // Guarded because the stage can be destroyed mid-fade — the end of a
+        // turn, a rematch, someone quitting — and destroying twice throws.
+        onComplete: () => { if (!sprite.destroyed) sprite.destroy(); },
       });
     },
     undefined,
@@ -171,7 +173,7 @@ export function shockRing(
         alpha: 0,
         duration: 0.34,
         delay: 0.1,
-        onComplete: () => sprite.destroy(),
+        onComplete: () => { if (!sprite.destroyed) sprite.destroy(); },
       });
     },
     undefined,
@@ -181,5 +183,9 @@ export function shockRing(
 
 /** Fades and destroys an effect sprite at the end of its move. */
 export function fadeOut(tl: gsap.core.Timeline, sprite: Sprite, duration = 0.25): void {
-  tl.to(sprite, { alpha: 0, duration, onComplete: () => sprite.destroy() });
+  tl.to(sprite, {
+    alpha: 0,
+    duration,
+    onComplete: () => { if (!sprite.destroyed) sprite.destroy(); },
+  });
 }

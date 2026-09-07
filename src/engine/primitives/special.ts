@@ -1,5 +1,5 @@
 import gsap from 'gsap';
-import { spawnEffect } from '../effects';
+import { spawnEffect, despawnEffect } from '../effects';
 import { clamp, directionToEnemy, duration } from './util';
 import type {
   DizzyParams, GrowParams, InhaleParams, KnockdownParams, PrimitiveContext, ShrinkParams,
@@ -34,7 +34,7 @@ export function inhale(ctx: PrimitiveContext, params: InhaleParams = {}) {
       flip: dir > 0,
       alpha: 0.75,
     });
-    gsap.to(wind, { alpha: 0, duration: seconds * 0.5, onComplete: () => wind.destroy() });
+    gsap.to(wind, { alpha: 0, duration: seconds * 0.5, onComplete: () => despawnEffect(wind) });
   });
 
   // Balloon up as the opponent is hauled in and squashed down.
@@ -63,7 +63,7 @@ export function grow(ctx: PrimitiveContext, params: GrowParams = {}) {
       y: ctx.actor.root.y - ctx.actor.height * scale * 0.9,
       height: 130,
     });
-    gsap.to(spark, { alpha: 0, duration: 0.5, onComplete: () => spark.destroy() });
+    gsap.to(spark, { alpha: 0, duration: 0.5, onComplete: () => despawnEffect(spark) });
   });
   tl.to({}, { duration: seconds * 0.3 });
   return tl;
@@ -100,7 +100,7 @@ export function knockdown(ctx: PrimitiveContext, params: KnockdownParams = {}) {
       height: 110,
     });
     gsap.to(stars, { rotation: Math.PI * 2, duration: 1.2, ease: 'none' });
-    gsap.to(stars, { alpha: 0, duration: 0.4, delay: 0.7, onComplete: () => stars.destroy() });
+    gsap.to(stars, { alpha: 0, duration: 0.4, delay: 0.7, onComplete: () => despawnEffect(stars) });
   });
 
   // Stay down a beat, then get back up.
@@ -122,7 +122,7 @@ export function dizzy(ctx: PrimitiveContext, params: DizzyParams = {}) {
       height: 120,
     });
     gsap.to(stars, { rotation: Math.PI * 2, duration: seconds, ease: 'none' });
-    gsap.to(stars, { alpha: 0, duration: 0.3, delay: seconds - 0.3, onComplete: () => stars.destroy() });
+    gsap.to(stars, { alpha: 0, duration: 0.3, delay: seconds - 0.3, onComplete: () => despawnEffect(stars) });
   });
 
   const wobbles = 4;
