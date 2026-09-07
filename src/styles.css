@@ -967,3 +967,12 @@ input[type='text'] {
 
 .move-count { font-size: 14px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 .move-count.is-over { color: var(--coral); opacity: 1; font-weight: 700; }
+
+.battle-caption {
+  margin: 0;
+  max-width: 60ch;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1.45;
+  opacity: 0.8;
+}

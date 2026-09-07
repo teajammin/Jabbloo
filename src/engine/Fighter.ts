@@ -37,6 +37,7 @@ export class Fighter {
 
   readonly name: string;
   readonly weaponName: string;
+  private heldWeaponName: string;
 
   private bodySprite!: Sprite;
   private weaponSprite!: Sprite;
@@ -48,6 +49,7 @@ export class Fighter {
   private constructor(options: FighterOptions) {
     this.name = options.name ?? 'Fighter';
     this.weaponName = options.weaponName ?? 'Weapon';
+    this.heldWeaponName = this.weaponName;
     this.anchor = options.handAnchor ?? DEFAULT_ANCHOR;
     this.targetHeight = options.height ?? DEFAULT_HEIGHT;
     this.targetWeaponHeight =
@@ -157,6 +159,28 @@ export class Fighter {
 
   get height(): number {
     return this.bodySprite.height;
+  }
+
+  /**
+   * Swaps the held weapon.
+   *
+   * A fighter is built with one weapon but a player picks a different one each
+   * turn, and rebuilding the whole fighter would lose their position on stage
+   * and restart the entrance.
+   */
+  async setWeapon(url: string, name?: string): Promise<void> {
+    const texture = await Assets.load<Texture>(url);
+    this.weaponSprite.texture = texture;
+    this.weaponSprite.scale.set(this.targetWeaponHeight / texture.height);
+    // Facing is applied by mirroring the root, so the sprite's own sign has to
+    // be reset or a swap mid-fight can leave the new weapon back to front.
+    this.weaponSprite.scale.x = Math.abs(this.weaponSprite.scale.x);
+    if (name !== undefined) this.heldWeaponName = name;
+  }
+
+  /** The weapon currently held, which changes as a player picks per turn. */
+  get currentWeaponName(): string {
+    return this.heldWeaponName;
   }
 
   /** The weapon sprite, for primitives that animate it directly. */
