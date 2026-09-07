@@ -1,6 +1,7 @@
 import type * as Party from 'partykit/server';
 import { handleApi } from '../server/api';
 import {
+  MAX_PHOTO_BYTES,
   MAX_PLAYERS,
   MAX_ULTS,
   WEAPON_COUNT,
@@ -316,10 +317,17 @@ export default class Room implements Party.Server {
     let suffix = 2;
     while (taken.has(unique.toLowerCase())) unique = `${clean} ${suffix++}`;
 
+    // A photo that arrives too large is dropped rather than stored: it would
+    // be rebroadcast inside every state update from here to the end of the
+    // game, and the first one over the limit would close everyone's socket.
+    const avatar = typeof photo === 'string' && photo.length <= MAX_PHOTO_BYTES * 1.4
+      ? photo
+      : undefined;
+
     this.state.players.push({
       id: sender.id,
       name: unique,
-      ...(photo ? { photo } : {}),
+      ...(avatar ? { photo: avatar } : {}),
       role: 'unassigned',
       connected: true,
       isHost: false,
@@ -849,21 +857,27 @@ export default class Room implements Party.Server {
   private onRequestArt(sender: Party.Connection): void {
     if (!this.isHost(sender)) return;
 
-    const art = creators(this.state).map((player) => {
+    // One message per player. Six characters and eighteen weapons together run
+    // to several megabytes, and the platform closes a socket that carries a
+    // message over a megabyte — which would take the host's screen down at the
+    // exact moment the battle starts.
+    for (const player of creators(this.state)) {
       const pieces = this.creationsFor(player.id);
       const character = pieces.find((p) => p.slot === 'character');
       const weapons = pieces
         .filter((p) => p.slot.startsWith('weapon'))
         .sort((a, b) => a.slot.localeCompare(b.slot))
         .map((w) => ({ png: w.png, name: w.name }));
-      return {
-        playerId: player.id,
-        character: character ? { png: character.png, name: character.name } : null,
-        weapons,
-      };
-    });
 
-    this.send(sender, { type: 'art', art });
+      this.send(sender, {
+        type: 'art',
+        art: [{
+          playerId: player.id,
+          character: character ? { png: character.png, name: character.name } : null,
+          weapons,
+        }],
+      });
+    }
   }
 
   /** The judges actually holding a phone right now. */

@@ -28,6 +28,38 @@ export const VOTE_SECONDS = 20;
 /** How long the draw is shown before the battle starts. */
 export const REVEAL_SECONDS = 4;
 
+/**
+ * The platform's hard limit on one websocket message.
+ *
+ * Cloudflare closes the connection outright when a message exceeds this —
+ * code 1009, "Message is too large" — which is how an iPhone photo attached at
+ * the join screen cost a player their seat: the socket died mid-join, the
+ * client reconnected, and the player was never registered at all.
+ */
+export const MAX_MESSAGE_BYTES = 1_048_576;
+
+/**
+ * What one piece of artwork may weigh.
+ *
+ * Well under the hard limit, because the payload is only part of the message
+ * and because a connection lost to a large drawing is far worse than a drawing
+ * sent slightly smaller.
+ */
+export const MAX_ARTWORK_BYTES = 700_000;
+
+/** An avatar is decoration; it does not need a camera's full resolution. */
+export const MAX_PHOTO_BYTES = 120_000;
+
+/** Rough byte length of a string once encoded, without building a buffer. */
+export function byteLength(value: string): number {
+  // Data URLs are base64 and therefore single-byte throughout, which is the
+  // case this guards; TextEncoder would be exact but allocates a copy of a
+  // megabyte-scale string to find out.
+  return typeof TextEncoder === 'function'
+    ? new TextEncoder().encode(value).length
+    : value.length;
+}
+
 export const MAX_PLAYERS = 6;
 export const MIN_PLAYERS = 2;
 export const ROOM_CODE_LENGTH = 4;

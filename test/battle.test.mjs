@@ -71,8 +71,17 @@ check('a phone cannot pull the artwork', last(a, 'art') === undefined);
 
 host.send(JSON.stringify({ type: 'requestArt' }));
 await wait(300);
-const art = last(host, 'art')?.art;
+// Artwork arrives one player at a time: everyone's together would be several
+// megabytes, and the platform closes a socket carrying a message over one.
+const artMessages = host.inbox.filter((m) => m.type === 'art');
+const art = artMessages.flatMap((m) => m.art);
+check('artwork comes one player per message',
+  artMessages.length === 2 && artMessages.every((m) => m.art.length === 1),
+  `${artMessages.length} messages`);
 check('the host receives artwork', Array.isArray(art) && art.length === 2, JSON.stringify(art?.length));
+check('and no single message is near the platform limit',
+  artMessages.every((m) => JSON.stringify(m).length < 1_048_576),
+  JSON.stringify(artMessages.map((m) => JSON.stringify(m).length)));
 
 const ann = art?.find((x) => x.playerId === ids[0]);
 check('a character comes back', Boolean(ann?.character), JSON.stringify(ann?.character?.name));

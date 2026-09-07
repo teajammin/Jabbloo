@@ -27,6 +27,7 @@
     "test:judging": "node test/judging.test.mjs",
     "test:ult": "node test/ult.test.mjs",
     "test:bots": "node test/bots.test.mjs",
+    "test:limits": "node test/limits.test.mjs",
     "build:web": "vite build",
     "deploy": "npm run build && partykit deploy --serve dist",
     "deploy:preview": "npm run build && partykit deploy --serve dist --preview staging",

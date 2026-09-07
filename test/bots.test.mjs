@@ -90,7 +90,9 @@ check('and named Sword, Axe and Hammer',
 // The host asks for artwork: the absent player's must be complete.
 host.send(JSON.stringify({ type: 'requestArt' }));
 await wait(300);
-const art = last(host, 'art')?.art?.find((entry) => entry.playerId === ids[1]);
+const art = host.inbox.filter((m) => m.type === 'art')
+  .flatMap((m) => m.art)
+  .find((entry) => entry.playerId === ids[1]);
 check('their artwork is whole', art?.character !== null && art?.weapons.length === 3,
   JSON.stringify(art?.weapons?.length));
 check('the stand-in weapons point at real files',

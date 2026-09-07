@@ -1,6 +1,7 @@
 import PartySocket from 'partysocket';
-import type {
-  ClientMessage, PlayerArt, RoomState, ServerMessage,
+import {
+  MAX_MESSAGE_BYTES,
+  type ClientMessage, type PlayerArt, type RoomState, type ServerMessage,
 } from '../shared/protocol';
 
 /**
@@ -105,6 +106,7 @@ export class RoomConnection {
   /** Assigned by the server on welcome; identifies this client's player. */
   playerId: string | null = null;
   state: RoomState | null = null;
+  private readonly artByPlayer = new Map<string, PlayerArt>();
 
   constructor(code: string) {
     this.socket = new PartySocket({
@@ -133,7 +135,11 @@ export class RoomConnection {
           this.handlers.onState?.(message.state);
           break;
         case 'art':
-          this.handlers.onArt?.(message.art);
+          // Sent one player at a time — six characters and eighteen weapons in
+          // a single message would be past the platform's limit — so entries
+          // accumulate here and every screen still sees one whole list.
+          for (const entry of message.art) this.artByPlayer.set(entry.playerId, entry);
+          this.handlers.onArt?.([...this.artByPlayer.values()]);
           break;
         case 'error':
           this.handlers.onError?.(message.reason);
@@ -153,8 +159,22 @@ export class RoomConnection {
     return this;
   }
 
-  send(message: ClientMessage): void {
-    this.socket.send(JSON.stringify(message));
+  /**
+   * Sends a message, unless it would cost us the connection.
+   *
+   * The platform closes a socket that carries an oversized message rather than
+   * rejecting the message, so an unchecked send does not fail — it disconnects
+   * the player, silently, and whatever they were doing is lost. Refusing to
+   * send is the lesser failure, and the caller is told.
+   */
+  send(message: ClientMessage): boolean {
+    const encoded = JSON.stringify(message);
+    if (encoded.length > MAX_MESSAGE_BYTES * 0.95) {
+      console.warn(`[room] refusing to send ${message.type}: ${encoded.length} bytes`);
+      return false;
+    }
+    this.socket.send(encoded);
+    return true;
   }
 
   close(): void {

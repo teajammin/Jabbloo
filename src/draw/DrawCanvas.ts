@@ -1085,9 +1085,26 @@ export class DrawCanvas {
   // ------------------------------------------------------------------- export
 
   /** The drawing as a transparent PNG data URL. */
-  toDataURL(): string {
+  /**
+   * Exports the drawing, optionally shrunk to fit a size limit.
+   *
+   * A drawing with a photo in it can weigh several megabytes at full size, and
+   * the platform closes a socket carrying a message over one — so a character
+   * that will be drawn 320 pixels tall on the stage is better sent small than
+   * not sent at all.
+   */
+  toDataURL(maxEdge?: number): string {
     this.flattenForExport();
-    return this.canvas.toDataURL('image/png');
+    if (!maxEdge || maxEdge >= CANVAS_W) return this.canvas.toDataURL('image/png');
+
+    const scratch = document.createElement('canvas');
+    scratch.width = Math.round(CANVAS_W * (maxEdge / CANVAS_W));
+    scratch.height = Math.round(CANVAS_H * (maxEdge / CANVAS_W));
+    const ctx = scratch.getContext('2d');
+    if (!ctx) return this.canvas.toDataURL('image/png');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(this.canvas, 0, 0, scratch.width, scratch.height);
+    return scratch.toDataURL('image/png');
   }
 
   /** The drawing as data, for sending to the host. */

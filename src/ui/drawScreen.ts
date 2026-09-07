@@ -6,6 +6,7 @@ import {
   type MaskShape,
 } from '../draw/images';
 import { CONTROL_HELP, drawHelpDialog } from './drawHelp';
+import { MAX_ARTWORK_BYTES, byteLength } from '../shared/protocol';
 import { photoMenu } from './photoMenu';
 
 /**
@@ -529,11 +530,28 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       say('Cleared — ↶ brings it back');
     }, 'tool wide ghost');
 
-    const doneButton = control('done', () => options.onDone?.(canvas.toDataURL()), 'tool wide primary');
+    /**
+     * Exports the drawing at the largest size that will fit down the wire.
+     *
+     * A message over a megabyte does not fail — the platform closes the socket
+     * carrying it — so a drawing with a photo in it could cost a player their
+     * connection and their character at once. Fighters are drawn a few hundred
+     * pixels tall, so stepping the export down costs nothing anyone can see.
+     */
+    const exportDrawing = (): string => {
+      let png = canvas.toDataURL();
+      for (const edge of [768, 640, 512, 384]) {
+        if (byteLength(png) <= MAX_ARTWORK_BYTES) break;
+        png = canvas.toDataURL(edge);
+      }
+      return png;
+    };
+
+    const doneButton = control('done', () => options.onDone?.(exportDrawing()), 'tool wide primary');
 
     // Nothing is exported until asked for, so this costs nothing until the
     // clock or a locking screen calls it.
-    options.onSnapshot?.(() => (canvas.isEmpty ? null : canvas.toDataURL()));
+    options.onSnapshot?.(() => (canvas.isEmpty ? null : exportDrawing()));
 
     // Only visible while a crop frame is up: on a phone there is no Enter key
     // to confirm with, so the confirm has to be on screen.

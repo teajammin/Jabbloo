@@ -161,6 +161,9 @@ check('nobody scored means no damage',
 // --- who wins --------------------------------------------------------------
 
 import { teamDamage, winningTeam } from '../src/shared/protocol';
+import {
+  MAX_MESSAGE_BYTES, MAX_PHOTO_BYTES, MAX_ARTWORK_BYTES, byteLength,
+} from '../src/shared/protocol';
 
 const hurt = (p: Player, taken: number): Player => ({ ...p, damageTaken: taken });
 
@@ -176,6 +179,16 @@ check('least damage taken wins', winningTeam(fight(30, 60)) === 'teamA');
 check('and the other way round', winningTeam(fight(60, 30)) === 'teamB');
 check('level means no winner yet', winningTeam(fight(40, 40)) === null);
 check('nobody hurt is still level', winningTeam(fight(0, 0)) === null);
+
+// The wire limits. test/limits.test.mjs proves the first of these against a
+// running server with the same number written out, so a change here without a
+// change there would be caught rather than silently untested.
+check('the platform limit is one mebibyte', MAX_MESSAGE_BYTES === 1_048_576);
+check('a photo budget well inside it', MAX_PHOTO_BYTES === 120_000);
+check('and artwork under three quarters of it',
+  MAX_ARTWORK_BYTES < MAX_MESSAGE_BYTES * 0.75);
+check('byte length counts bytes, not characters', byteLength('a\u00e9\u20ac') === 6,
+  String(byteLength('a\u00e9\u20ac')));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
