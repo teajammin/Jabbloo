@@ -246,6 +246,7 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     const drawing = connection.sent.find((m) => m.type === 'submitDrawing');
     check('finishing a drawing submits it', Boolean(drawing), JSON.stringify(connection.sent.map((m) => m.type)));
     check('into the slot the step asked for', drawing?.slot === 'character', drawing?.slot);
+    check('and says the step is finished', drawing?.done === true, JSON.stringify(drawing?.done));
 
     // The naming step that follows.
     connection.push({ step: 1 });
@@ -282,6 +283,9 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     check('a sleeping phone saves what is on the canvas', Boolean(saved),
       JSON.stringify(connection.sent.map((m) => m.type)));
     check('into the right slot', saved?.slot === 'character', saved?.slot);
+    // The step ends when everyone says they are done, so a save must not.
+    check('an autosave does not claim the step is finished', saved?.done !== true,
+      JSON.stringify(saved?.done));
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 
     // And the step running out sends it too, without a second copy of the same

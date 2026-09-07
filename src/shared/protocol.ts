@@ -201,8 +201,15 @@ export type ClientMessage =
   | { type: 'setRole'; playerId: string; role: Role }
   | { type: 'setTeamName'; team: 'teamA' | 'teamB'; name: string }
   | { type: 'start' }
-  /** A finished drawing for a slot, as a PNG data URL. */
-  | { type: 'submitDrawing'; slot: string; png: string }
+  /**
+   * A drawing for a slot, as a PNG data URL.
+   *
+   * `done` separates "I have finished this step" from "here is my work so
+   * far". The drawing tool saves as it goes, and an autosave that also said
+   * the player was ready would end the step early — for everyone, since the
+   * room moves on as soon as the last person is ready.
+   */
+  | { type: 'submitDrawing'; slot: string; png: string; done?: boolean }
   | { type: 'submitName'; slot: string; name: string }
   /** Done early; the step advances once everyone has said so. */
   | { type: 'ready' }

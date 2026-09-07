@@ -48,8 +48,8 @@ host.send(JSON.stringify({ type: 'start' }));
 await wait(250);
 
 // Both draw a character; Bo names theirs and then vanishes.
-a.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG }));
-b.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG }));
+a.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG, done: true }));
+b.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG, done: true }));
 await wait(300);
 a.send(JSON.stringify({ type: 'submitName', slot: 'character', name: 'Sir Bonkalot' }));
 b.send(JSON.stringify({ type: 'submitName', slot: 'character', name: 'Deserter' }));
@@ -64,7 +64,7 @@ check('and is marked as gone',
 
 // Ann finishes the rest on her own; the room must not wait on a ghost.
 for (let i = 0; i < 14; i++) {
-  a.send(JSON.stringify({ type: 'submitDrawing', slot: `weapon${Math.floor(i / 2)}`, png: PNG }));
+  a.send(JSON.stringify({ type: 'submitDrawing', slot: `weapon${Math.floor(i / 2)}`, png: PNG, done: true }));
   a.send(JSON.stringify({ type: 'ready' }));
   await wait(90);
   if (state(host).phase !== 'creating') break;

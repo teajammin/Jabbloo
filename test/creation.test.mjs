@@ -53,14 +53,28 @@ check('deadline is in the future', s.stepEndsAt > Date.now(), String(s.stepEndsA
 const spread = Math.abs(state(a).stepEndsAt - state(b).stepEndsAt);
 check('every device gets the same deadline', spread === 0, `${spread}ms apart`);
 
+// The tool autosaves while a player draws. Those saves must be kept without
+// being mistaken for a finished step — otherwise the first stroke everyone
+// makes would end a ninety-second step in seconds.
+a.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG }));
+b.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG }));
+await wait(250);
+s = state(host);
+check('an autosave is kept',
+  s.players.filter((p) => p.progress.drawn.includes('character')).length === 2,
+  JSON.stringify(s.players.map((p) => p.progress.drawn)));
+check('an autosave does not say they are done', !s.players.some((p) => p.progress.ready),
+  JSON.stringify(s.players.map((p) => p.progress.ready)));
+check('and does not end the step', s.step === 0, String(s.step));
+
 // Both fighters finishing should advance without waiting out 90 seconds.
 const before = Date.now();
-a.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG }));
+a.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG, done: true }));
 await wait(150);
 check('one player done does not advance', state(host).step === 0, String(state(host).step));
 check('progress is visible to others', state(b).players.some((p) => p.progress.ready));
 
-b.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG }));
+b.send(JSON.stringify({ type: 'submitDrawing', slot: 'character', png: PNG, done: true }));
 await wait(250);
 s = state(host);
 check('both done advances the step', s.step === 1, String(s.step));

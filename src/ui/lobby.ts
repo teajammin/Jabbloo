@@ -136,8 +136,12 @@ export function lobbyScreen(
           // is the one address that means a different machine to every device
           // that reads it. Deployed, the page's own address is already right.
           const response = await fetch('/api/lan');
-          const { hosts } = await response.json() as { hosts: string[] };
-          const host = hosts[0];
+          // Deployed, there is no such endpoint and the page's own address is
+          // already the right one — so a 404 here is an answer, not a failure.
+          const body = response.ok
+            ? await response.json() as { hosts?: string[] }
+            : { hosts: [] };
+          const host = body.hosts?.[0];
           if (host) {
             joinAddress.textContent = host;
             url = `http://${host}/?room=${code}`;

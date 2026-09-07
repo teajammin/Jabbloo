@@ -88,8 +88,8 @@ check('nobody carries a stale ready flag',
   tied.players.every((p) => !p.progress.ready));
 
 // The extra weapon continues the numbering rather than replacing one.
-a.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon3', png: PNG }));
-b.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon3', png: PNG }));
+a.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon3', png: PNG, done: true }));
+b.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon3', png: PNG, done: true }));
 await wait(250);
 check('the ULT drawing lands in a fourth slot',
   state(host).players.find((p) => p.id === ids[0])?.progress.drawn.includes('weapon3'));
@@ -118,8 +118,8 @@ check('a second tie forces a second ULT', state(host).phase === 'ult', state(hos
 check('the second ULT takes the next slot up',
   state(host).ultRound === 2, String(state(host).ultRound));
 
-a.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon4', png: PNG }));
-b.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon4', png: PNG }));
+a.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon4', png: PNG, done: true }));
+b.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon4', png: PNG, done: true }));
 await wait(250);
 a.send(JSON.stringify({ type: 'submitName', slot: 'weapon4', name: 'Last Word' }));
 b.send(JSON.stringify({ type: 'submitName', slot: 'weapon4', name: 'Final Say' }));

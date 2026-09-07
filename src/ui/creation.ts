@@ -42,6 +42,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       if (!png || png === lastSaved) return;
       lastSaved = png;
       drawnPng = png;
+      // Work in progress, not a finished step: `done` is what ends the step.
       connection.send({ type: 'submitDrawing', slot: pendingSlot, png });
     }
 
@@ -61,7 +62,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     const submitDrawing = (png: string, slot: string) => {
       drawnPng = png;
       lastSaved = png;
-      connection.send({ type: 'submitDrawing', slot, png });
+      connection.send({ type: 'submitDrawing', slot, png, done: true });
     };
 
     // --- the drawing step ---------------------------------------------------

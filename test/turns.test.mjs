@@ -53,7 +53,7 @@ const steps = [
 for (const [type, slot] of steps) {
   for (const [ws, who] of [[a, 'Ann'], [b, 'Bo']]) {
     ws.send(JSON.stringify(type === 'submitDrawing'
-      ? { type, slot, png: PNG }
+      ? { type, slot, png: PNG, done: true }
       : { type, slot, name: `${who} ${slot}` }));
   }
   await wait(80);

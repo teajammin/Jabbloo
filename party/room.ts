@@ -203,7 +203,7 @@ export default class Room implements Party.Server {
         this.beginGame(sender);
         break;
       case 'submitDrawing':
-        this.onSubmitDrawing(message.slot, message.png, sender);
+        this.onSubmitDrawing(message.slot, message.png, message.done === true, sender);
         break;
       case 'submitName':
         this.onSubmitName(message.slot, message.name, sender);
@@ -777,16 +777,25 @@ export default class Room implements Party.Server {
     this.beginTurn();
   }
 
-  private onSubmitDrawing(slot: string, png: string, sender: Party.Connection): void {
+  /**
+   * Stores a drawing. Only an explicit `done` ends the player's step.
+   *
+   * The tool autosaves while a player draws, so that work survives a dead
+   * phone or a timer running out. Treating those saves as "finished" would
+   * end the step the moment everyone had drawn a single line.
+   */
+  private onSubmitDrawing(
+    slot: string, png: string, done: boolean, sender: Party.Connection,
+  ): void {
     const player = this.state.players.find((p) => p.id === sender.id);
     if (!player || !this.isCreating()) return;
     if (typeof png !== 'string' || !png.startsWith('data:image/png;base64,')) return;
 
     this.art.set(`${player.id}:${slot}`, png);
     if (!player.progress.drawn.includes(slot)) player.progress.drawn.push(slot);
-    player.progress.ready = true;
+    if (done) player.progress.ready = true;
     this.broadcastState();
-    this.advanceIfAllReady();
+    if (done) this.advanceIfAllReady();
   }
 
   private onSubmitName(slot: string, name: string, sender: Party.Connection): void {

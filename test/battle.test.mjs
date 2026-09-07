@@ -51,12 +51,12 @@ const steps = [
 ];
 for (const [type, slot] of steps) {
   const payload = type === 'submitDrawing'
-    ? { type, slot, png: PNG }
+    ? { type, slot, png: PNG, done: true }
     : { type, slot, name: `Ann ${slot}` };
   a.send(JSON.stringify(payload));
   // Bo submits a drawing but leaves every name blank.
   b.send(JSON.stringify(type === 'submitDrawing'
-    ? { type, slot, png: PNG }
+    ? { type, slot, png: PNG, done: true }
     : { type, slot, name: '' }));
   await wait(90);
 }
