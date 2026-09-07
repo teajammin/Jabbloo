@@ -1,4 +1,6 @@
-import 'dotenv/config';
+// Must come first: it loads the environment during the import phase, before
+// any module below constructs a client that reads a key.
+import './env';
 import express from 'express';
 import { choreograph } from './choreographer';
 import { cutout, cutoutAvailable } from './cutout';

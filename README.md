@@ -4,7 +4,8 @@ A whimsical, Jackbox-style multiplayer party game for the browser. Players draw 
 characters and weapons on their phones, then describe — in their own words — how they want
 to attack. An AI turns that description into a real animated move, and a judge scores it.
 
-**Status:** early development. Version 0.1.0.
+**Status:** playable end to end, and never yet run in a real browser — see
+[What has not been tested](#what-has-not-been-tested). Version 0.1.0.
 
 ---
 
@@ -65,13 +66,48 @@ API keys live on the server. They are never shipped to the client.
 
 ---
 
-## Build Order
+## Running It
 
-The project is built one section at a time. Current scope:
+```sh
+npm install
+cp .env.example .env.local      # then fill in ANTHROPIC_API_KEY
+npm run dev                     # vite + express + partykit, all three
+```
 
-**→ Battle Animation Engine** (in progress)
+Open the host screen on a laptop at the address Vite prints, create a room, and
+join from phones on the same network at `<laptop-ip>:5173`. The room code is the
+join code.
 
-Nothing outside this scope is being built yet.
+Keys live in `.env.local`, never in `.env`: PartyKit reads `.env` when it deploys
+the multiplayer room, and that room needs no keys at all, so keeping them
+elsewhere means a deploy cannot carry them off the machine. Both files are
+gitignored. Every AI call is made by the Express backend — no key ever reaches a
+browser.
+
+### Tests
+
+```sh
+npm test              # pure logic: protocol, parsing, settings, limb detection
+npm run dev:party     # in one terminal, then in another:
+npm run test:room     # and :creation :battleground :battle :turns :judging :ult :bots
+```
+
+The integration suites drive a real PartyKit room over a websocket, because the
+rules being checked — who may score, what happens when someone drops, when a tie
+becomes an ULT — only exist as behaviour of the running server.
+
+---
+
+## What Has Not Been Tested
+
+Every line here was written without a browser to run it in. The logic is covered
+by tests; the pixels are not. Specifically unverified:
+
+- Anything visual: layout, the drawing tool's feel, the battle canvas
+- Phone browsers entirely — iOS Safari's file picker and `<input type="color">`
+  in particular
+- Multi-device play: a real host laptop with real phones on the same network
+- The AI round trip end to end with a live key
 
 ---
 
@@ -91,39 +127,31 @@ independently of the body during an animation.
 
 ### Animation primitives
 
-These are the only moves the choreographer may call.
+Thirty of them, grouped in `src/engine/primitives/`: locomotion, weapon work,
+melee, acrobatics, ranged, specials and effects. `PRIMITIVE_NAMES` is the list
+the choreographer is given and the list the parser accepts — one definition, so
+the prompt and the engine cannot drift apart.
 
-| Primitive | Params |
-|---|---|
-| `move_to` | `x` (0–1, % of canvas width), `duration` |
-| `charge` | `target: "enemy"`, `duration` |
-| `recoil` | `distance` (px), `duration` |
-| `spin_weapon` | `rotations`, `duration` |
-| `swing` | `direction: left\|right\|down\|up`, `arc` (degrees), `duration` |
-| `slam` | `direction: down\|forward`, `duration` |
-| `throw` | `target: "enemy"`, `returnAfter` (bool), `duration` |
-| `jump` | `height` (px), `forward` (bool), `duration` |
-| `shake_screen` | `intensity` (1–10), `duration` |
-| `idle` | `duration` |
+The set is deliberately broad enough for what players actually write: uppercuts,
+leg sweeps, roundhouses, handsprings, teleports, breathing fire, throwing the
+sun. A move marked `on: "enemy"` is applied to the other fighter, which is how
+one player's sentence can knock the other one down.
 
-All durations are in seconds. If the AI returns something unusable, the engine falls back to
-a default swing — the weapon hits the opponent like an axe.
-
-Character art is scanned for limbs before the rig draws its own: a drawing
-with arms gets the weapon put in its own hand and no capsule arm over the top,
-and one with legs keeps them. The procedural limbs in `src/engine/Limb.ts` are
-the fallback for limbless characters only.
+All durations are in seconds and a whole choreography is capped at seven, with
+overruns time-scaled to fit rather than truncated. If the AI returns something
+unusable, the engine falls back to a default swing — the weapon hits the
+opponent like an axe.
 
 ### Limbs
 
-Characters are flat PNGs with no skeleton, so kicks and punches have nothing to articulate.
-The engine draws procedural bubble limbs, colour-sampled from the character's own artwork,
-which appear only for the duration of a melee move.
+Characters are flat PNGs with no skeleton, so kicks and punches have nothing to
+articulate. The engine draws procedural bubble limbs, colour-sampled from the
+character's own artwork, which appear only for the duration of a melee move.
 
-**Planned:** when the drawing tool is built, player art must be scanned for limbs the player
-actually drew, and those animated in preference. Procedural limbs are the fallback for
-limbless characters only — drawing a capsule leg onto a character who already has two legs
-reads as a bug.
+Player art is scanned first (`src/engine/limbs.ts`): legs read as two separated
+runs near the bottom of the silhouette, arms as rows markedly wider than the
+body. Where the drawing has its own, the procedural limb is suppressed and the
+weapon anchor moves onto the hand the player drew.
 
 ---
 
@@ -133,8 +161,12 @@ reads as a bug.
 `npm run gen:effects`. Both are original artwork drawn procedurally, so they can
 be re-rendered at any resolution.
 
-`public/cursor-axe*.png` is supplied artwork, not generated. Check its licence
-before release and add attribution to the credits screen if required.
+`public/placeholder-*.png` are generated too (`npm run gen:placeholders`) and
+stand in for anything a player never drew — the Sword, Axe and Hammer the brief
+names as fallbacks.
+
+Sound has no assets at all: every cue in `src/audio.ts` is synthesised from
+oscillators and an envelope.
 
 ## Repository
 
@@ -142,10 +174,6 @@ Branching follows a **main + dev** strategy.
 
 - `main` — stable
 - `dev` — active development; each completed task is pushed here
-
-## Getting Started
-
-Setup instructions will be added once the first buildable section lands.
 
 ## Contributing
 
