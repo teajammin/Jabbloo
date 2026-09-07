@@ -2,6 +2,7 @@ import type * as Party from 'partykit/server';
 import {
   MAX_PLAYERS,
   MAX_ULTS,
+  WEAPON_COUNT,
   JUDGE_SECONDS,
   MOVE_SECONDS,
   REVEAL_SECONDS,
@@ -39,6 +40,50 @@ import {
  */
 /** Stand-in names, per the brief's rule for anything left unnamed. */
 const FALLBACK_WEAPONS = ['Sword', 'Axe', 'Hammer'];
+
+/**
+ * Artwork for anything nobody drew.
+ *
+ * Paths rather than data URLs: the host loads them straight from its own
+ * origin, which costs nothing to broadcast and nothing to store.
+ */
+const FALLBACK_WEAPON_ART = [
+  '/placeholder-weapon-sword.png',
+  '/placeholder-weapon-axe.png',
+  '/placeholder-weapon-hammer.png',
+];
+const FALLBACK_CHARACTER_ART = [
+  '/placeholder-character-a.png',
+  '/placeholder-character-b.png',
+];
+
+/**
+ * What a bot writes when it is playing someone's turn for them.
+ *
+ * Deliberately short and physical: these go through the same choreographer as
+ * a real player's fifty words, and a vague sentence animates as a shrug.
+ */
+const BOT_MOVES = [
+  'charge in and swing it overhead as hard as possible',
+  'spin on the spot and let it fly at them',
+  'leap up and slam it straight down',
+  'poke them with it repeatedly, very fast',
+  'throw it, then panic and run away',
+  'sweep their legs out from under them',
+  'wind up a huge uppercut and connect',
+  'hurl it like a javelin and dive after it',
+];
+
+const pick = <T>(items: readonly T[]): T =>
+  items[Math.floor(Math.random() * items.length)]!;
+
+/** What the bot plays on behalf of a player who is not there. */
+function botMove(player: Player): { weapon: number; prompt: string } {
+  return {
+    weapon: Math.floor(Math.random() * Math.max(1, player.weaponNames.length)),
+    prompt: pick(BOT_MOVES),
+  };
+}
 
 function defaultName(slot: string): string {
   if (slot === 'character') return 'Nameless';
@@ -81,6 +126,15 @@ export default class Room implements Party.Server {
   private stepTimer: ReturnType<typeof setTimeout> | null = null;
 
   onConnect(connection: Party.Connection): void {
+    // A returning phone keeps its socket id across a reconnect, so a locked
+    // screen or a walk out of wifi range comes back to the same seat and the
+    // bot hands their fighter straight back.
+    const player = this.state.players.find((p) => p.id === connection.id);
+    if (player && !player.connected) {
+      player.connected = true;
+      this.broadcastState();
+    }
+
     // A connection is not yet a player: the host and joining phones both
     // connect first, then declare themselves with `host` or `join`.
     this.send(connection, { type: 'state', state: this.state });
@@ -165,6 +219,9 @@ export default class Room implements Party.Server {
       player.connected = false;
     }
     this.broadcastState();
+    // If they walked out mid-turn, the bot picks up their move now rather than
+    // holding the fight open for a minute of nothing.
+    this.playBots();
   }
 
   // ------------------------------------------------------------------ handlers
@@ -199,7 +256,9 @@ export default class Room implements Party.Server {
   private onJoin(name: string, photo: string | undefined, sender: Party.Connection): void {
     const existing = this.state.players.find((p) => p.id === sender.id);
     if (existing) {
+      existing.connected = true;
       this.send(sender, { type: 'welcome', playerId: existing.id, state: this.state });
+      this.broadcastState();
       return;
     }
 
@@ -312,8 +371,48 @@ export default class Room implements Party.Server {
 
   // -------------------------------------------------------------- battleground
 
+  /**
+   * Gives every creator a full set of artwork and names.
+   *
+   * A player whose phone died mid-draw keeps whatever they had last submitted,
+   * per the brief; anything they never got to becomes the stand-in Sword, Axe
+   * or Hammer. Without this a dropped player has no character texture at all,
+   * and the battle screen simply skips them — the fight would be one-sided
+   * with no explanation.
+   */
+  private fillCreations(): void {
+    for (const [index, player] of creators(this.state).entries()) {
+      const slots = ['character', ...this.weaponSlots()];
+      for (const slot of slots) {
+        const key = `${player.id}:${slot}`;
+        if (!this.art.has(key)) {
+          this.art.set(key, slot === 'character'
+            ? FALLBACK_CHARACTER_ART[index % FALLBACK_CHARACTER_ART.length]!
+            : FALLBACK_WEAPON_ART[
+                Number(slot.replace('weapon', '')) % FALLBACK_WEAPON_ART.length
+              ]!);
+          if (!player.progress.drawn.includes(slot)) player.progress.drawn.push(slot);
+        }
+        if (!this.names.has(key)) {
+          const name = defaultName(slot);
+          this.names.set(key, name);
+          if (slot === 'character') player.characterName ||= name;
+          else player.weaponNames[Number(slot.replace('weapon', ''))] ||= name;
+          if (!player.progress.named.includes(slot)) player.progress.named.push(slot);
+        }
+      }
+    }
+  }
+
+  /** Every weapon slot that exists so far, ULTs included. */
+  private weaponSlots(): string[] {
+    const count = WEAPON_COUNT + this.state.ultRound;
+    return Array.from({ length: count }, (_, i) => `weapon${i}`);
+  }
+
   /** Opens the vote, on the same server-held clock the creation steps use. */
   private beginVote(): void {
+    this.fillCreations();
     if (this.stepTimer) clearTimeout(this.stepTimer);
     this.state.phase = 'battleground';
     this.state.step = -1;
@@ -403,6 +502,32 @@ export default class Room implements Party.Server {
     this.state.stepEndsAt = Date.now() + MOVE_SECONDS * 1000;
     this.stepTimer = setTimeout(() => this.closeMoves(), MOVE_SECONDS * 1000);
     this.broadcastState();
+    this.playBots();
+  }
+
+  /**
+   * Writes for any fighter on stage who is not there to write for themselves.
+   *
+   * Immediately, rather than on the move clock: a bot that waited out the full
+   * minute would leave the player opposite staring at an empty stage for it,
+   * which is the same as no bot at all.
+   */
+  private playBots(): void {
+    const turn = this.state.turn;
+    if (!turn || turn.phase !== 'picking') return;
+
+    let wrote = false;
+    for (const id of turn.fighters) {
+      if (turn.moves[id]) continue;
+      const player = this.state.players.find((p) => p.id === id);
+      if (!player || player.connected) continue;
+      turn.moves[id] = botMove(player);
+      wrote = true;
+    }
+    if (!wrote) return;
+
+    this.broadcastState();
+    if (turn.fighters.every((id) => turn.moves[id])) this.closeMoves();
   }
 
   /**
@@ -443,6 +568,7 @@ export default class Room implements Party.Server {
    */
   private beginSuddenDeath(): void {
     if (this.stepTimer) clearTimeout(this.stepTimer);
+    this.fillCreations();
     this.state.phase = 'battle';
     for (const player of this.state.players) {
       player.health = STARTING_HEALTH;
@@ -484,8 +610,16 @@ export default class Room implements Party.Server {
 
     // Anyone who wrote nothing still fights; the brief says an unusable
     // request just swings the weapon like an axe.
+    //
+    // A player whose phone has dropped gets more than that: a bot takes their
+    // turn, because a disconnected fighter standing still for three rounds is
+    // no fun for the person across from them.
     for (const id of turn.fighters) {
-      if (!turn.moves[id]) turn.moves[id] = { weapon: 0, prompt: '' };
+      if (turn.moves[id]) continue;
+      const player = this.state.players.find((p) => p.id === id);
+      turn.moves[id] = player && !player.connected
+        ? botMove(player)
+        : { weapon: 0, prompt: '' };
     }
 
     turn.first = turn.fighters[Math.floor(Math.random() * 2)]!;
@@ -522,7 +656,9 @@ export default class Room implements Party.Server {
     // A judge scores as themselves; the host stands in for the AI when there
     // are no judges, and must not be able to score a game that has them.
     const isJudge = judges(this.state).some((p) => p.id === sender.id);
-    const isAiJudge = this.isHost(sender) && judges(this.state).length === 0;
+    // The AI stands in when there are no judges *present* — a judge whose
+    // phone has locked must not be able to stall the round from the sofa.
+    const isAiJudge = this.isHost(sender) && this.activeJudges().length === 0;
     if (!isJudge && !isAiJudge) return;
 
     const clean = Math.max(0, Math.min(MAX_SCORE, Math.round(Number(score) || 0)));
@@ -530,7 +666,7 @@ export default class Room implements Party.Server {
     this.broadcastState();
 
     // Close as soon as every scorer has rated both fighters.
-    const scorers = isAiJudge ? [sender.id] : judges(this.state).filter((p) => p.connected).map((p) => p.id);
+    const scorers = isAiJudge ? [sender.id] : this.activeJudges().map((p) => p.id);
     const complete = scorers.length > 0 && scorers.every(
       (id) => turn.fighters.every((f) => typeof turn.judged[id]?.[f] === 'number'),
     );
@@ -675,6 +811,11 @@ export default class Room implements Party.Server {
     });
 
     this.send(sender, { type: 'art', art });
+  }
+
+  /** The judges actually holding a phone right now. */
+  private activeJudges(): Player[] {
+    return judges(this.state).filter((p) => p.connected);
   }
 
   /** Everything one player made, for the battle to draw with. */

@@ -104,12 +104,15 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       for (const [index, id] of turn.fighters.entries()) {
         const entry = artFor(id);
         const player = playerFor(id);
-        if (!entry?.character || !player) continue;
+        if (!player) continue;
 
-        const weapon = entry.weapons[0];
+        const weapon = entry?.weapons[0];
         const fighter = await engine.Fighter.create({
-          name: entry.character.name || player.name,
-          character: entry.character.png,
+          name: entry?.character?.name || player.characterName || player.name,
+          // The server fills in stand-in artwork for anything nobody drew, so
+          // this only fires if a fighter's art never arrived at all — better a
+          // placeholder on stage than an empty half of the screen.
+          character: entry?.character?.png ?? '/placeholder-character-a.png',
           // A player who never drew a weapon still fights, with the standard
           // one the brief falls back to elsewhere.
           weapon: weapon?.png ?? '/placeholder-weapon-sword.png',
@@ -201,7 +204,9 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
      * are any, and the host stepping in there would override them.
      */
     async function judgeWithAi(turn: Turn, current: RoomState): Promise<void> {
-      if (judges(current).length > 0) return;
+      // Connected judges only: a judge whose phone has locked would otherwise
+      // hold the round open until the clock ran out with nobody scoring.
+      if (judges(current).some((p) => p.connected)) return;
 
       for (const attackerId of turn.fighters) {
         if (disposed) return;

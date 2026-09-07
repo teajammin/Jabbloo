@@ -12,7 +12,8 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  Canvas, encodePng, roundedRect, ellipse, outlineOf, darken, C, OUTLINE,
+  Canvas, encodePng, roundedRect, ellipse, outlineOf, darken, minus, circle,
+  any, C, OUTLINE,
 } from './lib/raster.mjs';
 
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -61,12 +62,40 @@ function hammer(headColour) {
   return { width: W, height: H, buf: c.buf };
 }
 
+/**
+ * The third fallback weapon.
+ *
+ * The brief names Sword, Axe and Hammer as the stand-ins for anything a player
+ * never drew, so all three need artwork — a bot handed two of them and a
+ * missing texture would be the one visible sign a player had dropped out.
+ *
+ * The head is a disc with a bite taken out of it, which is a cheaper way to
+ * get a crescent blade than describing one.
+ */
+function axe(headColour) {
+  const W = 160, H = 256, c = new Canvas(W, H);
+  const blade = minus(
+    any(circle(74, 74, 56), roundedRect(66, 30, 34, 92, 16)),
+    circle(28, 74, 44),
+  );
+
+  c.fill(outlineOf(70, 40, 26, 196, 13, OUTLINE), darken(C.peach, 0.6));
+  c.fill(blade, darken(headColour, 0.6));
+  c.fill((px, py) => blade(px - 3, py) && blade(px + 3, py) && blade(px, py - 3) && blade(px, py + 3),
+    headColour);
+  c.fill(ellipse(74, 52, 16, 8), C.white, 0.45);
+  c.fill(roundedRect(70, 40, 26, 196, 13), C.peach);
+
+  return { width: W, height: H, buf: c.buf };
+}
+
 mkdirSync(OUT_DIR, { recursive: true });
 
 const sprites = {
   'placeholder-character-a.png': character(C.coral),
   'placeholder-character-b.png': character(C.sky),
   'placeholder-weapon-sword.png': sword(C.butter),
+  'placeholder-weapon-axe.png': axe(C.mint),
   'placeholder-weapon-hammer.png': hammer(C.lavender),
 };
 
