@@ -109,6 +109,11 @@ These are the only moves the choreographer may call.
 All durations are in seconds. If the AI returns something unusable, the engine falls back to
 a default swing — the weapon hits the opponent like an axe.
 
+Character art is scanned for limbs before the rig draws its own: a drawing
+with arms gets the weapon put in its own hand and no capsule arm over the top,
+and one with legs keeps them. The procedural limbs in `src/engine/Limb.ts` are
+the fallback for limbless characters only.
+
 ### Limbs
 
 Characters are flat PNGs with no skeleton, so kicks and punches have nothing to articulate.

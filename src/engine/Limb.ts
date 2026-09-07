@@ -13,12 +13,10 @@ import { darken } from './colour';
  * move, which keeps them from looking like a permanent mis-rig on characters
  * that already have legs drawn on.
  *
- * PLANNED — drawn limbs take priority:
- *   When the drawing tool lands, character art must first be scanned for limbs
- *   the player actually drew. Where arms or legs are found, the rig should
- *   animate THOSE, emitting anchor points for them, and this procedural limb
- *   becomes the fallback for limbless characters only. Drawing a capsule leg
- *   onto a character who already has two legs reads as a bug, not a feature.
+ * Drawn limbs take priority: `detectLimbs` scans the character's silhouette
+ * first, and where the player drew their own arms or legs this limb is
+ * suppressed for good. Drawing a capsule leg onto a character who already has
+ * two legs reads as a bug, not a feature.
  */
 export class Limb {
   readonly view = new Graphics();
@@ -26,6 +24,15 @@ export class Limb {
   /** Tweened by primitives; call `redraw()` after changing either. */
   angle = Math.PI / 2;
   length = 0;
+
+  /**
+   * Set when the character was drawn with this limb already.
+   *
+   * Suppressing rather than removing keeps every melee primitive working
+   * unchanged — they extend a limb that simply declines to appear, and the
+   * body movement they also drive carries the move on its own.
+   */
+  private suppressed = false;
 
   constructor(
     private readonly colour: number,
@@ -42,7 +49,16 @@ export class Limb {
     return this.redraw();
   }
 
+  /** Silences this limb permanently: the drawing has one of its own. */
+  suppress(): this {
+    this.suppressed = true;
+    this.view.clear();
+    this.view.visible = false;
+    return this;
+  }
+
   redraw(): this {
+    if (this.suppressed) return this;
     const g = this.view;
     g.clear();
 

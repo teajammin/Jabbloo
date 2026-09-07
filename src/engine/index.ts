@@ -15,6 +15,12 @@ export { HealthBar, type BarSide } from './HealthBar';
 export { BubbleText, type BubbleTextOptions } from './BubbleText';
 export { Limb } from './Limb';
 export {
+  detectLimbs,
+  silhouetteOf,
+  type DetectedLimbs,
+  type Silhouette,
+} from './limbs';
+export {
   EFFECT_KINDS,
   isEffectKind,
   effectUrl,

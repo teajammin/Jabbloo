@@ -1,6 +1,7 @@
 import { Container, Sprite, Texture, Assets } from 'pixi.js';
 import { Limb } from './Limb';
 import { sampleDominantColour } from './colour';
+import { detectLimbs, silhouetteOf } from './limbs';
 import type { FighterOptions, HandAnchor, Facing } from './types';
 
 const DEFAULT_ANCHOR: HandAnchor = { x: 0.42, y: 0.05 };
@@ -42,14 +43,21 @@ export class Fighter {
   private bodySprite!: Sprite;
   private weaponSprite!: Sprite;
   private _facing: Facing;
-  private readonly anchor: HandAnchor;
+  /** Not readonly: limb detection can move it onto a hand the player drew. */
+  private anchor: HandAnchor;
   private readonly targetHeight: number;
   private readonly targetWeaponHeight: number;
+
+  /** Whether the character came with limbs of its own. */
+  private drawnLimbs = { arms: false, legs: false };
+  /** True when the caller pinned the anchor and detection must not move it. */
+  private readonly anchorGiven: boolean;
 
   private constructor(options: FighterOptions) {
     this.name = options.name ?? 'Fighter';
     this.weaponName = options.weaponName ?? 'Weapon';
     this.heldWeaponName = this.weaponName;
+    this.anchorGiven = options.handAnchor !== undefined;
     this.anchor = options.handAnchor ?? DEFAULT_ANCHOR;
     this.targetHeight = options.height ?? DEFAULT_HEIGHT;
     this.targetWeaponHeight =
@@ -90,6 +98,7 @@ export class Fighter {
     this.hand.addChild(this.weaponSprite);
 
     this.buildLimbs(characterTexture);
+    this.useDrawnLimbs(characterTexture);
     this.positionHand();
     this.applyFacing();
   }
@@ -117,6 +126,30 @@ export class Fighter {
 
     this.limbs.addChild(this.leg.view);
     this.limbs.addChild(this.arm.view);
+  }
+
+  /**
+   * Defers to whatever the player actually drew.
+   *
+   * A character with arms gets the weapon put in its own hand and no second
+   * arm drawn over the top; one with legs keeps them and loses the procedural
+   * kick. A bean with neither is unaffected, which is the case the procedural
+   * limbs were built for in the first place.
+   */
+  private useDrawnLimbs(characterTexture: Texture): void {
+    const found = detectLimbs(silhouetteOf(characterTexture));
+    this.drawnLimbs = { arms: found.arms, legs: found.legs };
+
+    if (found.arms) this.arm.suppress();
+    if (found.legs) this.leg.suppress();
+    // An explicit anchor from the caller wins: it was a decision, and this is
+    // a guess.
+    if (found.hand && !this.anchorGiven) this.anchor = found.hand;
+  }
+
+  /** What the drawing brought with it, for anything that wants to know. */
+  get ownLimbs(): { arms: boolean; legs: boolean } {
+    return { ...this.drawnLimbs };
   }
 
   /** Places the hand container at the anchor offset from the body's centre. */
