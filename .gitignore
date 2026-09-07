@@ -37,6 +37,10 @@ coverage/
 # PartyKit
 .partykit/
 
+# Local background-removal service: a Python environment and a 176MB model,
+# rebuilt with `npm run setup:cutout` rather than committed.
+.venv-cutout/
+
 # Letter-generator review sheet
 letters-sheet.png
 letters-tracing-sheet.png

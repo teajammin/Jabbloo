@@ -45,7 +45,7 @@ const body = (result: { body: unknown } | null) => result?.body as Record<string
 // Background removal degrades instead of failing.
 {
   const noKey = await handleApi('/api/cutout', { image: 'data:image/png;base64,AAAA' }, {});
-  check('no remove.bg key reports unavailable', body(noKey)['available'] === false);
+  check('with nothing configured it reports unavailable', body(noKey)['available'] === false);
   check('with a reason the client can log', typeof body(noKey)['reason'] === 'string');
 
   const rubbish = await handleApi('/api/cutout', { image: 'not an image' }, {
@@ -53,6 +53,35 @@ const body = (result: { body: unknown } | null) => result?.body as Record<string
   });
   check('a non-image is rejected', rubbish?.status === 400, String(rubbish?.status));
   check('and never reported as available', body(rubbish)['available'] === false);
+
+  // A local service that is configured but not running must not take the
+  // request down with it: whatever else is set up still gets a turn, and
+  // failing that the browser cuts the photo out itself.
+  const deadLocal = await handleApi('/api/cutout', {
+    image: 'data:image/png;base64,AAAA',
+  }, { REMBG_URL: 'http://127.0.0.1:9' });
+  check('an unreachable local service falls through', deadLocal?.status === 200,
+    String(deadLocal?.status));
+  check('and says so rather than erroring', body(deadLocal)['available'] === false,
+    JSON.stringify(body(deadLocal)));
+}
+
+// Health says which cutout is available, since the drawing tool words its
+// message differently for a service and for the browser's own.
+{
+  const none = await handleApi('/api/health', {}, {});
+  check('no cutout is reported as none', body(none)['cutout'] === false);
+
+  const local = await handleApi('/api/health', {}, { REMBG_URL: 'http://127.0.0.1:7000' });
+  check('a local service is reported as local', body(local)['cutout'] === 'local');
+
+  const hosted = await handleApi('/api/health', {}, { REMOVEBG_API_KEY: 'k' });
+  check('a key is reported as the hosted service', body(hosted)['cutout'] === 'removebg');
+
+  const both = await handleApi('/api/health', {}, {
+    REMBG_URL: 'http://127.0.0.1:7000', REMOVEBG_API_KEY: 'k',
+  });
+  check('local wins when both are there', body(both)['cutout'] === 'local');
 }
 
 // Anything else belongs to whoever called: static files, in the worker's case.

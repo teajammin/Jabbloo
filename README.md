@@ -84,6 +84,33 @@ elsewhere means a deploy cannot carry them off the machine. Both files are
 gitignored. Every AI call is made by the Express backend — no key ever reaches a
 browser.
 
+### Background removal
+
+Photos imported into the drawing tool can have their background cut out. Three
+paths, tried in that order:
+
+1. **A local service** — free, unmetered, offline, and started by
+   `npm run dev`. One-time setup:
+
+   ```sh
+   npm run setup:cutout     # a Python env and a 168MB model, both gitignored
+   ```
+
+   It runs the rembg model behind `scripts/cutout-server.py` rather than the
+   FastAPI server rembg ships with: that one accepts a multipart upload and
+   never answers it on Python 3.14 — the request does not even reach the
+   application, while inference itself is fine. Ours takes raw bytes and
+   returns a PNG, which removes multipart from both ends. Port 8788 rather
+   than rembg's default of 7000, which on macOS belongs to AirPlay Receiver:
+   it accepts the connection and never replies, so requests simply hang.
+
+2. **Remove.bg**, if `REMOVEBG_API_KEY` is set. The free tier is 50 calls a
+   month, which is about eight six-player games.
+3. **The browser itself** — `src/draw/cutout.ts` floods inward from the border,
+   which never fails and needs nothing configured, but wants a plain backdrop.
+
+The deployed game cannot reach a laptop's rembg, so it uses 2 or 3.
+
 ### Tests
 
 ```sh

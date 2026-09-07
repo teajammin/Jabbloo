@@ -15,6 +15,14 @@ export interface AiConfig {
   choreographerFallback: string;
   judge: string;
   removeBgKey: string;
+  /**
+   * A background-removal service running beside the game, if there is one.
+   *
+   * Local first, when configured: it has no quota, no per-image cost and no
+   * round trip to another continent, which for a party game handing round a
+   * phone matters more than the last few percent of quality.
+   */
+  rembgUrl: string;
 }
 
 /** An environment as either runtime hands it over. */
@@ -32,6 +40,7 @@ export function readConfig(env: Env): AiConfig {
     choreographerFallback: text(env, 'CHOREOGRAPHER_FALLBACK_MODEL', 'claude-sonnet-5'),
     judge: text(env, 'JUDGE_MODEL', 'claude-sonnet-5'),
     removeBgKey: text(env, 'REMOVEBG_API_KEY'),
+    rembgUrl: text(env, 'REMBG_URL').replace(/\/$/, ''),
   };
 }
 

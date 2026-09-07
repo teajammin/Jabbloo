@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Whimsical creative multiplayer fighting game",
   "scripts": {
-    "dev": "concurrently -n web,api,party -c cyan,magenta,yellow \"vite\" \"npm:dev:server\" \"npm:dev:party\"",
+    "dev": "concurrently -n web,api,party,cut -c cyan,magenta,yellow,green \"vite\" \"npm:dev:server\" \"npm:dev:party\" \"npm:dev:cutout\"",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -28,11 +28,14 @@
     "test:ult": "node test/ult.test.mjs",
     "test:bots": "node test/bots.test.mjs",
     "test:limits": "node test/limits.test.mjs",
+    "test:cutout": "node test/cutout-service.test.mjs",
     "build:web": "vite build",
     "deploy": "npm run build && partykit deploy --serve dist",
     "deploy:preview": "npm run build && partykit deploy --serve dist --preview staging",
     "deploy:env": "partykit env add ANTHROPIC_API_KEY",
-    "logs": "partykit tail"
+    "logs": "partykit tail",
+    "dev:cutout": "test -x .venv-cutout/bin/python && .venv-cutout/bin/python scripts/cutout-server.py 8788 || echo \"[cutout] not installed \u2014 run: npm run setup:cutout (photos will use the in-browser cutout until then)\"",
+    "setup:cutout": "python3 -m venv .venv-cutout && .venv-cutout/bin/pip install --quiet \"rembg[cli]\" && .venv-cutout/bin/rembg d u2net"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

@@ -39,8 +39,20 @@ const base64From = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-export async function cutoutImage(dataUrl: unknown, key: string): Promise<CutoutResult> {
-  if (!key) return { status: 200, body: { available: false, reason: 'no key configured' } };
+export interface CutoutConfig {
+  /** Remove.bg key, for the hosted service. */
+  removeBgKey: string;
+  /** A rembg server running beside the game, if there is one. */
+  rembgUrl: string;
+}
+
+export async function cutoutImage(
+  dataUrl: unknown, config: CutoutConfig,
+): Promise<CutoutResult> {
+  const { removeBgKey: key, rembgUrl } = config;
+  if (!key && !rembgUrl) {
+    return { status: 200, body: { available: false, reason: 'no cutout service configured' } };
+  }
 
   const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(
     typeof dataUrl === 'string' ? dataUrl : '',
@@ -55,6 +67,17 @@ export async function cutoutImage(dataUrl: unknown, key: string): Promise<Cutout
   const bytes = bytesFrom(match[2]!);
   if (bytes.byteLength > MAX_BYTES) {
     return { status: 413, body: { available: false, error: 'image too large' } };
+  }
+
+  // Local first: unmetered, private, and fast on the machine already hosting
+  // the game. A service is the fallback rather than the other way round.
+  if (rembgUrl) {
+    const local = await viaRembg(bytes, match[1]!, rembgUrl);
+    if (local) return local;
+  }
+
+  if (!key) {
+    return { status: 200, body: { available: false, reason: 'local cutout unavailable' } };
   }
 
   try {
@@ -91,4 +114,56 @@ export async function cutoutImage(dataUrl: unknown, key: string): Promise<Cutout
     console.error('[cutout]', error);
     return { status: 200, body: { available: false, reason: 'request failed' } };
   }
+}
+
+/**
+ * The local cutout service, if it is up.
+ *
+ * Two shapes are tried. First `POST /cutout` with the raw image bytes, which
+ * is the service in `scripts/cutout-server.py` — no multipart encoding on
+ * either side, which is one fewer thing to go wrong and the reason that script
+ * exists at all. Failing that, the multipart endpoint a stock rembg server
+ * exposes, so REMBG_URL can point at one of those instead.
+ *
+ * Returns null rather than an error when neither answers, so a laptop running
+ * the game without the service falls through to whatever else is configured.
+ * Nobody should lose a photo because a side process was not started.
+ */
+async function viaRembg(
+  bytes: Uint8Array<ArrayBuffer>, format: string, base: string,
+): Promise<CutoutResult | null> {
+  // The model runs on a CPU: a large photo takes a couple of seconds, and a
+  // phone waiting is better than a phone told it failed.
+  const timeout = () => AbortSignal.timeout(30_000);
+
+  const attempts: (() => Promise<Response>)[] = [
+    () => fetch(`${base}/cutout`, {
+      method: 'POST',
+      headers: { 'Content-Type': `image/${format}` },
+      body: bytes,
+      signal: timeout(),
+    }),
+    () => {
+      const form = new FormData();
+      form.append('file', new Blob([bytes]), `upload.${format}`);
+      return fetch(`${base}/api/remove`, { method: 'POST', body: form, signal: timeout() });
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const response = await attempt();
+      if (!response.ok) continue;
+      const out = new Uint8Array(await response.arrayBuffer());
+      return {
+        status: 200,
+        body: { available: true, image: `data:image/png;base64,${base64From(out)}` },
+      };
+    } catch (error) {
+      console.warn('[cutout] local service:',
+        error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return null;
 }

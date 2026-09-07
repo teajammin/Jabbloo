@@ -239,8 +239,26 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       }
     }
 
-    /** One pass of the state machine, driven by whatever the server says. */
-    async function sync(): Promise<void> {
+    /**
+     * One pass of the state machine at a time.
+     *
+     * Each pass can take seconds — two fighters are announced and walk on, an
+     * exchange is choreographed and played — while state keeps arriving. Two
+     * passes overlapping would put two animations on the same fighter at once:
+     * a player who wrote their move quickly could have their attack start
+     * while their character was still walking into the arena, each tween
+     * fighting the other for the same position.
+     */
+    let queue: Promise<void> = Promise.resolve();
+    function sync(): Promise<void> {
+      queue = queue.then(() => syncOnce()).catch((error: unknown) => {
+        // One failed pass must not stop every pass after it.
+        console.error('[battle]', error);
+      });
+      return queue;
+    }
+
+    async function syncOnce(): Promise<void> {
       if (disposed || !state || !art) return;
       await ensureStage(state);
       if (disposed || !ready) return;

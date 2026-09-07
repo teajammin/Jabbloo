@@ -61,7 +61,9 @@ export async function handleApi(
         body: {
           ok: true,
           keyConfigured: Boolean(config.apiKey),
-          cutout: Boolean(config.removeBgKey),
+          // Which cutout is available, if any: the drawing tool words its
+          // message differently for a service and for the browser's own.
+          cutout: config.rembgUrl ? 'local' : config.removeBgKey ? 'removebg' : false,
           model: config.choreographer,
           fallback: config.choreographerFallback,
         },
@@ -87,7 +89,7 @@ export async function handleApi(
     }
 
     case '/api/cutout': {
-      const result = await cutoutImage(body['image'], config.removeBgKey);
+      const result = await cutoutImage(body['image'], config);
       return { status: result.status, body: result.body };
     }
 
