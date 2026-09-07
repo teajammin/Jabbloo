@@ -390,6 +390,83 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   holder.remove();
 }
 
+// --- the lobby, which builds its own connection ------------------------------
+//
+// The one screen that makes a real socket, and so the one this harness used to
+// skip — which is exactly where a blank page hid: it throws on mount, the
+// screen manager has already emptied the page, and nothing is rendered.
+
+{
+  // A socket that never opens. PartySocket buffers sends until it does, so the
+  // lobby behaves as it does in the second before a connection lands.
+  const realSocket = globalThis.WebSocket;
+  class DeadSocket {
+    static CONNECTING = 0; static OPEN = 1; static CLOSING = 2; static CLOSED = 3;
+    readyState = 0;
+    binaryType = 'blob';
+    constructor(url) { this.url = url; }
+    addEventListener() {}
+    removeEventListener() {}
+    send() {}
+    close() { this.readyState = 3; }
+  }
+  globalThis.WebSocket = DeadSocket;
+  window.WebSocket = DeadSocket;
+
+  // Mounted the way a phone sees it: served over plain http from a laptop's
+  // LAN address, where every secure-context API is simply absent.
+  const realCrypto = globalThis.crypto;
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    value: { getRandomValues: realCrypto.getRandomValues.bind(realCrypto) },
+  });
+
+  try {
+    mounts('lobby (host)', ui.lobbyScreen('ABCD', 2, true), (root) => {
+      check('the lobby shows the room code',
+        (root.querySelector('[role="img"]')?.getAttribute('aria-label') ?? '').includes('ABCD'));
+      check('and an address to join at', root.querySelector('.join-url') !== null);
+    });
+    mounts('lobby (player)', ui.lobbyScreen('ABCD', 2, false, { name: 'Ann' }));
+  } finally {
+    globalThis.WebSocket = realSocket;
+    window.WebSocket = realSocket;
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: realCrypto });
+  }
+}
+
+// --- identity on an insecure page -------------------------------------------
+//
+// The game is served to phones from a laptop's LAN address over plain http,
+// which browsers do not treat as a secure context. Anything gated on one is
+// simply missing there, and a screen that reaches for it throws on mount and
+// renders nothing at all — a blank page, with the game apparently broken.
+
+{
+  const real = globalThis.crypto;
+
+  check('an id is produced normally', ui.randomId().length >= 16, ui.randomId());
+
+  // A secure-context-only API is not merely restricted: it is undefined.
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    value: { getRandomValues: real.getRandomValues.bind(real) },
+  });
+  const insecure = ui.randomId();
+  check('and still on a page with no randomUUID', insecure.length >= 16, insecure);
+  check('which is a room id a device can keep',
+    typeof ui.deviceId('ABCD') === 'string' && ui.deviceId('ABCD').length > 0);
+  check('and the same one on the next look', ui.deviceId('ABCD') === ui.deviceId('ABCD'));
+  check('but a different one per room', ui.deviceId('ABCD') !== ui.deviceId('WXYZ'));
+
+  // Nothing at all: an old browser, or a locked-down webview.
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: undefined });
+  const bare = ui.randomId();
+  check('and with no crypto whatsoever', typeof bare === 'string' && bare.length > 8, bare);
+
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: real });
+}
+
 // --- the host's team board --------------------------------------------------
 
 {

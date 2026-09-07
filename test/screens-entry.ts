@@ -7,6 +7,7 @@
  */
 export { mount, setHome, goHome } from '../src/ui/screens';
 export { launchScreen } from '../src/ui/launch';
+export { lobbyScreen } from '../src/ui/lobby';
 export { phoneLink } from '../src/ui/phoneLink';
 export { createRoomScreen } from '../src/ui/createRoom';
 export { joinRoomScreen } from '../src/ui/joinRoom';
@@ -20,3 +21,4 @@ export { mountOptions } from '../src/ui/options';
 export { teamBoard } from '../src/ui/teams';
 export { loadSettings } from '../src/settings';
 export { DrawCanvas } from '../src/draw/DrawCanvas';
+export { deviceId, randomId } from '../src/net/room';

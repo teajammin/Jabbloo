@@ -41,18 +41,32 @@ const PARTY_HOST = import.meta.env['VITE_PARTYKIT_HOST'] || defaultPartyHost();
  * the tab would arrive as a stranger, be told the game had already started,
  * and leave the bot playing out a fight for someone standing right there.
  */
-function deviceId(code: string): string {
+export function randomId(): string {
+  const source = globalThis.crypto as Crypto | undefined;
+  // `crypto.randomUUID` exists only in a secure context, and a game served to
+  // phones over a laptop's LAN address is not one — localhost is treated as
+  // secure, `http://192.168.x.x` is not. `getRandomValues` has no such
+  // restriction, so it is the one to build on.
+  if (source?.getRandomValues) {
+    const bytes = source.getRandomValues(new Uint8Array(16));
+    return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  // Neither: unique enough to tell two phones in a living room apart.
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function deviceId(code: string): string {
   const key = `jabbloo.device.${code.toUpperCase()}`;
   try {
     const stored = localStorage.getItem(key);
     if (stored) return stored;
-    const fresh = crypto.randomUUID();
+    const fresh = randomId();
     localStorage.setItem(key, fresh);
     return fresh;
   } catch {
     // No storage: a fresh id every load is the old behaviour, which still
     // plays — it just cannot reclaim a seat.
-    return crypto.randomUUID();
+    return randomId();
   }
 }
 
