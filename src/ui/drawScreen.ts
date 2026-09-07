@@ -30,6 +30,14 @@ export interface DrawScreenOptions {
   title?: string;
   onDone?: (png: string) => void;
   /**
+   * Handed a way to read the drawing at any moment.
+   *
+   * Creation runs on a clock, and a player who is still drawing when it runs
+   * out has never pressed Done — so without this their work never leaves the
+   * phone and they fight as a nameless bean holding a stand-in sword.
+   */
+  onSnapshot?: (read: () => string | null) => void;
+  /**
    * Rendered inside another screen rather than as one.
    *
    * Nesting a <main> inside a <main> is invalid and leaves a screen reader
@@ -146,8 +154,9 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     let drawing = false;
 
-    const HOLD_MS = 500;
-    const HOLD_SLOP = 10;
+    const HOLD_MS = 550;
+    // Tight on purpose: any real movement means a drag, not a hold.
+    const HOLD_SLOP = 6;
     let holdTimer: number | null = null;
     let holdStart: { x: number; y: number } | null = null;
 
@@ -156,17 +165,22 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       holdStart = null;
     };
 
+    /**
+     * Hold to select the thing under your finger.
+     *
+     * It used to copy and paste in one go, which meant any slow, careful
+     * stroke that stayed still for half a second silently dropped a duplicate
+     * of the drawing on top of itself. Selecting is what a hold should do;
+     * copying is what the ⧉ button is for.
+     */
     const grabSubject = (at: { x: number; y: number; p: number }) => {
       canvas.abortStroke();
       drawing = false;
       if (!canvas.selectSubjectAt(at)) {
-        say('Nothing to grab there — hold on something you have drawn');
+        say('Nothing there — hold on something you have drawn');
         return;
       }
-      canvas.copy();
-      canvas.paste();
-      selectTool('select');
-      say('Copied — drag it where you want, then press Done or pick another tool');
+      say('Selected — ⧉ copies it, 📋 pastes the copy');
       navigator.vibrate?.(18);
     };
 
@@ -216,9 +230,22 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         say('Photo placed');
       }
 
+      // A placed photo can be picked back up and moved or resized, but only
+      // with the select tool — otherwise there would be no way to draw on top
+      // of one.
+      if (tool === 'select' && !canvas.hasFloating && canvas.liftImageAt(at)) {
+        canvas.beginTransformDrag(canvas.transformHandleAt(at) ?? 'move', at);
+        transformDrag = true;
+        say('Drag to move · corners resize · tap away to put it back down');
+        return;
+      }
+
       drawing = true;
       canvas.beginStroke(tool, colour, size, at, filled);
 
+      // Hold-to-select belongs to the select tool. Bound to the pen it fired
+      // mid-stroke on any slow, careful line.
+      if (tool !== 'select') return;
       holdStart = { x: event.clientX, y: event.clientY };
       holdTimer = window.setTimeout(() => {
         holdTimer = null;
@@ -503,6 +530,10 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     }, 'tool wide ghost');
 
     const doneButton = control('done', () => options.onDone?.(canvas.toDataURL()), 'tool wide primary');
+
+    // Nothing is exported until asked for, so this costs nothing until the
+    // clock or a locking screen calls it.
+    options.onSnapshot?.(() => (canvas.isEmpty ? null : canvas.toDataURL()));
 
     // Only visible while a crop frame is up: on a phone there is no Enter key
     // to confirm with, so the confirm has to be on screen.

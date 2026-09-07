@@ -23,6 +23,34 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     let lastStep = '';
     let drawnPng: string | null = null;
 
+    /**
+     * Autosave for the drawing in progress.
+     *
+     * The brief says a player who drops keeps their work as last touched, and
+     * the same rule saves anyone who simply runs out of time: the step ends,
+     * whatever is on the canvas is sent, and they fight as what they drew
+     * rather than as a placeholder.
+     */
+    let readDrawing: (() => string | null) | null = null;
+    let pendingSlot: string | null = null;
+    let lastSaved = '';
+    let saveTimer: number | null = null;
+
+    function flushDrawing(): void {
+      if (!pendingSlot || !readDrawing) return;
+      const png = readDrawing();
+      if (!png || png === lastSaved) return;
+      lastSaved = png;
+      drawnPng = png;
+      connection.send({ type: 'submitDrawing', slot: pendingSlot, png });
+    }
+
+    // A phone going to sleep or a tab going to the background is the most
+    // likely way work is lost, and neither fires unload reliably.
+    const onHide = () => { if (document.visibilityState === 'hidden') flushDrawing(); };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flushDrawing);
+
     const clock = countdown();
     const heading = el('h1', { class: 'creation-title' }, '');
     const subheading = el('p', { class: 'lede' }, '');
@@ -32,6 +60,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     /** Submits whatever the current step produced, then waits for the others. */
     const submitDrawing = (png: string, slot: string) => {
       drawnPng = png;
+      lastSaved = png;
       connection.send({ type: 'submitDrawing', slot, png });
     };
 
@@ -42,17 +71,30 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       const holder = el('div', { class: 'creation-canvas' });
       body.appendChild(holder);
 
+      pendingSlot = slot;
+      lastSaved = '';
+
       // drawScreen is a Screen, so it mounts into a host element of its own.
       const teardown = drawScreen({
         title: prompt,
         embedded: true,
+        onSnapshot: (read) => { readDrawing = read; },
         onDone: (png) => {
           submitDrawing(png, slot);
           showWaiting('Saved — waiting for everyone else');
         },
       })(holder, go);
 
-      cleanups.push(() => { teardown?.(); });
+      // Often enough that little is lost, rarely enough that a phone is not
+      // uploading a PNG every few seconds all through the step.
+      saveTimer = window.setInterval(flushDrawing, 10_000);
+
+      cleanups.push(() => {
+        if (saveTimer !== null) { clearInterval(saveTimer); saveTimer = null; }
+        readDrawing = null;
+        pendingSlot = null;
+        teardown?.();
+      });
     }
 
     // --- the naming step ----------------------------------------------------
@@ -119,7 +161,11 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
         const row = el('li', { class: `player${player.progress.ready ? ' is-ready' : ''}` },
           el('span', { class: 'avatar placeholder' }, player.name.slice(0, 1).toUpperCase()),
           el('span', { class: 'player-name' }, player.name),
-          el('span', { class: 'you' }, player.progress.ready ? 'done' : 'working'),
+          // Saying a player has gone matters more than saying they are busy:
+          // it explains why a bot is about to play their turns.
+          el('span', { class: 'you' },
+            !player.connected ? 'gone — a bot will play'
+              : player.progress.ready ? 'done' : 'working'),
         );
         roster.appendChild(row);
       }
@@ -136,7 +182,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       subheading.textContent = isHost
         ? ult
           ? 'Level on damage — both sides are drawing an ULT.'
-          : 'Everyone is drawing on their phones.'
+          : 'Everyone is drawing on their devices.'
         : ult
           ? 'The scores are level. One more weapon decides it.'
           : `Step ${state.step + 1} of ${stepsFor(state).length}`;
@@ -148,6 +194,9 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       if (key === lastStep) return;
       lastStep = key;
 
+      // The step is over: send whatever is on the canvas before the tool that
+      // holds it is torn down.
+      flushDrawing();
       for (const fn of cleanups.splice(0)) fn();
 
       const me = state.players.find((p) => p.id === connection.playerId);
@@ -189,6 +238,9 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
 
     return () => {
       clock.stop();
+      flushDrawing();
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flushDrawing);
       for (const fn of cleanups.splice(0)) fn();
     };
   };

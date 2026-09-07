@@ -34,7 +34,7 @@ export const createRoomScreen: Screen = (root, go) => {
     el('main', { class: 'screen' },
       bubbleText('HOW MANY', { height: 62, className: 'title' }),
       el('p', { class: 'lede' },
-        'Everyone joins from their phone. Judges count too — with 3 or 5 players the extras judge.'),
+        'Everyone joins from their own device. Judges count too — with 3 or 5 players the extras judge.'),
       counts,
       el('div', { class: 'stack' },
         button('Open the room', () => {

@@ -116,14 +116,52 @@ export function lobbyScreen(
 
     const joinUrl = `${location.origin}/?room=${code}`;
 
+    // Filled in once the server says which address a phone can reach it on.
+    const joinAddress = el('p', { class: 'join-url' }, location.host);
+    const joinQr = el('img', { class: 'join-qr', alt: '' });
+    joinQr.hidden = true;
+
+    /**
+     * Replaces "localhost" with an address a phone can actually type.
+     *
+     * The laptop's browser only knows the name it was opened under, and on the
+     * host that is localhost — the one address on the network that means a
+     * different machine to every device that reads it.
+     */
+    if (isHost) {
+      void (async () => {
+        try {
+          const response = await fetch('/api/lan');
+          const { hosts } = await response.json() as { hosts: string[] };
+          const host = hosts[0];
+          if (!host) return;
+          joinAddress.textContent = host;
+
+          // A code is easy to say out loud; an IP address is not, so the host
+          // screen carries a QR for it.
+          const url = `http://${host}/?room=${code}`;
+          const { toDataURL } = await import('qrcode');
+          joinQr.src = await toDataURL(url, {
+            margin: 1, width: 220, color: { dark: '#4a4458', light: '#fffdf7' },
+          });
+          joinQr.alt = `Scan to join at ${url}`;
+          joinQr.hidden = false;
+        } catch {
+          // No backend, or no network: the code and the typed address still
+          // work, so this is a nicety failing rather than the lobby breaking.
+        }
+      })();
+    }
+
     root.append(
       el('main', { class: 'screen screen-lobby' },
         isHost
           ? el('div', { class: 'code-block' },
               el('p', { class: 'lede' }, 'Join at'),
-              el('p', { class: 'join-url' }, location.host),
+              joinAddress,
               el('p', { class: 'lede' }, 'with the code'),
               bubbleText(code, { height: 104, jitter: 4, className: 'title' }),
+              joinQr,
               el('a', { class: 'join-link', href: joinUrl, target: '_blank', rel: 'noreferrer' },
                 'or open the direct link'),
             )

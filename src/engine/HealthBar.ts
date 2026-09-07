@@ -61,20 +61,40 @@ export class HealthBar extends Container {
       fill: palette.ink,
     });
 
+    // A long name must not run into the number at the other end.
+    const maxLabel = BAR_WIDTH * 0.62;
+    if (this.label.width > maxLabel) this.label.scale.set(maxLabel / this.label.width);
+
     this.label.y = -this.label.height - 6;
     this.amount.y = this.label.y;
 
     // The right-hand bar mirrors its layout so both read outward from the
     // middle of the screen, the way a fighting game arranges them.
     if (side === 'right') {
-      this.label.x = BAR_WIDTH - this.label.width;
-      this.amount.x = 0;
       this.fill.pivot.x = BAR_WIDTH;
       this.fill.x = BAR_WIDTH;
     }
 
     this.addChild(track, this.fill, this.label, this.amount);
+    this.layoutText();
     this.redraw();
+  }
+
+  /**
+   * Puts the name at the bar's outer end and the number at its inner one.
+   *
+   * Re-run whenever the number changes, because it is right-aligned on the
+   * left-hand bar and its width changes with the digit count — laying it out
+   * once left 100 sitting on top of the name.
+   */
+  private layoutText(): void {
+    if (this.side === 'left') {
+      this.label.x = 0;
+      this.amount.x = BAR_WIDTH - this.amount.width;
+    } else {
+      this.label.x = BAR_WIDTH - this.label.width;
+      this.amount.x = 0;
+    }
   }
 
   /**
@@ -86,7 +106,7 @@ export class HealthBar extends Container {
   setHealth(health: number, max: number, animated = true): void {
     const target = max > 0 ? Math.max(0, Math.min(1, health / max)) : 0;
     this.amount.text = String(Math.max(0, Math.round(health)));
-    if (this.side === 'right') this.amount.x = 0;
+    this.layoutText();
 
     this.tween?.kill();
     if (!animated) {

@@ -1164,3 +1164,12 @@ body:has(.screen-draw) .help-open { display: none !important; }
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* The join QR on the host's lobby: big enough to scan across a room. */
+.join-qr {
+  width: min(220px, 60vw);
+  height: auto;
+  border-radius: 18px;
+  background: var(--cream);
+  align-self: center;
+}

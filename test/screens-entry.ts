@@ -18,3 +18,4 @@ export { resultsScreen } from '../src/ui/results';
 export { mountOptions } from '../src/ui/options';
 export { teamBoard } from '../src/ui/teams';
 export { loadSettings } from '../src/settings';
+export { DrawCanvas } from '../src/draw/DrawCanvas';

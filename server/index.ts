@@ -2,6 +2,7 @@
 // any module below constructs a client that reads a key.
 import './env';
 import express from 'express';
+import { networkInterfaces } from 'node:os';
 import { choreograph } from './choreographer';
 import { cutout, cutoutAvailable } from './cutout';
 import { judge } from './judge';
@@ -43,6 +44,28 @@ app.get('/api/health', (_req, res) => {
     model: process.env.CHOREOGRAPHER_MODEL ?? 'claude-haiku-4-5',
     fallback: process.env.CHOREOGRAPHER_FALLBACK_MODEL ?? 'claude-sonnet-5',
   });
+});
+
+/**
+ * The address a phone should use to reach this host.
+ *
+ * The browser cannot see the machine's network address — `location.host` on
+ * the laptop is `localhost`, which is exactly what a phone cannot use. Only
+ * the server can answer this, so it does.
+ */
+app.get('/api/lan', (_req, res) => {
+  const port = Number(process.env.WEB_PORT ?? 5173);
+  const addresses: string[] = [];
+  for (const entries of Object.values(networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      // IPv4 only, and nothing loopback or link-local: a phone needs an
+      // address it can actually route to.
+      if (entry.family !== 'IPv4' || entry.internal) continue;
+      if (entry.address.startsWith('169.254.')) continue;
+      addresses.push(`${entry.address}:${port}`);
+    }
+  }
+  res.json({ hosts: addresses });
 });
 
 app.post('/api/choreograph', async (req, res) => {

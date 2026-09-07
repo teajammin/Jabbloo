@@ -22,7 +22,7 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
     const heading = el('div', { class: 'ground-heading' });
     const grid = el('div', { class: 'ground-grid' });
     const note = el('p', { class: 'lede' }, isHost
-      ? 'Everyone is picking on their phones.'
+      ? 'Everyone is picking on their devices.'
       : 'Pick a battleground — every pick goes in the hat.');
 
     const cards = new Map<string, { card: HTMLElement; voters: HTMLElement }>();

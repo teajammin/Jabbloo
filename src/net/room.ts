@@ -11,7 +11,41 @@ import type {
  * state locally, it only forwards intents and renders what comes back.
  */
 
-const PARTY_HOST = import.meta.env['VITE_PARTYKIT_HOST'] ?? 'localhost:1999';
+/**
+ * Where the multiplayer server lives.
+ *
+ * Falls back to whatever host served the page rather than to `localhost`,
+ * because in a real game the page is served to a phone by the host's laptop —
+ * and `localhost` on the phone is the phone. This is what let the laptop join
+ * its own room while every phone sat on "connecting".
+ *
+ * A deployed build sets VITE_PARTYKIT_HOST to the real party host instead.
+ */
+const PARTY_HOST = import.meta.env['VITE_PARTYKIT_HOST']
+  ?? `${location.hostname || 'localhost'}:1999`;
+
+/**
+ * A stable id for this device in this room, kept across reloads.
+ *
+ * The server keys a player's seat — their artwork, their health, their turn —
+ * on the connection id. Without this, refreshing a phone or letting it drop
+ * the tab would arrive as a stranger, be told the game had already started,
+ * and leave the bot playing out a fight for someone standing right there.
+ */
+function deviceId(code: string): string {
+  const key = `jabbloo.device.${code.toUpperCase()}`;
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) return stored;
+    const fresh = crypto.randomUUID();
+    localStorage.setItem(key, fresh);
+    return fresh;
+  } catch {
+    // No storage: a fresh id every load is the old behaviour, which still
+    // plays — it just cannot reclaim a seat.
+    return crypto.randomUUID();
+  }
+}
 
 export interface RoomHandlers {
   onArt?: (art: PlayerArt[]) => void;
@@ -30,7 +64,11 @@ export class RoomConnection {
   state: RoomState | null = null;
 
   constructor(code: string) {
-    this.socket = new PartySocket({ host: PARTY_HOST, room: code.toUpperCase() });
+    this.socket = new PartySocket({
+      host: PARTY_HOST,
+      room: code.toUpperCase(),
+      id: deviceId(code),
+    });
 
     this.socket.addEventListener('message', (event) => {
       let message: ServerMessage;

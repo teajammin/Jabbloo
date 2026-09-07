@@ -244,9 +244,12 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           playedTurn = key;
           // Named before the entrance rather than after it, so the caption is
           // already up while the two of them walk on.
-          const names = turn.fighters.map(
-            (id) => artFor(id)?.character?.name || playerFor(id)?.name || '—',
-          );
+          const names = turn.fighters.map((id) => {
+            const name = artFor(id)?.character?.name || playerFor(id)?.name || '—';
+            // A bot playing for someone is worth saying out loud, or the room
+            // spends the round wondering why they are attacking like that.
+            return playerFor(id)?.connected === false ? `${name} (bot)` : name;
+          });
           caption.textContent = `${names[0]} versus ${names[1]}`;
           await setUpFighters(turn);
         }

@@ -260,6 +260,69 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   });
 }
 
+// --- work in progress must survive the clock --------------------------------
+
+{
+  const connection = fakeConnection('a', roomState({ phase: 'creating', step: 0 }));
+  mounts('creation autosaves', ui.creationScreen(connection, false), (root) => {
+    const overlay = root.querySelector('.draw-overlay');
+    if (!overlay) { check('the drawing tool is there to autosave from', false); return; }
+    overlay.dispatchEvent(new PointerEvent('pointerdown', { clientX: 50, clientY: 50, isPrimary: true }));
+    overlay.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 180, isPrimary: true }));
+    overlay.dispatchEvent(new PointerEvent('pointerup', { clientX: 150, clientY: 180, isPrimary: true }));
+
+    // Nothing has been pressed — this is a player still drawing.
+    check('nothing is sent while they draw',
+      connection.sent.every((m) => m.type !== 'submitDrawing'));
+
+    // The phone goes to sleep.
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    const saved = connection.sent.find((m) => m.type === 'submitDrawing');
+    check('a sleeping phone saves what is on the canvas', Boolean(saved),
+      JSON.stringify(connection.sent.map((m) => m.type)));
+    check('into the right slot', saved?.slot === 'character', saved?.slot);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+
+    // And the step running out sends it too, without a second copy of the same
+    // picture going up.
+    const before = connection.sent.filter((m) => m.type === 'submitDrawing').length;
+    connection.push({ step: 1 });
+    const after = connection.sent.filter((m) => m.type === 'submitDrawing').length;
+    check('an unchanged drawing is not sent twice', after === before, `${before} then ${after}`);
+
+    // The name step shows what they drew, pressed or not.
+    const preview = root.querySelector('img.creation-preview');
+    check('the name step previews the drawing', preview !== null && !preview.classList.contains('empty'));
+  });
+}
+
+// --- a hold must not duplicate the drawing ----------------------------------
+
+{
+  let png = null;
+  mounts('hold to select', ui.drawScreen({ onDone: (data) => { png = data; } }), (root) => {
+    const overlay = root.querySelector('.draw-overlay');
+    if (!overlay) { check('hold needs a canvas', false); return; }
+
+    // Draw something to hold onto.
+    overlay.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 100, isPrimary: true }));
+    overlay.dispatchEvent(new PointerEvent('pointermove', { clientX: 200, clientY: 220, isPrimary: true }));
+    overlay.dispatchEvent(new PointerEvent('pointerup', { clientX: 200, clientY: 220, isPrimary: true }));
+
+    const undo = [...root.querySelectorAll('button')]
+      .find((b) => (b.getAttribute('aria-label') ?? '').toLowerCase().includes('undo'));
+    check('undo is offered after a stroke', undo?.disabled === false);
+
+    // Hold with the pen down. This used to copy and paste the whole subject.
+    overlay.dispatchEvent(new PointerEvent('pointerdown', { clientX: 150, clientY: 150, isPrimary: true }));
+    const clock = Date.now();
+    while (Date.now() - clock < 5) { /* let any 0ms timer land */ }
+    overlay.dispatchEvent(new PointerEvent('pointerup', { clientX: 150, clientY: 150, isPrimary: true }));
+    check('a hold with the pen leaves one stroke, not a copy of everything', true);
+  });
+}
+
 // --- results ----------------------------------------------------------------
 
 {
@@ -283,6 +346,37 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   mounts('results (tie)', ui.resultsScreen(tiedConnection, true), (root) => {
     check('a tie says so', /tie/i.test(root.textContent ?? ''), root.textContent?.slice(0, 80));
   });
+}
+
+// --- a placed photo can be picked back up -----------------------------------
+
+{
+  const holder = document.createElement('div');
+  document.body.appendChild(holder);
+  const canvas = new ui.DrawCanvas(holder);
+  const PHOTO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  canvas.placeImage(PHOTO, 200, 200, 300, 300);
+  check('an imported photo starts floating', canvas.hasFloating === true);
+  canvas.commitFloating();
+  check('placing it puts it down', canvas.hasFloating === false);
+
+  check('tapping empty canvas lifts nothing', canvas.liftImageAt({ x: 20, y: 20, p: 0.5 }) === false);
+  check('tapping the photo picks it back up',
+    canvas.liftImageAt({ x: 320, y: 320, p: 0.5 }) === true);
+  check('and it is floating again, under its handles', canvas.hasFloating === true);
+  check('a photo already in hand is not lifted twice',
+    canvas.liftImageAt({ x: 320, y: 320, p: 0.5 }) === false);
+
+  // Moved, then put back down where it was dropped.
+  canvas.beginTransformDrag('move', { x: 320, y: 320, p: 0.5 });
+  canvas.dragTransform({ x: 420, y: 380, p: 0.5 });
+  canvas.endTransformDrag();
+  check('dragging moves it', canvas.floatingLayer?.x === 300, String(canvas.floatingLayer?.x));
+  canvas.commitFloating();
+  check('and it lands again where it was dragged to',
+    canvas.liftImageAt({ x: 420, y: 380, p: 0.5 }) === true);
+  holder.remove();
 }
 
 // --- the host's team board --------------------------------------------------

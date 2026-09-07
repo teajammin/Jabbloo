@@ -38,6 +38,16 @@ export class DrawCanvas {
   private dragOrigin: { x: number; y: number } | null = null;
   /** Decoded pastes, keyed by data URL, so a repaint does not re-decode. */
   private readonly imageCache = new Map<string, HTMLImageElement>();
+  /**
+   * Images still decoding.
+   *
+   * A flood fill reads the pixels it is about to flood, so it must not run
+   * while part of the picture is missing — it would flood straight through
+   * the gap where a photo is going to be, and the repaint that follows would
+   * then paint the photo over the top. That is what "fill doesn't work over
+   * images" was.
+   */
+  private pending = 0;
 
   /** The crop frame over the floating layer, while cropping. */
   private cropRect: Selection | null = null;
@@ -215,6 +225,8 @@ export class DrawCanvas {
 
   private repaint(): void {
     this.clearSurface();
+    // Counted afresh each pass: paintImage re-adds anything still decoding.
+    this.pending = 0;
     for (const stroke of this.strokes) this.paintStroke(stroke);
   }
 
@@ -255,10 +267,17 @@ export class DrawCanvas {
       this.ctx.drawImage(cached, stroke.x, stroke.y, stroke.w, stroke.h);
       return;
     }
-    if (cached) return;
+    if (cached) {
+      // Already decoding from an earlier paint. It will repaint on load; all
+      // this pass can do is know that the canvas is incomplete.
+      this.pending++;
+      return;
+    }
     const img = new Image();
     this.imageCache.set(stroke.data, img);
-    img.addEventListener('load', () => this.repaint());
+    this.pending++;
+    img.addEventListener('load', () => { this.pending--; this.repaint(); });
+    img.addEventListener('error', () => { this.pending--; });
     img.src = stroke.data;
   }
 
@@ -318,6 +337,10 @@ export class DrawCanvas {
    * horizontal runs cuts the work by roughly the width of each run.
    */
   private paintFill(stroke: FillStroke): void {
+    // Wait for the picture to be whole. Every image in flight repaints when it
+    // lands, and a repaint replays this fill against the finished canvas.
+    if (this.pending > 0) return;
+
     const x0 = Math.floor(stroke.at.x);
     const y0 = Math.floor(stroke.at.y);
     if (x0 < 0 || y0 < 0 || x0 >= CANVAS_W || y0 >= CANVAS_H) return;
@@ -478,6 +501,49 @@ export class DrawCanvas {
     this.selection = null;
     this.drawOverlay();
     this.onChange?.();
+  }
+
+  /**
+   * Picks a placed photo back up, so it can be moved or resized again.
+   *
+   * A photo is a stroke like any other once it lands, which made it permanent
+   * the moment it was placed. Lifting it out of the stroke list and back into
+   * the floating layer puts it under the same handles it had on the way in —
+   * the drawing is a list of things, so a thing can come back out of it.
+   *
+   * Topmost first, since that is the one being pointed at.
+   */
+  liftImageAt(at: Point): boolean {
+    if (this.floating) return false;
+
+    for (let i = this.strokes.length - 1; i >= 0; i--) {
+      const stroke = this.strokes[i];
+      if (!stroke || stroke.kind !== 'image') continue;
+      const inside = at.x >= stroke.x && at.x <= stroke.x + stroke.w
+        && at.y >= stroke.y && at.y <= stroke.y + stroke.h;
+      if (!inside) continue;
+
+      this.strokes.splice(i, 1);
+      this.floating = { ...stroke };
+      this.floatingImage = this.imageCache.get(stroke.data) ?? new Image();
+      if (!this.floatingImage.complete) {
+        this.floatingImage.addEventListener('load', () => this.drawOverlay());
+        this.floatingImage.src = stroke.data;
+      }
+      this.selection = null;
+      this.repaint();
+      this.drawOverlay();
+      this.onChange?.();
+      return true;
+    }
+    return false;
+  }
+
+  /** Whether a placed photo sits under this point. */
+  hasImageAt(at: Point): boolean {
+    return this.strokes.some((stroke) => stroke.kind === 'image'
+      && at.x >= stroke.x && at.x <= stroke.x + stroke.w
+      && at.y >= stroke.y && at.y <= stroke.y + stroke.h);
   }
 
   /** The floating layer, for tools that need to resize or replace it. */
