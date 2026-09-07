@@ -11,6 +11,7 @@
 
 export { BattleStage } from './BattleStage';
 export { Fighter } from './Fighter';
+export { HealthBar, type BarSide } from './HealthBar';
 export { BubbleText, type BubbleTextOptions } from './BubbleText';
 export { Limb } from './Limb';
 export {

@@ -4,7 +4,7 @@ import { requestChoreography, requestJudgement } from '../api';
 import { judgePanel } from './judging';
 import type { RoomConnection } from '../net/room';
 import {
-  judges, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
+  judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
 } from '../shared/protocol';
 
 /**
@@ -34,6 +34,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
     } | null = null;
     /** Fighters currently on stage, by player id. */
     let onStage = new Map<string, import('../engine').Fighter>();
+    /** Their health bars, kept alongside so damage can be shown as it lands. */
+    let bars = new Map<string, import('../engine').HealthBar>();
     /** Turns already played, so a re-broadcast never replays one. */
     let playedTurn = '';
     /**
@@ -88,7 +90,10 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         fighter.destroy();
       }
       onStage = new Map();
+      stage.clearHealthBars();
+      bars = new Map();
 
+      const entrances: Promise<void>[] = [];
       const sides = ['left', 'right'] as const;
       for (const [index, id] of turn.fighters.entries()) {
         const entry = artFor(id);
@@ -105,8 +110,28 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           weaponName: weapon?.name ?? 'Sword',
         });
         if (disposed) { fighter.destroy(); return; }
-        stage.addFighter(fighter, sides[index]!);
+        const side = sides[index]!;
+        stage.addFighter(fighter, side);
         onStage.set(id, fighter);
+
+        const bar = new engine.HealthBar(fighter.name, side);
+        bar.setHealth(player.health, STARTING_HEALTH, false);
+        stage.addHealthBar(bar, side);
+        bars.set(id, bar);
+
+        entrances.push(stage.enterStage(fighter, side));
+      }
+
+      // Both walk on together — one after the other doubles the wait for no
+      // extra ceremony.
+      await Promise.all(entrances);
+    }
+
+    /** Moves every bar to the health the server last reported. */
+    function refreshHealth(current: RoomState): void {
+      for (const [id, bar] of bars) {
+        const player = current.players.find((p) => p.id === id);
+        if (player) bar.setHealth(player.health, STARTING_HEALTH);
       }
     }
 
@@ -205,9 +230,13 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (turn.phase === 'picking') {
         if (playedTurn !== key) {
           playedTurn = key;
-          await setUpFighters(turn);
-          const names = turn.fighters.map((id) => onStage.get(id)?.name ?? '—');
+          // Named before the entrance rather than after it, so the caption is
+          // already up while the two of them walk on.
+          const names = turn.fighters.map(
+            (id) => artFor(id)?.character?.name || playerFor(id)?.name || '—',
+          );
           caption.textContent = `${names[0]} versus ${names[1]}`;
+          await setUpFighters(turn);
         }
         return;
       }
@@ -226,6 +255,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
       if (turn.phase === 'over' && playedTurn !== key) {
         playedTurn = key;
+        refreshHealth(state);
         showDamage(turn);
         // A beat to read the damage before the next pair walk on.
         setTimeout(() => {
@@ -271,6 +301,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
     return () => {
       disposed = true;
       for (const fighter of onStage.values()) fighter.destroy();
+      ready?.stage.clearHealthBars();
       ready?.stage.destroy();
     };
   };

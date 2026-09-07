@@ -1,8 +1,10 @@
 import { Application, Container, Graphics } from 'pixi.js';
+import gsap from 'gsap';
 import { getBattleground, palette } from './theme';
 import { GROUND_Y, type BattleStageOptions, type Side } from './types';
 import type { BattlegroundId } from './theme';
 import type { Fighter } from './Fighter';
+import { HealthBar } from './HealthBar';
 
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
@@ -105,6 +107,58 @@ export class BattleStage {
    * Adds a fighter and stands them on their side of the stage,
    * automatically facing their opponent.
    */
+  /**
+   * Puts a health bar on the overlay for one side.
+   *
+   * The stage owns the placement because it owns the margins; the bar itself
+   * only knows how to draw and animate, which keeps it usable anywhere.
+   */
+  addHealthBar(bar: HealthBar, side: Side): void {
+    const margin = this.width * 0.045;
+    bar.x = side === 'left' ? margin : this.width - margin - HealthBar.width;
+    bar.y = this.height * 0.085;
+    this.overlay.addChild(bar);
+  }
+
+  /** Clears the overlay's bars between turns, when the fighters change. */
+  clearHealthBars(): void {
+    for (const child of [...this.overlay.children]) {
+      if (child instanceof HealthBar) child.destroy();
+    }
+  }
+
+  /**
+   * Walks a fighter on from the wings.
+   *
+   * The brief asks for a grand entrance, and there is a practical reason for
+   * one beyond the flourish: it gives the crowd a beat to see who is fighting
+   * before the first move plays, which otherwise arrives on a stage that
+   * simply blinked into existence.
+   *
+   * Resolves when the fighter is home and settled.
+   */
+  enterStage(fighter: Fighter, side: Side): Promise<void> {
+    const home = this.homeX(side);
+    const ground = this.height * GROUND_Y;
+    fighter.setPosition(this.offstageX(side), ground);
+
+    const tl = gsap.timeline();
+    // Two hops in rather than a slide: a slide reads as the sprite being
+    // dragged, hops read as the character arriving under its own power.
+    tl.to(fighter.root, { x: home, duration: 0.9, ease: 'power2.out' });
+    for (const at of [0, 0.32]) {
+      tl.to(fighter.root, { y: ground - 90, duration: 0.24, ease: 'power2.out' }, at);
+      tl.to(fighter.root, { y: ground, duration: 0.26, ease: 'power2.in' }, at + 0.24);
+      tl.to(fighter.body, { scaleY: 0.88, scaleX: 1.1, duration: 0.1 }, at + 0.5);
+      tl.to(fighter.body, { scaleY: 1, scaleX: 1, duration: 0.14 }, at + 0.6);
+    }
+    // A flourish of the weapon to finish, so the thing they drew gets a look.
+    tl.to(fighter.hand, { rotation: -0.9, duration: 0.18, ease: 'power2.out' }, 0.95);
+    tl.to(fighter.hand, { rotation: 0, duration: 0.3, ease: 'elastic.out(1, 0.5)' });
+
+    return new Promise((resolve) => { tl.eventCallback('onComplete', () => resolve()); });
+  }
+
   addFighter(fighter: Fighter, side: Side): void {
     this.sides.set(fighter, side);
     this.place(fighter, side);
@@ -116,9 +170,18 @@ export class BattleStage {
     this.fighters.removeChild(fighter.root);
   }
 
+  /** Where a fighter stands when they are not moving. */
+  homeX(side: Side): number {
+    return side === 'left' ? this.width * SPAWN_INSET : this.width * (1 - SPAWN_INSET);
+  }
+
+  /** Just off the edge they come on from, and go back to when beaten. */
+  offstageX(side: Side): number {
+    return side === 'left' ? -this.width * 0.2 : this.width * 1.2;
+  }
+
   private place(fighter: Fighter, side: Side): void {
-    const x =
-      side === 'left' ? this.width * SPAWN_INSET : this.width * (1 - SPAWN_INSET);
+    const x = this.homeX(side);
     fighter.setPosition(x, this.height * GROUND_Y);
     fighter.facing = side === 'left' ? 'right' : 'left';
   }
