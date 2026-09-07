@@ -90,16 +90,23 @@ export function installDom() {
 
   // A store that behaves, so settings can be exercised for real. jsdom's own
   // localStorage is getter-only, hence the redefine.
-  const store = new Map();
-  Object.defineProperty(window, 'localStorage', { configurable: true, value: {
-    getItem: (k) => (store.has(k) ? store.get(k) : null),
-    setItem: (k, v) => store.set(k, String(v)),
-    removeItem: (k) => store.delete(k),
-    clear: () => store.clear(),
-  } });
+  const shim = () => {
+    const store = new Map();
+    return {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+      clear: () => store.clear(),
+    };
+  };
+  // Separate stores, as a browser has: local storage is shared across tabs,
+  // session storage is not, and the game depends on the difference.
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: shim() });
+  Object.defineProperty(window, 'sessionStorage', { configurable: true, value: shim() });
 
   for (const key of [
-    'window', 'document', 'navigator', 'location', 'localStorage', 'matchMedia',
+    'window', 'document', 'navigator', 'location', 'localStorage', 'sessionStorage',
+    'matchMedia',
     'HTMLElement', 'HTMLCanvasElement', 'HTMLInputElement', 'HTMLDialogElement',
     'Image', 'Event', 'CustomEvent', 'PointerEvent', 'MouseEvent', 'KeyboardEvent',
     'FileReader', 'Blob', 'File', 'FormData', 'DOMMatrix', 'Node', 'ResizeObserver',

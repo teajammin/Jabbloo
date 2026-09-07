@@ -137,7 +137,7 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
 
     return () => {
       clock.stop();
-      if (shuffleTimer !== null) clearTimeout(shuffleTimer);
+      if (shuffleTimer !== null) window.clearTimeout(shuffleTimer);
     };
   };
 }

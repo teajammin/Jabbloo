@@ -119,7 +119,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
       let held = false;
       let timer: number | null = null;
-      const stop = () => { if (timer !== null) { clearTimeout(timer); timer = null; } };
+      const stop = () => { if (timer !== null) { window.clearTimeout(timer); timer = null; } };
 
       let pressAt: { x: number; y: number } | null = null;
       node.addEventListener('pointerdown', (event) => {
@@ -161,7 +161,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     let holdStart: { x: number; y: number } | null = null;
 
     const cancelHold = () => {
-      if (holdTimer !== null) { clearTimeout(holdTimer); holdTimer = null; }
+      if (holdTimer !== null) { window.clearTimeout(holdTimer); holdTimer = null; }
       holdStart = null;
     };
 

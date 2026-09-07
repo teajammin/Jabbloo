@@ -34,12 +34,19 @@ function defaultPartyHost(): string {
 const PARTY_HOST = import.meta.env['VITE_PARTYKIT_HOST'] || defaultPartyHost();
 
 /**
- * A stable id for this device in this room, kept across reloads.
+ * A stable id for this tab in this room, kept across reloads.
  *
  * The server keys a player's seat — their artwork, their health, their turn —
- * on the connection id. Without this, refreshing a phone or letting it drop
- * the tab would arrive as a stranger, be told the game had already started,
- * and leave the bot playing out a fight for someone standing right there.
+ * on the connection id. Without one that survives a reload, refreshing a phone
+ * would arrive as a stranger, be told the game had already started, and leave
+ * a bot playing out a fight for someone standing right there.
+ *
+ * Session storage, not local storage: local storage is shared by every tab of
+ * the same origin, so a host screen and a player joining from the same laptop
+ * handed the server the same identity. The second connection displaced the
+ * first, the host stopped receiving anything, and the lobby sat at nobody
+ * joined while people were joining. Session storage is per tab and still
+ * survives the reloads this is for.
  */
 export function randomId(): string {
   const source = globalThis.crypto as Crypto | undefined;
@@ -58,10 +65,10 @@ export function randomId(): string {
 export function deviceId(code: string): string {
   const key = `jabbloo.device.${code.toUpperCase()}`;
   try {
-    const stored = localStorage.getItem(key);
+    const stored = sessionStorage.getItem(key);
     if (stored) return stored;
     const fresh = randomId();
-    localStorage.setItem(key, fresh);
+    sessionStorage.setItem(key, fresh);
     return fresh;
   } catch {
     // No storage: a fresh id every load is the old behaviour, which still
@@ -77,6 +84,19 @@ export interface RoomHandlers {
   onError?: (reason: string) => void;
   onClose?: () => void;
 }
+
+/**
+ * Tells the interface whether the room is reachable.
+ *
+ * An event rather than a call into the UI: this module knows about sockets and
+ * nothing about screens, and every screen in the game can hear it without
+ * being handed a connection to watch.
+ */
+function announce(open: boolean): void {
+  window.dispatchEvent(new CustomEvent(CONNECTION_EVENT, { detail: { open } }));
+}
+
+export const CONNECTION_EVENT = 'jabbloo:connection';
 
 export class RoomConnection {
   private readonly socket: PartySocket;
@@ -121,7 +141,11 @@ export class RoomConnection {
       }
     });
 
-    this.socket.addEventListener('close', () => this.handlers.onClose?.());
+    this.socket.addEventListener('close', () => {
+      announce(false);
+      this.handlers.onClose?.();
+    });
+    this.socket.addEventListener('open', () => announce(true));
   }
 
   on(handlers: RoomHandlers): this {

@@ -1177,3 +1177,19 @@ body:has(.screen-draw) .help-open { display: none !important; }
 .phone-link { text-align: center; }
 .phone-link .join-url { margin: 6px 0 0; }
 .phone-link .join-qr { margin: 0 auto; display: block; }
+
+/* Shown when the room stops answering. Above everything: it explains why
+   everything else has stopped making sense. */
+.connection-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  padding: 10px 16px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--butter);
+  box-shadow: 0 4px 16px rgba(74, 68, 88, 0.22);
+}

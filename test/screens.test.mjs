@@ -111,6 +111,35 @@ mounts('launch', ui.launchScreen, (root) => {
 mounts('create room', ui.createRoomScreen);
 mounts('join room', ui.joinRoomScreen);
 
+// --- a dropped connection has to be visible ---------------------------------
+
+{
+  const teardown = ui.mountConnectionBanner();
+  const banner = document.querySelector('.connection-banner');
+  const drop = (open) => window.dispatchEvent(
+    new CustomEvent(ui.CONNECTION_EVENT, { detail: { open } }),
+  );
+
+  check('nothing is shown while all is well', banner?.hidden === true);
+
+  drop(false);
+  check('a blink does not raise a banner', banner?.hidden === true);
+  drop(true);
+  await new Promise((r) => setTimeout(r, 1400));
+  check('and a reconnect inside the grace period passes unremarked',
+    banner?.hidden === true);
+
+  drop(false);
+  await new Promise((r) => setTimeout(r, 1400));
+  check('a connection that stays down is announced', banner?.hidden === false);
+  drop(true);
+  check('and the notice clears when it comes back', banner?.hidden === true);
+
+  teardown();
+  check('the banner tears down', document.querySelector('.connection-banner') === null);
+}
+
+
 // --- the drawing tool -------------------------------------------------------
 
 let exported = null;
@@ -458,6 +487,20 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     typeof ui.deviceId('ABCD') === 'string' && ui.deviceId('ABCD').length > 0);
   check('and the same one on the next look', ui.deviceId('ABCD') === ui.deviceId('ABCD'));
   check('but a different one per room', ui.deviceId('ABCD') !== ui.deviceId('WXYZ'));
+
+  // The identity is what the server keys a seat on, so two tabs of the same
+  // browser must not share one: a host screen and a player joining from the
+  // same laptop would otherwise be the same connection, and the second would
+  // displace the first — the lobby sitting at nobody joined while people join.
+  const firstTab = ui.deviceId('ABCD');
+  sessionStorage.clear();                 // what a second tab starts with
+  const secondTab = ui.deviceId('ABCD');
+  check('a second tab is a different player', firstTab !== secondTab,
+    `${firstTab} vs ${secondTab}`);
+  check('and keeps its own id across a reload', secondTab === ui.deviceId('ABCD'));
+  check('the id is not left in shared storage',
+    localStorage.getItem('jabbloo.device.ABCD') === null,
+    String(localStorage.getItem('jabbloo.device.ABCD')));
 
   // Nothing at all: an old browser, or a locked-down webview.
   Object.defineProperty(globalThis, 'crypto', { configurable: true, value: undefined });

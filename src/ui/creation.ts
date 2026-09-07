@@ -91,7 +91,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       saveTimer = window.setInterval(flushDrawing, 10_000);
 
       cleanups.push(() => {
-        if (saveTimer !== null) { clearInterval(saveTimer); saveTimer = null; }
+        if (saveTimer !== null) { window.clearInterval(saveTimer); saveTimer = null; }
         readDrawing = null;
         pendingSlot = null;
         teardown?.();
