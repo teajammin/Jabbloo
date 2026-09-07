@@ -20,5 +20,5 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src", "server", "test"]
+  "include": ["src", "server", "test", "party"]
 }

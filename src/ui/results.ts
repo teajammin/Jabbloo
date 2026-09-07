@@ -30,9 +30,14 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
       title.replaceChildren(
         bubbleText(winner ? 'WINNER' : 'A TIE', { height: 84, jitter: 5 }),
       );
+      // A tie only reaches this screen once no more ULTs are owed — the room
+      // goes back to the drawing board rather than here while one is. So the
+      // copy has to read as a final answer, not a promise of another round.
       verdict.textContent = winner
         ? `${winner === 'teamA' ? names.teamA : names.teamB} took the least damage.`
-        : 'Level on damage — another weapon is owed as an ULT.';
+        : state.ultRound > 0
+          ? `Still level after ${state.ultRound} ULT${state.ultRound === 1 ? '' : 's'} — it stands as a tie.`
+          : 'Level on damage — the game is a tie.';
 
       table.replaceChildren();
       for (const team of ['teamA', 'teamB'] as const) {

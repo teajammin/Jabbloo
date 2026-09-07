@@ -163,7 +163,7 @@ export default class Room implements Party.Server {
         this.onSetTeamName(message.team, message.name, sender);
         break;
       case 'start':
-        this.onStart(sender);
+        this.beginGame(sender);
         break;
       case 'submitDrawing':
         this.onSubmitDrawing(message.slot, message.png, sender);
@@ -319,7 +319,13 @@ export default class Room implements Party.Server {
     this.broadcastState();
   }
 
-  private onStart(sender: Party.Connection): void {
+  /**
+   * Named `beginGame`, not `onStart`: PartyKit's own `Server.onStart` is the
+   * lifecycle hook it calls with no arguments when a room boots. A handler of
+   * that name here was being invoked by the runtime as well as by the host's
+   * Start button, with an undefined connection.
+   */
+  private beginGame(sender: Party.Connection): void {
     if (!this.isHost(sender)) return;
     if (!canStart(this.state)) {
       this.send(sender, { type: 'error', reason: 'Not everyone has a place yet' });
@@ -778,7 +784,8 @@ export default class Room implements Party.Server {
 
   // --------------------------------------------------------------------- utils
 
-  private isHost(connection: Party.Connection): boolean {
+  private isHost(connection: Party.Connection | undefined): boolean {
+    if (!connection) return false;
     return this.state.players.some((p) => p.id === connection.id && p.isHost);
   }
 

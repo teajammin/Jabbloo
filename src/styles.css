@@ -1118,6 +1118,15 @@ input[type='text'] {
 .options-value { width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
 .options-credits { margin: 0; font-size: 14px; opacity: 0.75; }
 
+/*
+ * The drawing screen owns the whole viewport, and its toolbars run along the
+ * bottom on a phone and down the left on a laptop — exactly where these two
+ * floating buttons sit. It carries its own "?" in the toolbar, so they step
+ * aside rather than landing on top of a tool.
+ */
+body:has(.screen-draw) .options-open,
+body:has(.screen-draw) .help-open { display: none !important; }
+
 /* --------------------------------------------------------- accessibility */
 
 /*

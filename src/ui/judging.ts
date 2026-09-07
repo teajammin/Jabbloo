@@ -74,7 +74,11 @@ export function judgePanel(connection: RoomConnection): JudgePanel {
     root,
     update(state) {
       const turn = state.turn;
-      const judging = Boolean(turn && turn.phase === 'judging');
+      // Only judges score. The server already refuses a fighter's score, but
+      // showing them the panel would let them lock one in and watch it count
+      // for nothing — a rejection they never see is worse than no panel.
+      const me = state.players.find((p) => p.id === connection.playerId);
+      const judging = Boolean(turn && turn.phase === 'judging' && me?.role === 'judge');
       root.hidden = !judging;
       if (!turn || !judging) return;
 
