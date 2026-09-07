@@ -338,35 +338,41 @@ function phoneView(
   );
 
   let showing = false;
-  connection.on({
-    onState: (state) => {
-      if (state.phase === 'ult') {
-        void import('./creation').then(({ creationScreen }) => {
-          go(creationScreen(connection, false));
-        });
-        return;
-      }
-      if (state.phase === 'results') {
-        void import('./results').then(({ resultsScreen }) => {
-          go(resultsScreen(connection, false));
-        });
-        return;
-      }
-      panel.update(state);
-      waiting.hidden = !panel.root.hidden;
 
-      const turn = state.turn;
-      const me = state.players.find((p) => p.id === connection.playerId);
-      if (!turn || !me || !turn.fighters.includes(me.id)) return;
+  const handle = (state: RoomState): void => {
+    if (state.phase === 'ult') {
+      void import('./creation').then(({ creationScreen }) => {
+        go(creationScreen(connection, false));
+      });
+      return;
+    }
+    if (state.phase === 'results') {
+      void import('./results').then(({ resultsScreen }) => {
+        go(resultsScreen(connection, false));
+      });
+      return;
+    }
+    panel.update(state);
+    waiting.hidden = !panel.root.hidden;
 
-      // Swapped in only on the way into a turn, so a state update arriving
-      // mid-sentence never rebuilds the screen and wipes what was typed.
-      if (turn.phase === 'picking' && !showing) {
-        showing = true;
-        const weapons = (me.weaponNames.length ? me.weaponNames : ['Sword', 'Axe', 'Hammer'])
-          .map((name) => ({ name: name || 'Weapon' }));
-        go(moveScreen(connection, weapons, me.characterName || me.name));
-      }
-    },
-  });
+    const turn = state.turn;
+    const me = state.players.find((p) => p.id === connection.playerId);
+    if (!turn || !me || !turn.fighters.includes(me.id)) return;
+
+    // Swapped in only on the way into a turn, so a state update arriving
+    // mid-sentence never rebuilds the screen and wipes what was typed.
+    if (turn.phase === 'picking' && !showing) {
+      showing = true;
+      const weapons = (me.weaponNames.length ? me.weaponNames : ['Sword', 'Axe', 'Hammer'])
+        .map((name) => ({ name: name || 'Weapon' }));
+      go(moveScreen(connection, weapons, me.characterName || me.name));
+    }
+  };
+
+  connection.on({ onState: handle });
+
+  // Acted on immediately as well as on every update: a phone arriving here
+  // from its own move screen during an ULT would otherwise sit on "watch the
+  // big screen" until the next broadcast, which can be most of a minute away.
+  if (connection.state) handle(connection.state);
 }
