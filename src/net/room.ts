@@ -21,8 +21,17 @@ import type {
  *
  * A deployed build sets VITE_PARTYKIT_HOST to the real party host instead.
  */
-const PARTY_HOST = import.meta.env['VITE_PARTYKIT_HOST']
-  ?? `${location.hostname || 'localhost'}:1999`;
+function defaultPartyHost(): string {
+  const { hostname, host, protocol } = location;
+  // In development Vite serves the page on :5173 while the party server runs
+  // beside it on :1999. In production the party worker serves the page itself,
+  // so it is simply wherever this page came from — port and all.
+  const local = protocol === 'http:'
+    && (hostname === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(hostname));
+  return local ? `${hostname}:1999` : host;
+}
+
+const PARTY_HOST = import.meta.env['VITE_PARTYKIT_HOST'] || defaultPartyHost();
 
 /**
  * A stable id for this device in this room, kept across reloads.

@@ -1,42 +1,60 @@
-import type { Request, Response } from 'express';
-
 /**
- * Background removal proxy.
+ * Background removal, via Remove.bg.
  *
- * Exists so the Remove.bg key stays server-side, the same reason the
- * choreographer runs here. The client posts a data URL and gets one back.
+ * Exists so the key stays server-side, the same reason the choreographer runs
+ * there. Written against fetch, FormData and base64 helpers that both runtimes
+ * have, so the deployed worker cuts subjects out exactly as the dev server
+ * does rather than quietly losing the feature in production.
  *
- * Without a key configured this reports `available: false` rather than
- * failing, so the client can fall back to its local cutout and players are
- * never blocked by a missing credential.
+ * Without a key it reports `available: false` instead of failing, and the
+ * client falls back to its own edge-flood cutout — a player is never blocked
+ * by a missing credential.
  */
 
 const ENDPOINT = 'https://api.remove.bg/v1.0/removebg';
 /** Remove.bg rejects anything larger; also keeps a phone upload sane. */
 const MAX_BYTES = 12 * 1024 * 1024;
 
-export function cutoutAvailable(): boolean {
-  return Boolean(process.env.REMOVEBG_API_KEY);
+export interface CutoutResult {
+  status: number;
+  body: { available: boolean; image?: string; reason?: string; error?: string };
 }
 
-export async function cutout(req: Request, res: Response): Promise<void> {
-  const key = process.env.REMOVEBG_API_KEY;
-  if (!key) {
-    res.json({ available: false, reason: 'no key configured' });
-    return;
-  }
+const bytesFrom = (base64: string): Uint8Array<ArrayBuffer> => {
+  const binary = atob(base64);
+  // Backed by a plain ArrayBuffer explicitly: a Blob part cannot be a view
+  // over shared memory, and TypeScript is right to insist on the difference.
+  const out = new Uint8Array(new ArrayBuffer(binary.length));
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
+};
 
-  const dataUrl = typeof req.body?.image === 'string' ? req.body.image : '';
-  const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl);
+const base64From = (bytes: Uint8Array): string => {
+  // Chunked: a single spread of a few megabytes overflows the call stack.
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+};
+
+export async function cutoutImage(dataUrl: unknown, key: string): Promise<CutoutResult> {
+  if (!key) return { status: 200, body: { available: false, reason: 'no key configured' } };
+
+  const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(
+    typeof dataUrl === 'string' ? dataUrl : '',
+  );
   if (!match) {
-    res.status(400).json({ error: 'expected a png, jpeg or webp data URL' });
-    return;
+    return {
+      status: 400,
+      body: { available: false, error: 'expected a png, jpeg or webp data URL' },
+    };
   }
 
-  const bytes = Buffer.from(match[2]!, 'base64');
+  const bytes = bytesFrom(match[2]!);
   if (bytes.byteLength > MAX_BYTES) {
-    res.status(413).json({ error: 'image too large' });
-    return;
+    return { status: 413, body: { available: false, error: 'image too large' } };
   }
 
   try {
@@ -58,17 +76,19 @@ export async function cutout(req: Request, res: Response): Promise<void> {
       console.warn(`[cutout] remove.bg ${response.status}: ${detail.slice(0, 200)}`);
       // Not an error to the client: it falls back locally and the player
       // still gets a usable image.
-      res.json({ available: false, reason: `remove.bg ${response.status}` });
-      return;
+      return {
+        status: 200,
+        body: { available: false, reason: `remove.bg ${response.status}` },
+      };
     }
 
-    const out = Buffer.from(await response.arrayBuffer());
-    res.json({
-      available: true,
-      image: `data:image/png;base64,${out.toString('base64')}`,
-    });
+    const out = new Uint8Array(await response.arrayBuffer());
+    return {
+      status: 200,
+      body: { available: true, image: `data:image/png;base64,${base64From(out)}` },
+    };
   } catch (error) {
     console.error('[cutout]', error);
-    res.json({ available: false, reason: 'request failed' });
+    return { status: 200, body: { available: false, reason: 'request failed' } };
   }
 }

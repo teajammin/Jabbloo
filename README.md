@@ -98,16 +98,72 @@ becomes an ULT — only exist as behaviour of the running server.
 
 ---
 
+## Deploying
+
+One command puts the whole game on the internet:
+
+```sh
+npm run deploy
+```
+
+That builds the site and hands it to PartyKit, which serves three things from
+one origin: the static page, the `/api` endpoints, and the multiplayer rooms.
+There is no second host to arrange and no CORS to configure — and because the
+page and the party server share an origin, the client finds the rooms without
+being told where they are.
+
+First time only:
+
+```sh
+npx partykit login          # GitHub, in a browser
+npm run deploy:env          # paste the Anthropic key when prompted
+```
+
+The key is stored by the platform, not by this repo. `partykit deploy` sends
+local variables only when asked with `--with-vars`, and `npm run deploy` never
+asks — which is also why secrets live in `.env.local` rather than `.env`.
+
+For the Remove.bg cutout in production, add that key too:
+
+```sh
+npx partykit env add REMOVEBG_API_KEY
+```
+
+Without it, uploads fall back to the local edge-flood cutout, exactly as they
+do in development.
+
+`npm run logs` streams the deployed server's output. `npm run deploy:preview`
+puts a build on a separate preview URL, for trying something without taking
+the live game down mid-party.
+
+### How it fits together
+
+| | Development | Deployed |
+|---|---|---|
+| Page | Vite on :5173 | PartyKit static assets |
+| `/api` | Express on :8787, via Vite's proxy | `Room.onFetch` in the worker |
+| Rooms | `partykit dev` on :1999 | The same worker |
+| Key | `.env.local` | PartyKit environment |
+
+Both columns run the *same* API: `server/api.ts` is a function from a path and
+a body to a status and some JSON, with no reference to Express, Request or
+Response. The dev server and the worker are two thin shells around it, so
+there is no second implementation to drift.
+
+---
+
 ## What Has Not Been Tested
 
-Every line here was written without a browser to run it in. The logic is covered
-by tests; the pixels are not. Specifically unverified:
+The logic is covered by tests, including a jsdom pass that mounts and drives
+every screen. What that cannot cover is how any of it looks or feels.
+Specifically unverified:
 
 - Anything visual: layout, the drawing tool's feel, the battle canvas
-- Phone browsers entirely — iOS Safari's file picker and `<input type="color">`
-  in particular
-- Multi-device play: a real host laptop with real phones on the same network
-- The AI round trip end to end with a live key
+- Phone browsers — iOS Safari's file picker and `<input type="color">` in
+  particular
+- A real deploy. The production shape — worker-served site, `/api` and rooms
+  from one origin — is verified locally against the same Cloudflare runtime it
+  deploys to, but nothing has been shipped from this machine.
 
 ---
 

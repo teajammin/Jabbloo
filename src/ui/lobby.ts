@@ -130,16 +130,25 @@ export function lobbyScreen(
      */
     if (isHost) {
       void (async () => {
+        let url = joinUrl;
         try {
+          // Development only: on a laptop `location.host` is localhost, which
+          // is the one address that means a different machine to every device
+          // that reads it. Deployed, the page's own address is already right.
           const response = await fetch('/api/lan');
           const { hosts } = await response.json() as { hosts: string[] };
           const host = hosts[0];
-          if (!host) return;
-          joinAddress.textContent = host;
+          if (host) {
+            joinAddress.textContent = host;
+            url = `http://${host}/?room=${code}`;
+          }
+        } catch {
+          // No dev backend: the page's own address stands.
+        }
 
-          // A code is easy to say out loud; an IP address is not, so the host
+        try {
+          // A code is easy to say out loud; an address is not, so the host
           // screen carries a QR for it.
-          const url = `http://${host}/?room=${code}`;
           const { toDataURL } = await import('qrcode');
           joinQr.src = await toDataURL(url, {
             margin: 1, width: 220, color: { dark: '#4a4458', light: '#fffdf7' },
@@ -147,8 +156,7 @@ export function lobbyScreen(
           joinQr.alt = `Scan to join at ${url}`;
           joinQr.hidden = false;
         } catch {
-          // No backend, or no network: the code and the typed address still
-          // work, so this is a nicety failing rather than the lobby breaking.
+          // A nicety failing, not the lobby breaking.
         }
       })();
     }

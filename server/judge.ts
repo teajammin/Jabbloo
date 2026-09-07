@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { extractJson } from './choreographer';
+import { clientFor, type AiConfig } from './ai';
 
 /**
  * The AI judge, for two-player games.
@@ -10,8 +11,6 @@ import { extractJson } from './choreographer';
  * Choreography is structure and Haiku handles it; this is taste.
  */
 
-const client = new Anthropic();
-const MODEL = process.env.JUDGE_MODEL ?? 'claude-sonnet-5';
 const MAX_SCORE = 33;
 
 export interface JudgeRequest {
@@ -44,12 +43,12 @@ How to score:
 
 Be decisive and vary your scores. A judge who gives everything 18 is no judge.`;
 
-export async function judge(request: JudgeRequest): Promise<JudgeResult> {
+export async function judge(request: JudgeRequest, config: AiConfig): Promise<JudgeResult> {
   const described = request.prompt.trim();
 
   try {
-    const message = await client.messages.create({
-      model: MODEL,
+    const message = await clientFor(config).messages.create({
+      model: config.judge,
       max_tokens: 200,
       system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{

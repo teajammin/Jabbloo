@@ -13,7 +13,7 @@
     "dev:web": "vite",
     "dev:server": "tsx watch server/index.ts",
     "test": "npm run test:unit && npm run test:screens",
-    "test:unit": "esbuild test/parse.test.ts test/protocol.test.ts test/settings.test.ts test/limbs.test.ts --bundle --platform=node --format=esm --outdir=node_modules/.cache/tests --out-extension:.js=.mjs --log-level=error && node node_modules/.cache/tests/parse.test.mjs && node node_modules/.cache/tests/protocol.test.mjs && node node_modules/.cache/tests/settings.test.mjs && node node_modules/.cache/tests/limbs.test.mjs",
+    "test:unit": "esbuild test/parse.test.ts test/protocol.test.ts test/settings.test.ts test/limbs.test.ts test/api.test.ts --bundle --platform=node --format=esm --outdir=node_modules/.cache/tests --out-extension:.js=.mjs --log-level=error && node node_modules/.cache/tests/parse.test.mjs && node node_modules/.cache/tests/protocol.test.mjs && node node_modules/.cache/tests/settings.test.mjs && node node_modules/.cache/tests/limbs.test.mjs && node node_modules/.cache/tests/api.test.mjs",
     "test:screens": "esbuild test/screens-entry.ts --bundle --platform=node --format=esm --outdir=node_modules/.cache/tests --out-extension:.js=.mjs --external:pixi.js --define:import.meta.env={} --log-level=error && node test/screens.test.mjs",
     "dev:party": "partykit dev",
     "test:room": "node test/room.test.mjs",
@@ -26,7 +26,12 @@
     "test:turns": "node test/turns.test.mjs",
     "test:judging": "node test/judging.test.mjs",
     "test:ult": "node test/ult.test.mjs",
-    "test:bots": "node test/bots.test.mjs"
+    "test:bots": "node test/bots.test.mjs",
+    "build:web": "vite build",
+    "deploy": "npm run build && partykit deploy --serve dist",
+    "deploy:preview": "npm run build && partykit deploy --serve dist --preview staging",
+    "deploy:env": "partykit env add ANTHROPIC_API_KEY",
+    "logs": "partykit tail"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

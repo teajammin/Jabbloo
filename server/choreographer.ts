@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, buildUserMessage, type FightContext } from './prompt';
+import { clientFor, type AiConfig } from './ai';
 
 /**
  * Turns a player's prompt into choreography JSON via Claude.
@@ -9,11 +10,6 @@ import { SYSTEM_PROMPT, buildUserMessage, type FightContext } from './prompt';
  * substitutes the default bonk for anything unusable, so a player always sees
  * a fight.
  */
-
-const client = new Anthropic(); // reads ANTHROPIC_API_KEY from the environment
-
-const PRIMARY = process.env.CHOREOGRAPHER_MODEL ?? 'claude-haiku-4-5';
-const FALLBACK = process.env.CHOREOGRAPHER_FALLBACK_MODEL ?? 'claude-sonnet-5';
 
 /** Choreographies are small; this is generous. */
 const MAX_TOKENS = 1024;
@@ -65,8 +61,10 @@ function textOf(message: Anthropic.Message): string {
     .join('');
 }
 
-async function callModel(model: string, fight: FightContext): Promise<unknown> {
-  const message = await client.messages.create({
+async function callModel(
+  model: string, fight: FightContext, config: AiConfig,
+): Promise<unknown> {
+  const message = await clientFor(config).messages.create({
     model,
     max_tokens: MAX_TOKENS,
     system: [
@@ -90,28 +88,32 @@ async function callModel(model: string, fight: FightContext): Promise<unknown> {
   return parsed;
 }
 
-export async function choreograph(fight: FightContext): Promise<ChoreographyResult> {
+export async function choreograph(
+  fight: FightContext, config: AiConfig,
+): Promise<ChoreographyResult> {
   const started = Date.now();
+  const primary = config.choreographer;
+  const fallback = config.choreographerFallback;
 
   try {
-    const choreography = await callModel(PRIMARY, fight);
-    return { choreography, source: 'primary', model: PRIMARY, ms: Date.now() - started };
+    const choreography = await callModel(primary, fight, config);
+    return { choreography, source: 'primary', model: primary, ms: Date.now() - started };
   } catch (primaryError) {
     const primaryMessage = describe(primaryError);
-    console.warn(`[choreographer] ${PRIMARY} failed: ${primaryMessage}`);
+    console.warn(`[choreographer] ${primary} failed: ${primaryMessage}`);
 
     try {
-      const choreography = await callModel(FALLBACK, fight);
+      const choreography = await callModel(fallback, fight, config);
       return {
         choreography,
         source: 'fallback',
-        model: FALLBACK,
+        model: fallback,
         ms: Date.now() - started,
         error: primaryMessage,
       };
     } catch (fallbackError) {
       const fallbackMessage = describe(fallbackError);
-      console.error(`[choreographer] ${FALLBACK} failed: ${fallbackMessage}`);
+      console.error(`[choreographer] ${fallback} failed: ${fallbackMessage}`);
       // Null, not an exception: the client turns this into the default bonk.
       return {
         choreography: null,

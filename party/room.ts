@@ -1,4 +1,5 @@
 import type * as Party from 'partykit/server';
+import { handleApi } from '../server/api';
 import {
   MAX_PLAYERS,
   MAX_ULTS,
@@ -94,6 +95,42 @@ function defaultName(slot: string): string {
 }
 
 export default class Room implements Party.Server {
+  /**
+   * The API, for anything that is not a room.
+   *
+   * In development the browser talks to an Express server through Vite's
+   * proxy; in production this worker serves the site itself, so the same
+   * `/api` paths have to land somewhere. They land here, running the very same
+   * handler — the key lives in the worker's environment and never in a bundle.
+   *
+   * `onFetch` only sees requests that match neither a party nor a static
+   * asset, so returning null hands anything else back to the static site.
+   */
+  static async onFetch(
+    request: Party.Request, lobby: Party.FetchLobby,
+  ): Promise<Response | null> {
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith('/api/')) return null;
+
+    let body: Record<string, unknown> = {};
+    if (request.method === 'POST') {
+      try {
+        body = (await request.json()) as Record<string, unknown>;
+      } catch {
+        return Response.json({ error: 'expected JSON' }, { status: 400 });
+      }
+    }
+
+    try {
+      const result = await handleApi(url.pathname, body, lobby.env);
+      if (!result) return Response.json({ error: 'no such endpoint' }, { status: 404 });
+      return Response.json(result.body, { status: result.status });
+    } catch (error) {
+      console.error('[api]', error);
+      return Response.json({ error: 'request failed' }, { status: 500 });
+    }
+  }
+
   private state: RoomState;
 
   constructor(readonly room: Party.Room) {
@@ -840,3 +877,8 @@ export default class Room implements Party.Server {
     this.room.broadcast(JSON.stringify({ type: 'state', state: this.state } satisfies ServerMessage));
   }
 }
+
+// Type-checks the static hooks above — `implements` cannot see them, so
+// without this an `onFetch` with the wrong shape would compile and then simply
+// never be called.
+Room satisfies Party.Worker;
