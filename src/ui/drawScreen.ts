@@ -237,7 +237,18 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       if (tool === 'select' && !canvas.hasFloating && canvas.liftImageAt(at)) {
         canvas.beginTransformDrag(canvas.transformHandleAt(at) ?? 'move', at);
         transformDrag = true;
-        say('Drag to move · corners resize · tap away to put it back down');
+        say('Drag to move · corners resize · hold for options');
+
+        // Holding on it opens the same options right-click gives a laptop.
+        holdStart = { x: event.clientX, y: event.clientY };
+        const { clientX, clientY } = event;
+        holdTimer = window.setTimeout(() => {
+          holdTimer = null;
+          canvas.endTransformDrag();
+          transformDrag = false;
+          menu.open(clientX, clientY);
+          navigator.vibrate?.(14);
+        }, HOLD_MS);
         return;
       }
 
@@ -469,7 +480,12 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
           try {
             const cut = await cutSubject({ data: layer.data, w: layer.w, h: layer.h });
             canvas.replaceFloating(cut.data);
-            say('Background gone — drag it into place');
+            // Which one did it is worth saying: a rough cut on this device and
+            // a rough cut from a service want different responses from the
+            // player — try a plainer background, or try again.
+            say(cut.service
+              ? 'Background gone — drag it into place'
+              : 'Trimmed here — plainer backgrounds cut cleaner');
           } catch {
             say('Could not cut that one out');
           }

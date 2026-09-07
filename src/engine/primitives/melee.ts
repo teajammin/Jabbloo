@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 import {
-  LimbDriver, burst, contactPoint, directionToEnemy, duration,
+  LimbDriver, burst, contactPoint, directionToEnemy, duration, shockRing,
 } from './util';
 import type {
   BiteParams, GrabParams, HeadbuttParams, KickParams, LickParams,
@@ -190,7 +190,7 @@ export function stomp(ctx: PrimitiveContext, params: StompParams = {}) {
   leg.to(tl, { angle: 1.5, length: 120 }, seconds * 0.16, 'power4.in');
   tl.to(ctx.actor.root, { y: ground, duration: seconds * 0.16, ease: 'power4.in' }, '<');
 
-  burst(tl, ctx, 'shockring', { x: ctx.actor.root.x, y: ground + 10 }, 260);
+  shockRing(tl, ctx, { x: ctx.actor.root.x, y: ground + 10 }, 260);
   tl.to(ctx.actor.body, { scaleY: 0.82, scaleX: 1.18, duration: seconds * 0.1 });
   tl.to(ctx.actor.body, { scaleY: 1, scaleX: 1, duration: seconds * 0.34, ease: 'elastic.out(1, 0.5)' });
   leg.hide(tl, seconds * 0.2, '<');

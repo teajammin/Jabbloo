@@ -123,11 +123,19 @@ function soundwave() {
   return { W, H, c };
 }
 
-/** Expanding ring — impacts, stomps, generic shock. */
+/**
+ * Expanding ring — impacts, stomps, generic shock.
+ *
+ * Drawn with the game's ink outline rather than as plain white. A white ring
+ * on a pastel battleground does not read as a shockwave; it reads as a stray
+ * white circle appearing for no reason, which is exactly how it was reported.
+ * The outline is what gives it a shape at any size, on any ground.
+ */
 function shockring() {
   const W = 260, H = 260, c = new Canvas(W, H);
-  c.fill(ring(130, 130, 88, 116), darken(C.white, 0.75), 0.85);
-  c.fill(ring(130, 130, 94, 110), C.white, 0.9);
+  c.fill(ring(130, 130, 84, 120), C.ink, 0.9);
+  c.fill(ring(130, 130, 90, 114), C.sky, 0.95);
+  c.fill(ring(130, 130, 97, 107), C.white, 0.95);
   return { W, H, c };
 }
 

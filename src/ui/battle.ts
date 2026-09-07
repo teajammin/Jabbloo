@@ -99,8 +99,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       stage.clearHealthBars();
       bars = new Map();
 
-      const entrances: Promise<void>[] = [];
       const sides = ['left', 'right'] as const;
+      const entering: { fighter: import('../engine').Fighter; side: 'left' | 'right'; name: string }[] = [];
       for (const [index, id] of turn.fighters.entries()) {
         const entry = artFor(id);
         const player = playerFor(id);
@@ -128,12 +128,22 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         stage.addHealthBar(bar, side);
         bars.set(id, bar);
 
-        entrances.push(stage.enterStage(fighter, side));
+        entering.push({ fighter, side, name: fighter.name });
       }
 
-      // Both walk on together — one after the other doubles the wait for no
-      // extra ceremony.
-      await Promise.all(entrances);
+      // One at a time, each announced by name: the brief asks for a reveal,
+      // and two fighters arriving together is a scene rather than an entrance.
+      // They wait offstage until called so nobody is standing around unnamed.
+      for (const { fighter, side } of entering) {
+        fighter.setPosition(stage.offstageX(side), stage.height * engine.GROUND_Y);
+      }
+      for (const { fighter, side, name } of entering) {
+        if (disposed) return;
+        caption.textContent = name;
+        await stage.announce(name, side);
+        if (disposed) return;
+        await stage.enterStage(fighter, side);
+      }
     }
 
     /** Moves every bar to the health the server last reported. */
@@ -250,8 +260,10 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
             // spends the round wondering why they are attacking like that.
             return playerFor(id)?.connected === false ? `${name} (bot)` : name;
           });
-          caption.textContent = `${names[0]} versus ${names[1]}`;
+          caption.textContent = 'Entering the arena…';
           await setUpFighters(turn);
+          if (disposed) return;
+          caption.textContent = `${names[0]} versus ${names[1]}`;
         }
         return;
       }

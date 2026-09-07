@@ -4,6 +4,7 @@ import { getBattleground, palette } from './theme';
 import { GROUND_Y, type BattleStageOptions, type Side } from './types';
 import type { BattlegroundId } from './theme';
 import type { Fighter } from './Fighter';
+import { BubbleText } from './BubbleText';
 import { HealthBar } from './HealthBar';
 
 const DESIGN_WIDTH = 1280;
@@ -125,6 +126,36 @@ export class BattleStage {
     for (const child of [...this.overlay.children]) {
       if (child instanceof HealthBar) child.destroy();
     }
+  }
+
+  /**
+   * Announces a fighter by name, in the game's own lettering.
+   *
+   * The brief asks for a reveal rather than two sprites simply being present:
+   * a name big on the screen, one fighter at a time. It sits on the overlay so
+   * the entrance can shake the world underneath it without the name wobbling.
+   */
+  async announce(name: string, side: Side, seconds = 1.6): Promise<void> {
+    const text = await BubbleText.create(name.toUpperCase().slice(0, 14), {
+      height: this.height * 0.16,
+      jitter: 4,
+    });
+    // Placed over the half of the stage the fighter is walking onto, so the
+    // name and the character arrive in the same place.
+    text.x = this.homeX(side) - text.width / 2;
+    text.y = this.height * 0.24;
+    text.alpha = 0;
+    text.scale.set(0.7);
+    this.overlay.addChild(text);
+
+    const tl = gsap.timeline();
+    tl.to(text, { alpha: 1, duration: 0.25, ease: 'power2.out' });
+    tl.to(text.scale, { x: 1, y: 1, duration: 0.45, ease: 'back.out(2)' }, '<');
+    tl.to(text, { alpha: 0, duration: 0.3 }, `+=${Math.max(0.1, seconds - 0.75)}`);
+
+    await new Promise<void>((resolve) => {
+      tl.eventCallback('onComplete', () => { text.destroy({ children: true }); resolve(); });
+    });
   }
 
   /**

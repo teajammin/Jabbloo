@@ -77,10 +77,19 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
      * Slows as it goes, so it reads as a draw coming to rest rather than a
      * result that was decided all along.
      */
-    function runShuffle(winner: string): void {
+    function runShuffle(winner: string, votes: Record<string, string>): void {
       revealing = true;
-      note.textContent = 'Drawing…';
-      const ids = battlegrounds.map((b) => b.id);
+
+      // Only the grounds someone voted for are in the draw, so only those
+      // should be cycled through: spinning over all four says the vote counted
+      // for nothing. With no votes at all, everything is in play.
+      const voted = [...new Set(Object.values(votes))]
+        .filter((id) => battlegrounds.some((b) => b.id === id));
+      const ids = voted.length > 0 ? voted : battlegrounds.map((b) => b.id);
+
+      note.textContent = voted.length > 1
+        ? `Drawing from ${voted.length} places…`
+        : 'Drawing…';
       let i = 0;
       let delay = 90;
       const started = Date.now();
@@ -120,7 +129,7 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
         renderVotes(state);
         if (state.chosen && !revealing) {
           clock.setDeadline(0, 1);
-          runShuffle(state.chosen);
+          runShuffle(state.chosen, state.votes);
         } else if (!state.chosen) {
           clock.setDeadline(state.stepEndsAt, VOTE_SECONDS);
         }

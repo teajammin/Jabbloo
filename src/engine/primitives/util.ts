@@ -139,6 +139,46 @@ export function burst(
   );
 }
 
+/**
+ * A ring that expands outward and thins as it goes.
+ *
+ * Named for the sprite rather than the move: `shockwave` is a primitive of its
+ * own in ranged.ts, and this is the small ground-level ring a stomp leaves.
+ *
+ * Distinct from `burst`, which pops a sprite in and fades it on the spot. A
+ * ring that only pops reads as a circle appearing rather than a wave leaving —
+ * it has to grow past its own size for the eye to see it travelling. It is
+ * also spun to a fixed angle rather than a random one: a ring has no natural
+ * orientation, and a random rotation only makes its outline flicker.
+ */
+export function shockRing(
+  tl: gsap.core.Timeline,
+  ctx: PrimitiveContext,
+  at: { x: number; y: number },
+  size = 240,
+  position?: gsap.Position,
+): void {
+  tl.call(
+    () => {
+      const sprite = spawnEffect(ctx.stage.effects, 'shockring', { ...at, height: size });
+      const { x, y } = sprite.scale;
+      gsap.fromTo(
+        sprite.scale,
+        { x: x * 0.35, y: y * 0.2 },
+        { x: x * 1.45, y: y * 0.85, duration: 0.42, ease: 'power2.out' },
+      );
+      gsap.to(sprite, {
+        alpha: 0,
+        duration: 0.34,
+        delay: 0.1,
+        onComplete: () => sprite.destroy(),
+      });
+    },
+    undefined,
+    position,
+  );
+}
+
 /** Fades and destroys an effect sprite at the end of its move. */
 export function fadeOut(tl: gsap.core.Timeline, sprite: Sprite, duration = 0.25): void {
   tl.to(sprite, { alpha: 0, duration, onComplete: () => sprite.destroy() });

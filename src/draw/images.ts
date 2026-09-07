@@ -15,6 +15,8 @@ export const MAX_UPLOADS = 5;
 /** Longest edge kept after import. Comfortably above the canvas' own size. */
 const MAX_EDGE = 1400;
 
+import { cutBackground } from './cutout';
+
 export interface ImportedImage {
   data: string;
   w: number;
@@ -54,7 +56,12 @@ export function placeOnCanvas(image: ImportedImage): { x: number; y: number; w: 
  * service fails, falls back to a local cutout so a player is never blocked by
  * a missing credential — the brief's flow depends on this step working.
  */
-export async function cutSubject(image: ImportedImage): Promise<ImportedImage> {
+export interface CutResult extends ImportedImage {
+  /** Whether a cutout service did it, or this device did its best. */
+  service: boolean;
+}
+
+export async function cutSubject(image: ImportedImage): Promise<CutResult> {
   try {
     const response = await fetch('/api/cutout', {
       method: 'POST',
@@ -64,27 +71,22 @@ export async function cutSubject(image: ImportedImage): Promise<ImportedImage> {
     if (response.ok) {
       const body = (await response.json()) as { available?: boolean; image?: string };
       if (body.available && body.image) {
-        return await measure(body.image);
+        return { ...await measure(body.image), service: true };
       }
     }
   } catch {
     // Fall through to the local cutout.
   }
-  return localCutout(image);
+  return { ...await localCutout(image), service: false };
 }
 
 /**
- * Local fallback: floods inward from the edges, clearing pixels close to the
- * border colour.
+ * Local fallback, when no cutout service is configured.
  *
- * The same approach used to strip backgrounds from supplied art, and for the
- * same reason: flooding from the outside leaves matching colours INSIDE the
- * subject intact, where a global colour key would punch holes through it.
- *
- * Nowhere near Remove.bg on a busy photo, but reliable on the flat or plain
- * backgrounds people usually shoot against, and it never fails.
+ * The pixel work lives in `cutout.ts`, where it can be tested; this only moves
+ * the image on and off a canvas.
  */
-export async function localCutout(image: ImportedImage, tolerance = 42): Promise<ImportedImage> {
+export async function localCutout(image: ImportedImage, strength = 1): Promise<ImportedImage> {
   const bitmap = await createImageBitmap(await (await fetch(image.data)).blob());
   const { width: w, height: h } = bitmap;
 
@@ -97,42 +99,11 @@ export async function localCutout(image: ImportedImage, tolerance = 42): Promise
   bitmap.close();
 
   const frame = ctx.getImageData(0, 0, w, h);
-  const data = frame.data;
+  const cleared = cutBackground(frame.data, w, h, { strength });
 
-  // Reference colour is the average of the four corners, which is far more
-  // robust than any single pixel on a slightly vignetted photo.
-  const corners = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]] as const;
-  let br = 0, bg = 0, bb = 0;
-  for (const [cx, cy] of corners) {
-    const i = (cy * w + cx) * 4;
-    br += data[i]!; bg += data[i + 1]!; bb += data[i + 2]!;
-  }
-  br /= 4; bg /= 4; bb /= 4;
-
-  const near = (i: number) =>
-    Math.abs(data[i]! - br) <= tolerance &&
-    Math.abs(data[i + 1]! - bg) <= tolerance &&
-    Math.abs(data[i + 2]! - bb) <= tolerance;
-
-  const seen = new Uint8Array(w * h);
-  const stack: number[] = [];
-  for (let x = 0; x < w; x++) { stack.push(x, 0); stack.push(x, h - 1); }
-  for (let y = 0; y < h; y++) { stack.push(0, y); stack.push(w - 1, y); }
-
-  while (stack.length) {
-    const y = stack.pop()!;
-    const x = stack.pop()!;
-    const p = y * w + x;
-    if (seen[p]) continue;
-    const i = p * 4;
-    if (!near(i)) continue;
-    seen[p] = 1;
-    data[i + 3] = 0;
-    if (x > 0) stack.push(x - 1, y);
-    if (x < w - 1) stack.push(x + 1, y);
-    if (y > 0) stack.push(x, y - 1);
-    if (y < h - 1) stack.push(x, y + 1);
-  }
+  // Nothing came off: the photo has no border the flood recognises as
+  // background, and returning it untouched is better than returning a hole.
+  if (cleared === 0) return image;
 
   ctx.putImageData(frame, 0, 0);
   return { data: scratch.toDataURL('image/png'), w, h };
