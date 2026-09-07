@@ -2,6 +2,8 @@ import { el, type Screen } from './screens';
 import { moveScreen } from './move';
 import { requestChoreography, requestJudgement } from '../api';
 import { judgePanel } from './judging';
+import { getSettings } from '../settings';
+import { play } from '../audio';
 import type { RoomConnection } from '../net/room';
 import {
   judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
@@ -61,6 +63,10 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       building = (async () => {
         const engine = await import('../engine');
         if (disposed) return;
+
+        // A player who asked for less motion gets a faster, shorter fight
+        // rather than none at all.
+        engine.setMotionScale(getSettings().reduceMotion ? 1.8 : 1);
 
         const stage = new engine.BattleStage({
           parent: stageHost,
@@ -167,6 +173,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           move.prompt || 'swinging it like an axe'
         }`;
 
+        play('whoosh');
         const response = await requestChoreography({
           prompt: move.prompt || 'swing the weapon at them',
           characterName: attacker.name,
@@ -255,6 +262,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
       if (turn.phase === 'over' && playedTurn !== key) {
         playedTurn = key;
+        play('hit');
         refreshHealth(state);
         showDamage(turn);
         // A beat to read the damage before the next pair walk on.

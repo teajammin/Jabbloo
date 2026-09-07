@@ -6,6 +6,8 @@
  * canvas, and a router would be more machinery than the problem needs.
  */
 
+import { play, unlockAudio } from '../audio';
+
 export type Teardown = () => void;
 export type Screen = (root: HTMLElement, go: Navigate) => Teardown | void;
 export type Navigate = (screen: Screen) => void;
@@ -63,6 +65,12 @@ export function button(
   className = '',
 ): HTMLButtonElement {
   const node = el('button', { class: className, type: 'button' }, label);
-  node.addEventListener('click', onClick);
+  node.addEventListener('click', () => {
+    // Every button is a gesture, which is the only moment a browser will let
+    // audio start — so unlocking here means the first click is also audible.
+    unlockAudio();
+    play('click');
+    onClick();
+  });
   return node;
 }

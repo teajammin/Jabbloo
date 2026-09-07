@@ -7,13 +7,19 @@
 
 import './styles.css';
 import { mount, setHome } from './ui/screens';
+import { mountOptions } from './ui/options';
+import { loadSettings } from './settings';
 import { launchScreen } from './ui/launch';
 import { joinRoomScreen } from './ui/joinRoom';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('#app missing');
 
+loadSettings();
 setHome(launchScreen);
+// Mounted on <body>, not inside a screen: the brief wants options reachable at
+// any point in the game, and screens come and go.
+mountOptions();
 const go = mount(root);
 
 const params = new URLSearchParams(location.search);

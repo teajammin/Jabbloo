@@ -1065,3 +1065,93 @@ input[type='text'] {
 
 .results-best { margin: 0; font-size: 14px; opacity: 0.8; }
 .results-quote { display: block; font-style: italic; opacity: 0.75; margin-top: 2px; }
+
+/* ----------------------------------------------------------------- options */
+
+.options-open {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  width: 52px; height: 52px;
+  padding: 0;
+  font-size: 22px;
+  background: var(--sky);
+  z-index: 40;
+}
+
+.options {
+  border: none;
+  border-radius: var(--radius);
+  padding: 26px 26px 22px;
+  max-width: 460px;
+  width: calc(100% - 32px);
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 12px 40px rgba(74, 68, 88, 0.28);
+}
+
+.options::backdrop { background: rgba(74, 68, 88, 0.35); }
+.options h2 { margin: 0 0 6px; }
+
+.options-heading {
+  margin: 18px 0 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+}
+
+.options-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: rgba(74, 68, 88, 0.05);
+  margin-bottom: 6px;
+}
+
+.options-row input[type='checkbox'] { width: 22px; height: 22px; flex: none; }
+.options-label { display: flex; flex-direction: column; flex: 1; text-align: left; }
+.options-label small { opacity: 0.6; }
+.options-slider { flex: 1; }
+.options-value { width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+.options-credits { margin: 0; font-size: 14px; opacity: 0.75; }
+
+/* --------------------------------------------------------- accessibility */
+
+/*
+ * Applied as attributes on <html> by src/settings.ts, so a screen never has to
+ * read a setting to render correctly — it just inherits.
+ */
+
+[data-large-text] body {
+  font-size: 20px;
+  zoom: 1.12;
+}
+
+[data-high-contrast] {
+  --cream: #ffffff;
+  --ink: #1e1a28;
+  --shadow: 0 3px 0 rgba(30, 26, 40, 0.5);
+}
+
+[data-high-contrast] button,
+[data-high-contrast] input,
+[data-high-contrast] textarea {
+  border: 2px solid var(--ink);
+}
+
+/*
+ * Reduced motion cuts transitions to something imperceptible rather than to
+ * zero: an instant change of state can be more disorienting than a slow one,
+ * and 0.01ms keeps any transitionend handler firing as normal.
+ */
+[data-reduce-motion] *,
+[data-reduce-motion] *::before,
+[data-reduce-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

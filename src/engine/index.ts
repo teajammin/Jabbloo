@@ -58,6 +58,7 @@ export {
 } from './primitives';
 export {
   playChoreography,
+  setMotionScale,
   parseChoreography,
   DEFAULT_CHOREOGRAPHY,
   MAX_CHOREOGRAPHY_SECONDS,

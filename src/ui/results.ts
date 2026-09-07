@@ -1,6 +1,7 @@
 import { el, button, goHome, type Screen } from './screens';
 import { bubbleText } from './bubbleText';
 import type { RoomConnection } from '../net/room';
+import { play } from '../audio';
 import {
   creators, teamDamage, winningTeam, type Player, type RoomState,
 } from '../shared/protocol';
@@ -19,8 +20,11 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
     const table = el('div', { class: 'results-grid' });
     const actions = el('div', { class: 'tool-row' });
 
+    let sounded = false;
+
     function render(state: RoomState): void {
       const winner = winningTeam(state);
+      if (!sounded) { sounded = true; play('fanfare'); }
       const names = state.teamNames;
 
       title.replaceChildren(

@@ -43,6 +43,10 @@ The host laptop shows the shared screen; phones are the controllers, Jackbox-sty
 7. **Battle stage** — choose weapon, describe the attack, watch it animate, get scored
 8. **Results** — damage taken, damage given, best weapon + prompt. Rematch or menu.
 
+A ⚙ button sits on every screen: accessibility (reduced motion, larger text,
+high contrast), volume, how to play, credits, and quit. Sound is synthesised
+in `src/audio.ts` rather than sampled, so the game ships with no audio assets.
+
 ---
 
 ## Tech Stack

@@ -111,6 +111,18 @@ export function parseChoreography(input: unknown): Choreography {
  * shape and simply reads as faster, where cutting it off would drop the payoff
  * and leave fighters stranded mid-pose.
  */
+/**
+ * Speeds every animation up, for players who asked for less motion.
+ *
+ * Lives here rather than in the app because the engine owns gsap; the app only
+ * says how much motion is wanted and the engine decides what that means.
+ * Scaling time rather than skipping animation keeps the fight legible — moves
+ * still happen, they just stop lingering.
+ */
+export function setMotionScale(scale: number): void {
+  gsap.globalTimeline.timeScale(Math.max(0.25, Math.min(4, scale)));
+}
+
 export function playChoreography(
   ctx: PrimitiveContext,
   choreography: Choreography,
