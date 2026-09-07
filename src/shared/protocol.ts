@@ -63,7 +63,7 @@ export interface Player {
   best: { weapon: string; prompt: string; damage: number } | null;
 }
 
-export type Phase = 'lobby' | 'creating' | 'battleground' | 'battle' | 'results';
+export type Phase = 'lobby' | 'creating' | 'battleground' | 'battle' | 'ult' | 'results';
 
 /** How many weapons each player makes, per the brief. */
 export const WEAPON_COUNT = 3;
@@ -92,6 +92,35 @@ export const CREATION_STEPS: CreationStep[] = [
     { slot: `weapon${i}`, kind: 'name' as const, seconds: 20, prompt: `Name weapon ${i + 1}` },
   ]).flat(),
 ];
+
+/**
+ * How many ULTs a tie may force before the game accepts a draw.
+ *
+ * Without a cap two evenly matched teams could be sent back to the drawing
+ * board forever; two extra weapons is already a long tail on a party game.
+ */
+export const MAX_ULTS = 2;
+
+/**
+ * The ULT round: one more weapon, on the same clock as a normal weapon.
+ *
+ * The slot continues the weapon numbering, so an ULT is simply a fourth (then
+ * fifth) weapon — nothing downstream has to learn a new kind of thing.
+ */
+export function ultSteps(round: number): CreationStep[] {
+  const slot = `weapon${WEAPON_COUNT + Math.max(0, round - 1)}`;
+  return [
+    { slot, kind: 'draw', seconds: 45, prompt: 'Draw your ULT weapon' },
+    { slot, kind: 'name', seconds: 20, prompt: 'Name your ULT weapon' },
+  ];
+}
+
+/** The step list the room is working through, whichever phase it is in. */
+export function stepsFor(state: RoomState): CreationStep[] {
+  if (state.phase === 'creating') return CREATION_STEPS;
+  if (state.phase === 'ult') return ultSteps(state.ultRound);
+  return [];
+}
 
 /** One player's move for the current turn. */
 export interface Move {
@@ -145,8 +174,10 @@ export interface RoomState {
   capacity: number;
   players: Player[];
   teamNames: { teamA: string; teamB: string };
-  /** Index into CREATION_STEPS while creating, else -1. */
+  /** Index into the current step list while creating or in an ULT, else -1. */
   step: number;
+  /** ULTs played so far; 0 until a tie forces one. */
+  ultRound: number;
   /** Battleground picks, by player id. Everyone votes, judges included. */
   votes: Record<string, string>;
   /** The drawn battleground, once the vote has closed. */
@@ -302,7 +333,7 @@ export function creators(state: RoomState): Player[] {
 
 /** The step being worked on, or null outside the creation phase. */
 export function currentStep(state: RoomState): CreationStep | null {
-  return state.phase === 'creating' ? CREATION_STEPS[state.step] ?? null : null;
+  return stepsFor(state)[state.step] ?? null;
 }
 
 export function startBlockedBecause(state: RoomState): string | null {

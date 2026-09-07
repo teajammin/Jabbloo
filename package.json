@@ -22,7 +22,8 @@
     "test:battleground": "node test/battleground.test.mjs",
     "test:battle": "node test/battle.test.mjs",
     "test:turns": "node test/turns.test.mjs",
-    "test:judging": "node test/judging.test.mjs"
+    "test:judging": "node test/judging.test.mjs",
+    "test:ult": "node test/ult.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

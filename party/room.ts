@@ -1,7 +1,7 @@
 import type * as Party from 'partykit/server';
 import {
-  CREATION_STEPS,
   MAX_PLAYERS,
+  MAX_ULTS,
   JUDGE_SECONDS,
   MOVE_SECONDS,
   REVEAL_SECONDS,
@@ -17,7 +17,9 @@ import {
   canStart,
   creators,
   drawBattleground,
+  stepsFor,
   voters,
+  winningTeam,
   type ClientMessage,
   type Player,
   type Role,
@@ -41,7 +43,9 @@ const FALLBACK_WEAPONS = ['Sword', 'Axe', 'Hammer'];
 function defaultName(slot: string): string {
   if (slot === 'character') return 'Nameless';
   const index = Number(slot.replace('weapon', ''));
-  return FALLBACK_WEAPONS[index] ?? 'Weapon';
+  // Anything past the three made in creation is an ULT, and naming it 'ULT'
+  // reads better on a weapon button than a fourth stand-in noun would.
+  return FALLBACK_WEAPONS[index] ?? 'ULT';
 }
 
 export default class Room implements Party.Server {
@@ -55,6 +59,7 @@ export default class Room implements Party.Server {
       players: [],
       teamNames: { teamA: 'Team One', teamB: 'Team Two' },
       step: -1,
+      ultRound: 0,
       stepEndsAt: 0,
       votes: {},
       chosen: null,
@@ -277,9 +282,13 @@ export default class Room implements Party.Server {
   private beginStep(index: number): void {
     if (this.stepTimer) clearTimeout(this.stepTimer);
 
-    const step = CREATION_STEPS[index];
+    const step = stepsFor(this.state)[index];
     if (!step) {
-      this.beginVote();
+      // Creation leads to the battleground vote; an ULT leads straight back
+      // onto the ground already chosen — the tie is what is being settled,
+      // not the venue.
+      if (this.state.phase === 'ult') this.beginSuddenDeath();
+      else this.beginVote();
       return;
     }
 
@@ -293,6 +302,9 @@ export default class Room implements Party.Server {
 
   /** Moves on early once every creator has finished the current step. */
   private advanceIfAllReady(): void {
+    // Guarded on the phase because `ready` survives into the battle, and a
+    // stray `ready` message there must not walk the step counter forward.
+    if (!this.isCreating()) return;
     const active = creators(this.state).filter((p) => p.connected);
     if (active.length === 0 || !active.every((p) => p.progress.ready)) return;
     this.beginStep(this.state.step + 1);
@@ -372,10 +384,7 @@ export default class Room implements Party.Server {
 
     // A side with nobody left to fight ends the battle.
     if (left.length === 0 || right.length === 0) {
-      this.state.turn = null;
-      this.state.phase = 'results';
-      this.state.stepEndsAt = 0;
-      this.broadcastState();
+      this.endBattle();
       return;
     }
 
@@ -394,6 +403,57 @@ export default class Room implements Party.Server {
     this.state.stepEndsAt = Date.now() + MOVE_SECONDS * 1000;
     this.stepTimer = setTimeout(() => this.closeMoves(), MOVE_SECONDS * 1000);
     this.broadcastState();
+  }
+
+  /**
+   * The fight is over: either someone won on damage taken, or nobody did.
+   *
+   * A level score sends both sides back to draw one more weapon, which is the
+   * brief's ULT. It is capped so an evenly matched pair of teams eventually
+   * gets an answer — a declared tie — rather than an endless creation loop.
+   */
+  private endBattle(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    this.state.turn = null;
+    this.state.stepEndsAt = 0;
+
+    if (winningTeam(this.state) === null && this.state.ultRound < MAX_ULTS) {
+      this.beginUlt();
+      return;
+    }
+
+    this.state.phase = 'results';
+    this.broadcastState();
+  }
+
+  /** Sends everyone back to the drawing board for one more weapon. */
+  private beginUlt(): void {
+    this.state.phase = 'ult';
+    this.state.ultRound += 1;
+    for (const player of this.state.players) player.progress.ready = false;
+    this.beginStep(0);
+  }
+
+  /**
+   * One more fight each, with the ULT in hand.
+   *
+   * Health is restored so a knocked-out fighter can still swing their ULT —
+   * the tie is being settled on total damage taken, and sitting a player out
+   * of the round that decides it would be a strange way to break it.
+   */
+  private beginSuddenDeath(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    this.state.phase = 'battle';
+    for (const player of this.state.players) {
+      player.health = STARTING_HEALTH;
+      player.fights = Math.max(0, ROUNDS_EACH - 1);
+    }
+    this.beginTurn();
+  }
+
+  /** True while players are making things, in creation or in an ULT. */
+  private isCreating(): boolean {
+    return this.state.phase === 'creating' || this.state.phase === 'ult';
   }
 
   private onSubmitMove(weapon: number, prompt: string, sender: Party.Connection): void {
@@ -540,7 +600,7 @@ export default class Room implements Party.Server {
 
   private onSubmitDrawing(slot: string, png: string, sender: Party.Connection): void {
     const player = this.state.players.find((p) => p.id === sender.id);
-    if (!player || this.state.phase !== 'creating') return;
+    if (!player || !this.isCreating()) return;
     if (typeof png !== 'string' || !png.startsWith('data:image/png;base64,')) return;
 
     this.art.set(`${player.id}:${slot}`, png);
@@ -552,7 +612,7 @@ export default class Room implements Party.Server {
 
   private onSubmitName(slot: string, name: string, sender: Party.Connection): void {
     const player = this.state.players.find((p) => p.id === sender.id);
-    if (!player || this.state.phase !== 'creating') return;
+    if (!player || !this.isCreating()) return;
 
     // A blank name still counts: the brief says everything must be named, and
     // a player who runs out of time should not stall the whole room.

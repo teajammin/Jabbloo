@@ -36,6 +36,7 @@ const room = (players: Player[]): RoomState => ({
   players,
   teamNames: { teamA: 'A', teamB: 'B' },
   step: -1,
+  ultRound: 0,
   stepEndsAt: 0,
   votes: {},
   chosen: null,

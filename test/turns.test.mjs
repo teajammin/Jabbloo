@@ -114,7 +114,10 @@ for (let i = 0; i < 2; i++) {
 s = state(host);
 check('nobody fights a fourth time', s.players.every((p) => p.isHost || p.fights <= 3),
   JSON.stringify(s.players.map((p) => p.fights)));
-check('the battle ends after three rounds', s.phase === 'results', s.phase);
+// Nobody landed a score here, so the sides are level — which the brief
+// settles with an ULT rather than a result.
+check('three rounds each ends the battle', s.turn === null, JSON.stringify(s.turn));
+check('a scoreless draw goes to an ULT', s.phase === 'ult', s.phase);
 
 for (const ws of [host, a, b]) ws.close();
 console.log(`\n${pass} passed, ${fail} failed`);

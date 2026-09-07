@@ -18,8 +18,9 @@ export function moveScreen(
   weapons: { name: string }[],
   characterName: string,
 ): Screen {
-  return (root) => {
+  return (root, go) => {
     let weapon = 0;
+    let left = false;
     let submitted = false;
 
     const clock = countdown();
@@ -90,22 +91,43 @@ export function moveScreen(
       ),
     );
 
+    /**
+     * Hands the phone back to the battle screen once the move is out of the
+     * player's hands.
+     *
+     * All the phase routing — the next turn, an ULT, the results — lives
+     * there, so leaving a phone parked on this screen would strand it for the
+     * rest of the game.
+     */
+    function leave(): void {
+      if (left) return;
+      left = true;
+      clock.stop();
+      void import('./battle').then(({ battleScreen }) => {
+        go(battleScreen(connection, false));
+      });
+    }
+
     connection.on({
       onState: (state: RoomState) => {
+        if (left) return;
         const turn = state.turn;
-        if (!turn) return;
+        if (!turn || state.phase !== 'battle') { leave(); return; }
+
         if (turn.phase === 'picking') {
           clock.setDeadline(state.stepEndsAt, MOVE_SECONDS);
-        } else {
-          clock.setDeadline(0, 1);
-          // Time ran out or the other player finished; either way it is gone.
-          if (!submitted) {
-            submitted = true;
-            send.disabled = true;
-            prompt.disabled = true;
-            status.textContent = 'Time — the AI will improvise.';
-          }
+          return;
         }
+
+        clock.setDeadline(0, 1);
+        // Time ran out or the other player finished; either way it is gone.
+        if (!submitted) {
+          submitted = true;
+          send.disabled = true;
+          prompt.disabled = true;
+          status.textContent = 'Time — the AI will improvise.';
+        }
+        leave();
       },
     });
 

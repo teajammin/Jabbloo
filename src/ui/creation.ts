@@ -4,7 +4,7 @@ import { drawScreen } from './drawScreen';
 import { battlegroundScreen } from './battleground';
 import type { RoomConnection } from '../net/room';
 import {
-  CREATION_STEPS, creators, currentStep, type RoomState,
+  creators, currentStep, stepsFor, type RoomState,
 } from '../shared/protocol';
 
 /**
@@ -20,7 +20,7 @@ import {
 
 export function creationScreen(connection: RoomConnection, isHost: boolean): Screen {
   return (root, go) => {
-    let lastStep = -1;
+    let lastStep = '';
     let drawnPng: string | null = null;
 
     const clock = countdown();
@@ -131,16 +131,22 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       const step = currentStep(state);
       if (!step) return;
 
+      const ult = state.phase === 'ult';
       heading.textContent = step.prompt;
       subheading.textContent = isHost
-        ? 'Everyone is drawing on their phones.'
-        : `Step ${state.step + 1} of ${CREATION_STEPS.length}`;
+        ? ult
+          ? 'Level on damage — both sides are drawing an ULT.'
+          : 'Everyone is drawing on their phones.'
+        : ult
+          ? 'The scores are level. One more weapon decides it.'
+          : `Step ${state.step + 1} of ${stepsFor(state).length}`;
       clock.setDeadline(state.stepEndsAt, step.seconds);
 
       // Only rebuild when the step actually changes, so typing a name or a
       // stroke in progress survives other players' updates arriving.
-      if (state.step === lastStep) return;
-      lastStep = state.step;
+      const key = `${state.phase}:${state.ultRound}:${state.step}`;
+      if (key === lastStep) return;
+      lastStep = key;
 
       for (const fn of cleanups.splice(0)) fn();
 
@@ -163,7 +169,15 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
           go(battlegroundScreen(connection, isHost));
           return;
         }
-        if (state.phase !== 'creating') {
+        // An ULT runs straight into the fight on the ground already chosen.
+        if (state.phase === 'battle') {
+          clock.stop();
+          void import('./battle').then(({ battleScreen }) => {
+            go(battleScreen(connection, isHost));
+          });
+          return;
+        }
+        if (state.phase !== 'creating' && state.phase !== 'ult') {
           clock.stop();
           return;
         }

@@ -249,6 +249,12 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       onArt: (next) => { art = next; void sync(); },
       onState: (next) => {
         state = next;
+        if (next.phase === 'ult') {
+          void import('./creation').then(({ creationScreen }) => {
+            go(creationScreen(connection, true));
+          });
+          return;
+        }
         if (next.phase === 'results') {
           void import('./results').then(({ resultsScreen }) => {
             go(resultsScreen(connection, true));
@@ -290,6 +296,12 @@ function phoneView(
   let showing = false;
   connection.on({
     onState: (state) => {
+      if (state.phase === 'ult') {
+        void import('./creation').then(({ creationScreen }) => {
+          go(creationScreen(connection, false));
+        });
+        return;
+      }
       if (state.phase === 'results') {
         void import('./results').then(({ resultsScreen }) => {
           go(resultsScreen(connection, false));

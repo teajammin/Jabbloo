@@ -17,7 +17,8 @@ doesn't make sense, the weapon just bonks the opponent like a sword.
 
 A judge — either an AI or the non-fighting players — rates each move out of 33. Every player
 starts with 100 health. Games are best of 3 rounds; the team that takes the least damage wins.
-A tie forces both sides to create one more weapon as an ULT.
+A tie forces both sides to create one more weapon as an ULT and fight one more
+round with it; after two ULTs a level game is declared a tie.
 
 ### Player counts
 
