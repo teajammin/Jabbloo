@@ -2,12 +2,16 @@ import type * as Party from 'partykit/server';
 import {
   CREATION_STEPS,
   MAX_PLAYERS,
+  JUDGE_SECONDS,
   MOVE_SECONDS,
   REVEAL_SECONDS,
   ROUNDS_EACH,
   STARTING_HEALTH,
   VOTE_SECONDS,
+  MAX_SCORE,
   availableFighters,
+  averageScore,
+  judges,
   trimPrompt,
   battlegrounds,
   canStart,
@@ -120,8 +124,17 @@ export default class Room implements Party.Server {
       case 'submitMove':
         this.onSubmitMove(message.weapon, message.prompt, sender);
         break;
-      case 'turnDone':
+      case 'turnPlayed':
         // Only the host knows when the animation has finished playing.
+        if (this.isHost(sender)) this.openJudging();
+        break;
+      case 'submitScore':
+        this.onScore(message.attackerId, message.score, sender);
+        break;
+      case 'submitNote':
+        if (this.isHost(sender)) this.onNote(message.attackerId, message.note);
+        break;
+      case 'turnDone':
         if (this.isHost(sender)) this.endTurn();
         break;
       default:
@@ -361,6 +374,9 @@ export default class Room implements Party.Server {
     this.state.turn = {
       fighters: [a.id, b.id],
       moves: {},
+      judged: {},
+      damage: {},
+      notes: {},
       first: null,
       phase: 'picking',
     };
@@ -403,6 +419,80 @@ export default class Room implements Party.Server {
 
     turn.first = turn.fighters[Math.floor(Math.random() * 2)]!;
     turn.phase = 'playing';
+    this.state.stepEndsAt = 0;
+    this.broadcastState();
+  }
+
+  // -------------------------------------------------------------------- judging
+
+  /**
+   * Opens judging once the exchange has played.
+   *
+   * With judges in the room they score on their phones; in a two-player game
+   * there are none, and the host submits the AI's scores through the same
+   * path — so the averaging and damage rules have only one implementation.
+   */
+  private openJudging(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    const turn = this.state.turn;
+    if (!turn || turn.phase !== 'playing') return;
+
+    turn.phase = 'judging';
+    this.state.stepEndsAt = Date.now() + JUDGE_SECONDS * 1000;
+    this.stepTimer = setTimeout(() => this.closeJudging(), JUDGE_SECONDS * 1000);
+    this.broadcastState();
+  }
+
+  private onScore(attackerId: string, score: number, sender: Party.Connection): void {
+    const turn = this.state.turn;
+    if (!turn || turn.phase !== 'judging') return;
+    if (!turn.fighters.includes(attackerId)) return;
+
+    // A judge scores as themselves; the host stands in for the AI when there
+    // are no judges, and must not be able to score a game that has them.
+    const isJudge = judges(this.state).some((p) => p.id === sender.id);
+    const isAiJudge = this.isHost(sender) && judges(this.state).length === 0;
+    if (!isJudge && !isAiJudge) return;
+
+    const clean = Math.max(0, Math.min(MAX_SCORE, Math.round(Number(score) || 0)));
+    (turn.judged[sender.id] ??= {})[attackerId] = clean;
+    this.broadcastState();
+
+    // Close as soon as every scorer has rated both fighters.
+    const scorers = isAiJudge ? [sender.id] : judges(this.state).filter((p) => p.connected).map((p) => p.id);
+    const complete = scorers.length > 0 && scorers.every(
+      (id) => turn.fighters.every((f) => typeof turn.judged[id]?.[f] === 'number'),
+    );
+    if (complete) this.closeJudging();
+  }
+
+  private onNote(attackerId: string, note: string): void {
+    const turn = this.state.turn;
+    if (!turn) return;
+    turn.notes[attackerId] = String(note ?? '').slice(0, 80);
+    this.broadcastState();
+  }
+
+  /**
+   * Averages the scores and takes the damage off.
+   *
+   * A move's score is damage dealt to the OTHER fighter, which is what makes
+   * "least damage taken wins" mean anything.
+   */
+  private closeJudging(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    const turn = this.state.turn;
+    if (!turn || turn.phase !== 'judging') return;
+
+    for (const attackerId of turn.fighters) {
+      const dealt = averageScore(turn, attackerId);
+      turn.damage[attackerId] = dealt;
+      const defenderId = turn.fighters.find((id) => id !== attackerId);
+      const defender = this.state.players.find((p) => p.id === defenderId);
+      if (defender) defender.health = Math.max(0, defender.health - dealt);
+    }
+
+    turn.phase = 'over';
     this.state.stepEndsAt = 0;
     this.broadcastState();
   }

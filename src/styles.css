@@ -976,3 +976,39 @@ input[type='text'] {
   line-height: 1.45;
   opacity: 0.8;
 }
+
+/* ----------------------------------------------------------------- judging */
+
+.judge-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(460px, 100%);
+}
+
+.judge-move {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.judge-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+
+.judge-slider {
+  flex: 1;
+  height: 40px;
+  accent-color: var(--lavender);
+}
+
+.judge-value {
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.5ch;
+  text-align: right;
+}

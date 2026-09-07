@@ -134,5 +134,25 @@ check('keeps the opening words', trimPrompt(long).startsWith('w0 w1 w2'));
 check('a short prompt is untouched', trimPrompt('bonk them') === 'bonk them');
 check('collapses whitespace', trimPrompt(' bonk\n  them ') === 'bonk them');
 
+// --- judging ---------------------------------------------------------------
+
+import { averageScore, type Turn } from '../src/shared/protocol';
+
+const turnWith = (judged: Record<string, Record<string, number>>): Turn => ({
+  fighters: ['ann', 'bo'], moves: {}, judged, damage: {}, notes: {},
+  first: null, phase: 'judging',
+});
+
+check('one judge stands alone',
+  averageScore(turnWith({ j1: { ann: 20 } }), 'ann') === 20);
+check('two judges average',
+  averageScore(turnWith({ j1: { ann: 20 }, j2: { ann: 10 } }), 'ann') === 15);
+check('averages round to a whole number',
+  averageScore(turnWith({ j1: { ann: 20 }, j2: { ann: 11 } }), 'ann') === 16);
+check('a judge who skipped one fighter is ignored for them',
+  averageScore(turnWith({ j1: { ann: 20 }, j2: { bo: 10 } }), 'ann') === 20);
+check('nobody scored means no damage',
+  averageScore(turnWith({}), 'ann') === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

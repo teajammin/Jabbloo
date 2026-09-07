@@ -1,9 +1,10 @@
 import { el, type Screen } from './screens';
 import { moveScreen } from './move';
-import { requestChoreography } from '../api';
+import { requestChoreography, requestJudgement } from '../api';
+import { judgePanel } from './judging';
 import type { RoomConnection } from '../net/room';
 import {
-  type BattlegroundId, type PlayerArt, type RoomState, type Turn,
+  judges, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
 } from '../shared/protocol';
 
 /**
@@ -157,8 +158,38 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       }
 
       if (disposed) return;
-      caption.textContent = 'Nice.';
-      connection.send({ type: 'turnDone' });
+      caption.textContent = 'Judging…';
+      connection.send({ type: 'turnPlayed' });
+    }
+
+    /**
+     * Scores the exchange when nobody else can.
+     *
+     * Only in a two-player game: the brief gives judges the job wherever there
+     * are any, and the host stepping in there would override them.
+     */
+    async function judgeWithAi(turn: Turn, current: RoomState): Promise<void> {
+      if (judges(current).length > 0) return;
+
+      for (const attackerId of turn.fighters) {
+        if (disposed) return;
+        const attacker = onStage.get(attackerId);
+        const defenderId = turn.fighters.find((id) => id !== attackerId)!;
+        const defender = onStage.get(defenderId);
+        const move = turn.moves[attackerId];
+        if (!attacker || !defender || !move) continue;
+
+        const entry = artFor(attackerId);
+        const verdict = await requestJudgement({
+          prompt: move.prompt,
+          characterName: attacker.name,
+          weaponName: entry?.weapons[move.weapon]?.name ?? attacker.weaponName,
+          enemyName: defender.name,
+        });
+        if (disposed) return;
+        connection.send({ type: 'submitNote', attackerId, note: verdict.reason });
+        connection.send({ type: 'submitScore', attackerId, score: verdict.score });
+      }
     }
 
     /** One pass of the state machine, driven by whatever the server says. */
@@ -184,7 +215,34 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (turn.phase === 'playing' && playedTurn !== key) {
         playedTurn = key;
         await playTurn(turn);
+        return;
       }
+
+      if (turn.phase === 'judging' && playedTurn !== key) {
+        playedTurn = key;
+        await judgeWithAi(turn, state);
+        return;
+      }
+
+      if (turn.phase === 'over' && playedTurn !== key) {
+        playedTurn = key;
+        showDamage(turn);
+        // A beat to read the damage before the next pair walk on.
+        setTimeout(() => {
+          if (!disposed) connection.send({ type: 'turnDone' });
+        }, 2600);
+      }
+    }
+
+    /** Shows what each move cost, so the score is visible, not just felt. */
+    function showDamage(turn: Turn): void {
+      const lines = turn.fighters.map((id) => {
+        const name = onStage.get(id)?.name ?? '—';
+        const dealt = turn.damage[id] ?? 0;
+        const note = turn.notes[id];
+        return `${name} dealt ${dealt}${note ? ` — ${note}` : ''}`;
+      });
+      caption.textContent = lines.join('   ·   ');
     }
 
     connection.on({
@@ -209,16 +267,23 @@ function phoneView(
   go: (screen: Screen) => void,
   root: HTMLElement,
 ): void {
+  const panel = judgePanel(connection);
+  const waiting = el('p', { class: 'lede' }, 'Your turn will appear here when it comes.');
+
   root.append(
     el('main', { class: 'screen' },
       el('h1', { class: 'creation-title' }, 'Watch the big screen'),
-      el('p', { class: 'lede' }, 'Your turn will appear here when it comes.'),
+      waiting,
+      panel.root,
     ),
   );
 
   let showing = false;
   connection.on({
     onState: (state) => {
+      panel.update(state);
+      waiting.hidden = !panel.root.hidden;
+
       const turn = state.turn;
       const me = state.players.find((p) => p.id === connection.playerId);
       if (!turn || !me || !turn.fighters.includes(me.id)) return;

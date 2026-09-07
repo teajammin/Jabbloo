@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { choreograph } from './choreographer';
 import { cutout, cutoutAvailable } from './cutout';
+import { judge } from './judge';
 import type { FightContext } from './prompt';
 
 /**
@@ -72,6 +73,18 @@ app.post('/api/choreograph', async (req, res) => {
 });
 
 app.post('/api/cutout', cutout);
+
+app.post('/api/judge', async (req, res) => {
+  const result = await judge({
+    characterName: clampName(req.body?.characterName, 'The fighter'),
+    weaponName: clampName(req.body?.weaponName, 'their weapon'),
+    enemyName: clampName(req.body?.enemyName, 'their opponent'),
+    prompt: clampPrompt(req.body?.prompt),
+  });
+  console.log(`[judge] ${result.source} ${result.score}/33 "${result.reason}"`);
+  // Always 200: a judging failure is a gameplay outcome, not an HTTP error.
+  res.json(result);
+});
 
 app.listen(PORT, () => {
   const keyed = process.env.ANTHROPIC_API_KEY ? 'key loaded' : 'NO KEY — set ANTHROPIC_API_KEY in .env';

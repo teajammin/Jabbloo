@@ -48,3 +48,37 @@ export async function requestChoreography(
     return { choreography: null, source: 'default', ms: 0 };
   }
 }
+
+// ------------------------------------------------------------------- judging
+
+export interface JudgeResponse {
+  score: number;
+  reason: string;
+  source: 'ai' | 'fallback';
+}
+
+/**
+ * Asks the AI judge to score one attack.
+ *
+ * Never throws. A judging failure returns a modest score rather than nothing,
+ * because a fight that stalls waiting for a verdict is worse than one scored
+ * a little generously.
+ */
+export async function requestJudgement(request: {
+  prompt: string;
+  characterName: string;
+  weaponName: string;
+  enemyName: string;
+}): Promise<JudgeResponse> {
+  try {
+    const response = await fetch('/api/judge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+    if (response.ok) return (await response.json()) as JudgeResponse;
+  } catch {
+    // Fall through.
+  }
+  return { score: request.prompt.trim() ? 14 : 8, reason: '', source: 'fallback' };
+}

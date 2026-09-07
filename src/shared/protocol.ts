@@ -18,6 +18,10 @@ export const MOVE_SECONDS = 60;
 export const ROUNDS_EACH = 3;
 /** Everyone starts here; a fighter at zero is knocked out. */
 export const STARTING_HEALTH = 100;
+/** The brief's scale: a move is worth up to this much damage. */
+export const MAX_SCORE = 33;
+/** How long judges have to score an exchange. */
+export const JUDGE_SECONDS = 30;
 
 /** How long everyone has to pick a battleground. */
 export const VOTE_SECONDS = 20;
@@ -99,6 +103,17 @@ export interface Turn {
   fighters: [string, string];
   moves: Record<string, Move>;
   /**
+   * Scores by judge, then by the fighter being judged.
+   *
+   * Kept per judge rather than pre-averaged so a late score still counts and
+   * a judge can change their mind before the round closes.
+   */
+  judged: Record<string, Record<string, number>>;
+  /** The averaged damage each fighter dealt, once judging has closed. */
+  damage: Record<string, number>;
+  /** What the AI judge said, shown on the big screen. */
+  notes: Record<string, string>;
+  /**
    * Who strikes first, drawn once both moves are in.
    *
    * The brief has the AI pick at random, so neither player gains anything by
@@ -160,6 +175,10 @@ export type ClientMessage =
   | { type: 'requestArt' }
   | { type: 'submitMove'; weapon: number; prompt: string }
   /** The host reports that the exchange has finished playing. */
+  /** The host reports the exchange has finished playing; judging opens. */
+  | { type: 'turnPlayed' }
+  | { type: 'submitScore'; attackerId: string; score: number }
+  | { type: 'submitNote'; attackerId: string; note: string }
   | { type: 'turnDone' };
 
 // --------------------------------------------------------------- server -> client
@@ -205,6 +224,25 @@ export function availableFighters(state: RoomState, team: Role): Player[] {
   return state.players.filter(
     (p) => p.role === team && p.health > 0 && p.fights < ROUNDS_EACH,
   );
+}
+
+/** The players scoring this game. Empty in a two-player game, where AI judges. */
+export function judges(state: RoomState): Player[] {
+  return state.players.filter((p) => !p.isHost && p.role === 'judge');
+}
+
+/**
+ * The damage a fighter dealt, averaged across judges.
+ *
+ * The brief says two judges average, so any number of them does. With no
+ * judges the AI's single score stands on its own.
+ */
+export function averageScore(turn: Turn, attackerId: string): number {
+  const scores = Object.values(turn.judged)
+    .map((byFighter) => byFighter[attackerId])
+    .filter((n): n is number => typeof n === 'number');
+  if (scores.length === 0) return 0;
+  return Math.round(scores.reduce((sum, n) => sum + n, 0) / scores.length);
 }
 
 /** Everyone with a vote: fighters and judges alike, but not the host screen. */
