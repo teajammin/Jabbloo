@@ -16,7 +16,15 @@ import { getSettings, onSettingsChange } from '../settings';
  * during a fight competes with the fight.
  */
 
-const COLOURS = ['#cb6ac8', '#f2a25c', '#7db4ee', '#9ad9a0'];
+/*
+ * Blue, purple, orange, green — with the purple deepened.
+ *
+ * The other three are as they were; only the purple has changed, from a light
+ * magenta to something darker and less pink. It anchors the other three, which
+ * a pastel of the same hue could not: everything drifting at the same weight
+ * reads as a wash rather than as colours moving.
+ */
+const COLOURS = ['#9a4fb0', '#f2a25c', '#7db4ee', '#9ad9a0'];
 
 /** Slow enough to be scenery. Anything faster asks to be watched. */
 const CYCLE_SECONDS = 26;
@@ -33,6 +41,9 @@ export function mountBackdrop(): () => void {
     blob.className = 'backdrop-blob';
     blob.style.background = colour;
     blob.style.width = `${40 + i * 6}%`;
+    // The purple is the darkest of the four, so a little less of it goes as
+    // far as more of the others.
+    if (i === 0) blob.style.opacity = '0.5';
     root.appendChild(blob);
 
     const path = [

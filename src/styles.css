@@ -448,10 +448,35 @@ input[type='text'] {
   transition: box-shadow 0.15s ease, background 0.15s ease;
 }
 
-.zone-teamA { background: #fff4f4; }
-.zone-teamB { background: #eef6ff; }
-.zone-judge { background: #f6f2ff; min-height: 118px; }
-.zone-unassigned { background: #fffbef; }
+/*
+ * The zones carry real colour.
+ *
+ * They were four barely-different washes, which made a lobby of four boxes
+ * read as one box drawn four times — and the whole point of them is that a
+ * player can see at a glance which side they are on. Each now has a saturated
+ * ground and a solid edge in a deeper shade of itself.
+ */
+.zone-teamA {
+  background: #f6cfcf;
+  box-shadow: inset 0 0 0 3px #d4736f, var(--shadow);
+}
+
+.zone-teamB {
+  background: #c9dcf5;
+  box-shadow: inset 0 0 0 3px #5b87c2, var(--shadow);
+}
+
+.zone-judge {
+  background: #ddd2f3;
+  box-shadow: inset 0 0 0 3px #7f6bb8, var(--shadow);
+  min-height: 118px;
+}
+
+.zone-unassigned {
+  background: #f7e6bd;
+  box-shadow: inset 0 0 0 3px #c2a052, var(--shadow);
+  min-height: 168px;
+}
 
 /* Highlighted while a card is dragged over, or while one is picked up. */
 .zone.over,
