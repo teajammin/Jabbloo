@@ -20,24 +20,37 @@ import { getSettings, onSettingsChange } from '../settings';
  */
 
 /**
- * The colours, in the order they are painted.
+ * The colours and how much of the field each one should hold.
  *
- * The first is the top layer, so the order is the balance: greens lead, the
- * purple sits underneath everything and is the smallest of the five. It was
- * on top before, and being both first and smallest made it the one thing the
- * eye kept landing on.
+ * Green a third, blue a third, purple and coral-orange a fifth each. The green
+ * is still two greens — a fresh leaf and a deeper sea, which is what stopped
+ * it looking like one flat colour — but they now share that third between
+ * them rather than taking one each.
  *
- * Two greens rather than one, and different kinds of green — a fresh leaf and
- * a deeper sea. A single hue drifting is a colour; two of the same family
- * moving past each other is a landscape.
+ * Shares are written as shares because that is the decision; the gradient
+ * sizes below are worked out from them. Area grows with the square of the
+ * width, so a colour asked for twice the presence needs about 1.4 times the
+ * size, which is not a number anyone should have to keep in their head.
  */
 const COLOURS = [
-  { colour: '#8ed9a6', size: 76 },   // fresh green
-  { colour: '#4fb086', size: 68 },   // deeper, sea-leaning green
-  { colour: '#7db4ee', size: 80 },   // blue
-  { colour: '#f2a25c', size: 62 },   // orange
-  { colour: '#9a4fb0', size: 52 },   // purple, underneath and smallest
+  { colour: '#9a4fb0', share: 0.20 },   // purple
+  { colour: '#f28a63', share: 0.20 },   // coral orange
+  { colour: '#8ed9a6', share: 0.15 },   // fresh green
+  { colour: '#4fb086', share: 0.15 },   // deeper, sea-leaning green
+  { colour: '#7db4ee', share: 0.30 },   // blue
 ];
+
+/** The widest a gradient gets, as a percentage of the sheet. */
+const MAX_SIZE = 82;
+
+/** Share of the field to gradient width. Painted largest-last, so the big ones
+ *  do not sit on top of the small ones and swallow them. */
+const LAYERS = [...COLOURS]
+  .map(({ colour, share }) => ({
+    colour,
+    size: MAX_SIZE * Math.sqrt(share / Math.max(...COLOURS.map((c) => c.share))),
+  }))
+  .sort((a, b) => a.size - b.size);
 
 /** Where each colour sits, at each turn of its journey. Percentages of the sheet. */
 const PATHS = [
@@ -66,9 +79,10 @@ export function mountBackdrop(): () => void {
   sheet.className = 'backdrop-sheet';
   // Oversized and centred, so a gradient can leave the screen entirely and
   // come back rather than piling up against an edge.
-  sheet.style.backgroundImage = COLOURS.map(({ colour }) =>
+  sheet.style.backgroundImage = LAYERS.map(({ colour }) =>
     `radial-gradient(circle at center, ${colour} 0%, ${colour} 34%, ${colour}00 68%)`).join(', ');
-  sheet.style.backgroundSize = COLOURS.map(({ size }) => `${size}% ${size}%`).join(', ');
+  sheet.style.backgroundSize = LAYERS.map(({ size }) =>
+    `${size.toFixed(1)}% ${size.toFixed(1)}%`).join(', ');
   sheet.style.backgroundRepeat = 'no-repeat';
   root.appendChild(sheet);
 
