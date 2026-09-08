@@ -1,4 +1,4 @@
-import { bubbleText } from './bubbleText';
+import { bubbleText, titleHeight } from './bubbleText';
 import { el, button, goHome, type Screen } from './screens';
 import { RoomConnection } from '../net/room';
 import { creationScreen } from './creation';
@@ -179,7 +179,7 @@ export function lobbyScreen(
                 joinAddress,
                 joinQr,
                 el('p', { class: 'lede' }, 'with the code'),
-                bubbleText(code, { height: 84, jitter: 4, className: 'title' }),
+                bubbleText(code, { height: titleHeight(120), jitter: 4, className: 'title' }),
                 el('a', { class: 'join-link', href: joinUrl, target: '_blank', rel: 'noreferrer' },
                   'or open the direct link'),
               ),
@@ -197,7 +197,7 @@ export function lobbyScreen(
               ),
             )
           : el('div', { class: 'lobby-player' },
-              bubbleText(code, { height: 62, className: 'title' }),
+              bubbleText(code, { height: titleHeight(110), className: 'title' }),
               status,
               roster,
               error,

@@ -1,4 +1,4 @@
-import { bubbleText } from './bubbleText';
+import { bubbleText, titleHeight } from './bubbleText';
 import { el, button, goHome, type Screen } from './screens';
 import { MAX_PLAYERS, MIN_PLAYERS, makeRoomCode } from '../shared/protocol';
 import { lobbyScreen } from './lobby';
@@ -32,7 +32,7 @@ export const createRoomScreen: Screen = (root, go) => {
 
   root.append(
     el('main', { class: 'screen' },
-      bubbleText('HOW MANY', { height: 62, className: 'title' }),
+      bubbleText('HOW MANY', { height: titleHeight(96), className: 'title' }),
       el('p', { class: 'lede' },
         'Everyone joins from their own device. Judges count too — with 3 or 5 players the extras judge.'),
       counts,

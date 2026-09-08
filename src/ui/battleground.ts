@@ -1,6 +1,6 @@
 import { el, type Screen, goHome } from './screens';
 import { countdown } from './timer';
-import { bubbleText } from './bubbleText';
+import { bubbleText, titleHeight } from './bubbleText';
 import { battleScreen } from './battle';
 import type { RoomConnection } from '../net/room';
 import {
@@ -108,7 +108,7 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
           const ground = battlegrounds.find((b) => b.id === winner);
           note.textContent = `${ground?.label ?? 'Somewhere'} it is.`;
           heading.replaceChildren(
-            bubbleText(ground?.label.toUpperCase() ?? '', { height: 72, jitter: 4 }),
+            bubbleText(ground?.label.toUpperCase() ?? '', { height: titleHeight(104), jitter: 4 }),
           );
           return;
         }
@@ -137,7 +137,7 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
       },
     });
 
-    heading.replaceChildren(bubbleText('WHERE', { height: 72, jitter: 4 }));
+    heading.replaceChildren(bubbleText('WHERE', { height: titleHeight(104), jitter: 4 }));
 
     root.append(
       el('main', { class: 'screen screen-ground' }, heading, note, clock.root, grid),

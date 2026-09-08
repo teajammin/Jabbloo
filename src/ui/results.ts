@@ -1,5 +1,5 @@
 import { el, button, goHome, type Screen } from './screens';
-import { bubbleText } from './bubbleText';
+import { bubbleText, titleHeight } from './bubbleText';
 import type { RoomConnection } from '../net/room';
 import { play } from '../audio';
 import {
@@ -28,7 +28,7 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
       const names = state.teamNames;
 
       title.replaceChildren(
-        bubbleText(winner ? 'WINNER' : 'A TIE', { height: 84, jitter: 5 }),
+        bubbleText(winner ? 'WINNER' : 'A TIE', { height: titleHeight(120), jitter: 5 }),
       );
       // A tie only reaches this screen once no more ULTs are owed — the room
       // goes back to the drawing board rather than here while one is. So the

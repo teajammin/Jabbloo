@@ -1,4 +1,4 @@
-import { bubbleText } from './bubbleText';
+import { bubbleText, titleHeight } from './bubbleText';
 import { el, button, type Screen } from './screens';
 import { helpButton, helpDialog } from './help';
 import { createRoomScreen } from './createRoom';
@@ -11,7 +11,7 @@ export const launchScreen: Screen = (root, go) => {
 
   root.append(
     el('main', { class: 'screen screen-launch' },
-      bubbleText('JABBLOO', { height: 128, jitter: 6, className: 'title' }),
+      bubbleText('JABBLOO', { height: titleHeight(180), jitter: 6, className: 'title' }),
       el('p', { class: 'version' }, `v${VERSION}`),
       el('div', { class: 'stack' },
         button('Create room', () => go(createRoomScreen), 'big primary'),

@@ -27,6 +27,19 @@ export interface BubbleTextOptions {
   className?: string;
 }
 
+/**
+ * A heading size that suits the window it is in.
+ *
+ * Lettering fixed in pixels is either small on a laptop or overwhelming on a
+ * phone. This takes the size a big screen should use and scales it down for
+ * narrower ones, so a title fills the space it is given on both.
+ */
+export function titleHeight(ideal: number, min = 40): number {
+  if (typeof window === 'undefined') return ideal;
+  const room = Math.min(window.innerWidth * 0.82, window.innerHeight * 0.3);
+  return Math.max(min, Math.min(ideal, Math.round(room * 0.62)));
+}
+
 /** Builds an element spelling `text` in the game's letters. */
 export function bubbleText(text: string, options: BubbleTextOptions = {}): HTMLElement {
   const { height = 90, jitter = 0, className } = options;
