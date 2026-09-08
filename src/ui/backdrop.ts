@@ -19,7 +19,25 @@ import { getSettings, onSettingsChange } from '../settings';
  * slowly underneath them, so the field never repeats.
  */
 
-const COLOURS = ['#9a4fb0', '#f2a25c', '#7db4ee', '#9ad9a0'];
+/**
+ * The colours, in the order they are painted.
+ *
+ * The first is the top layer, so the order is the balance: greens lead, the
+ * purple sits underneath everything and is the smallest of the five. It was
+ * on top before, and being both first and smallest made it the one thing the
+ * eye kept landing on.
+ *
+ * Two greens rather than one, and different kinds of green — a fresh leaf and
+ * a deeper sea. A single hue drifting is a colour; two of the same family
+ * moving past each other is a landscape.
+ */
+const COLOURS = [
+  { colour: '#8ed9a6', size: 76 },   // fresh green
+  { colour: '#4fb086', size: 68 },   // deeper, sea-leaning green
+  { colour: '#7db4ee', size: 80 },   // blue
+  { colour: '#f2a25c', size: 62 },   // orange
+  { colour: '#9a4fb0', size: 52 },   // purple, underneath and smallest
+];
 
 /** Where each colour sits, at each turn of its journey. Percentages of the sheet. */
 const PATHS = [
@@ -27,6 +45,7 @@ const PATHS = [
   [[84, 14], [26, 30], [12, 78], [70, 90], [84, 14]],
   [[18, 82], [80, 74], [92, 20], [30, 10], [18, 82]],
   [[76, 84], [14, 62], [34, 12], [88, 40], [76, 84]],
+  [[46, 46], [8, 70], [64, 30], [92, 82], [46, 46]],
 ];
 
 /**
@@ -47,9 +66,9 @@ export function mountBackdrop(): () => void {
   sheet.className = 'backdrop-sheet';
   // Oversized and centred, so a gradient can leave the screen entirely and
   // come back rather than piling up against an edge.
-  sheet.style.backgroundImage = COLOURS.map((colour) =>
+  sheet.style.backgroundImage = COLOURS.map(({ colour }) =>
     `radial-gradient(circle at center, ${colour} 0%, ${colour} 34%, ${colour}00 68%)`).join(', ');
-  sheet.style.backgroundSize = COLOURS.map((_, i) => `${58 + i * 8}% ${58 + i * 8}%`).join(', ');
+  sheet.style.backgroundSize = COLOURS.map(({ size }) => `${size}% ${size}%`).join(', ');
   sheet.style.backgroundRepeat = 'no-repeat';
   root.appendChild(sheet);
 

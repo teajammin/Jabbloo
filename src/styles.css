@@ -117,23 +117,37 @@ body {
 
 /* ------------------------------------------------------------ bubble letters */
 
+/*
+ * A word set in the game's letters stays on one line.
+ *
+ * Wrapping was the old answer to a word too wide for its column, and it turned
+ * a four-letter room code into two stacked pairs — which reads as two words,
+ * or as a mistake. The line holds instead, and the letters shrink together to
+ * fit whatever space they are given.
+ */
 .bubble-text {
   display: flex;
   align-items: flex-end;
   justify-content: center;
   gap: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  max-width: 100%;
 }
 
 .bubble-text img {
-  height: var(--bubble-height, 90px);
+  /* Height is the target, not the rule: given a narrow column, flexbox shrinks
+     the widths and `height: auto` keeps each glyph in proportion. */
+  height: auto;
+  max-height: var(--bubble-height, 90px);
   width: auto;
+  flex: 0 1 auto;
+  min-width: 0;
   /* Glyph boxes carry a little side padding; pull them together slightly. */
   margin-inline: calc(var(--bubble-height, 90px) * -0.018);
   user-select: none;
 }
 
-.bubble-space { width: calc(var(--bubble-height, 90px) * 0.3); }
+.bubble-space { flex: 0 0 auto; width: calc(var(--bubble-height, 90px) * 0.3); }
 
 .title { margin-bottom: 4px; }
 
