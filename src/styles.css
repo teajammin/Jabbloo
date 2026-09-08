@@ -425,6 +425,7 @@ input[type='text'] {
 /* ------------------------------------------------------------ drawing screen */
 
 .screen-draw {
+  position: relative;
   /* Fills the viewport so the canvas can claim whatever the toolbar leaves. */
   height: 100dvh;
   justify-content: flex-start;
@@ -514,6 +515,21 @@ input[type='text'] {
   scroll-padding-inline: 5px;
 }
 
+/*
+ * Done and Clear stay put while the rest of the toolbar scrolls.
+ *
+ * The toolbar is a scroll container on both layouts — a column on a laptop, a
+ * stack of rows on a phone — and the actions were the last thing in it, so on
+ * a short window they simply were not there.
+ */
+.tool-row.actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--cream);
+  box-shadow: 0 -6px 10px var(--cream);
+}
+
 .tool-row::-webkit-scrollbar { display: none; }
 .tool-row > * { flex: 0 0 auto; }
 
@@ -571,13 +587,27 @@ input[type='text'] {
 /* On a phone the toolbar is trimmed so the canvas keeps as much height as
    possible, while every control stays at a comfortable tap size. */
 @media (max-width: 480px) {
-  .screen-draw { gap: 6px; }
+  /*
+   * Every pixel of chrome here is a pixel the drawing does not get, and the
+   * canvas is the whole point of the screen. The padding goes, the title goes,
+   * the rows tighten, and what is left is given to the canvas — which is
+   * square, so width won back is height won too.
+   */
+  .screen-draw {
+    gap: 4px;
+    padding: max(4px, env(safe-area-inset-top)) 4px
+             max(6px, env(safe-area-inset-bottom)) 4px;
+  }
   .draw-title { display: none; }
-  .tool { min-width: 46px; min-height: 46px; font-size: 18px; padding: 6px 8px; }
-  .tool.wide { min-width: 70px; font-size: 14px; }
-  .size { width: 46px; height: 46px; }
-  .swatch { width: 34px; height: 34px; min-height: 34px; }
-  .toolbar { gap: 6px; }
+  .draw-hint { display: none; }
+  .tool { min-width: 44px; min-height: 44px; font-size: 17px; padding: 5px 7px; }
+  .tool.wide { min-width: 66px; font-size: 13px; }
+  .size { width: 44px; height: 44px; }
+  .swatch { width: 32px; height: 32px; min-height: 32px; }
+  .toolbar { gap: 4px; padding: 3px 0; }
+  .tool-row { gap: 5px; padding: 4px 4px 5px; }
+  .draw-stage { border-radius: 20px; }
+  .zoom-out { bottom: auto; top: 10px; right: 10px; }
 }
 
 /* Short screens (landscape phones) drop the hint too. */
@@ -585,6 +615,21 @@ input[type='text'] {
   .draw-hint { display: none; }
 }
 
+
+/*
+ * Zoom lives on the stage itself, so the canvas' own bounding box moves with
+ * it and pointer coordinates stay correct without the drawing code knowing
+ * anything about magnification.
+ */
+.draw-stage { transform-origin: center center; touch-action: none; }
+
+.zoom-out {
+  position: absolute;
+  right: 14px;
+  bottom: 96px;
+  z-index: 3;
+  background: var(--butter);
+}
 
 /* --------------------------------------------------- desktop drawing layout */
 
@@ -615,7 +660,9 @@ input[type='text'] {
     order: -1;
     flex: 0 0 300px;
     width: 300px;
-    justify-content: center;
+    /* Not centred: a centred flex column that overflows its container puts
+       content above the scrollable area, where it cannot be reached at all. */
+    justify-content: flex-start;
     gap: 12px;
     overflow-y: auto;
   }
@@ -1205,4 +1252,51 @@ body:has(.screen-draw) .help-open { display: none !important; }
   color: var(--ink);
   background: var(--butter);
   box-shadow: 0 4px 16px rgba(74, 68, 88, 0.22);
+}
+
+/* ------------------------------------------------------- weapon picker */
+
+.weapon-row { align-items: stretch; }
+
+.weapon-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 92px;
+  padding: 8px 10px 10px;
+  border: none;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.weapon-pick[aria-pressed='true'] {
+  background: var(--lavender);
+  box-shadow: 0 0 0 3px var(--ink), var(--shadow);
+}
+
+/* Reserved whether or not the drawing has arrived, so the row does not jump
+   when the pictures land. */
+.weapon-preview {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.weapon-name {
+  font-size: 13px;
+  font-weight: 700;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .weapon-pick { min-width: 78px; padding: 6px 8px 8px; }
+  .weapon-preview { width: 52px; height: 52px; }
 }

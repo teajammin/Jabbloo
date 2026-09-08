@@ -31,6 +31,8 @@ export const CONTROL_HELP: Record<string, ControlHelp> = {
   smaller: { icon: '－', name: 'Shrink', what: 'Makes the photo you are placing smaller.' },
   bigger: { icon: '＋', name: 'Enlarge', what: 'Makes the photo you are placing bigger.' },
 
+  zoomOut: { icon: '⤢', name: 'Fit to screen', what: 'Back to the whole canvas. Pinch with two fingers to zoom in on a detail.' },
+
   undo: { icon: '←', name: 'Undo', what: 'Takes back the last thing you did.', key: '⌘Z' },
   redo: { icon: '→', name: 'Redo', what: 'Puts back what you just undid.', key: '⇧⌘Z' },
   copy: { icon: '⧉', name: 'Copy', what: 'Copies whatever you have selected.', key: '⌘C' },

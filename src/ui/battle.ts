@@ -41,6 +41,13 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
     /** Turns already played, so a re-broadcast never replays one. */
     let playedTurn = '';
     /**
+     * Fighters already introduced.
+     *
+     * A name card belongs to a character's first appearance. Announcing the
+     * same two people again every round turns a reveal into a delay.
+     */
+    const introduced = new Set<string>();
+    /**
      * In-flight stage build.
      *
      * ensureStage awaits an import, so two state updates arriving together can
@@ -100,7 +107,12 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       bars = new Map();
 
       const sides = ['left', 'right'] as const;
-      const entering: { fighter: import('../engine').Fighter; side: 'left' | 'right'; name: string }[] = [];
+      const entering: {
+        fighter: import('../engine').Fighter;
+        side: 'left' | 'right';
+        name: string;
+        id: string;
+      }[] = [];
       for (const [index, id] of turn.fighters.entries()) {
         const entry = artFor(id);
         const player = playerFor(id);
@@ -128,7 +140,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         stage.addHealthBar(bar, side);
         bars.set(id, bar);
 
-        entering.push({ fighter, side, name: fighter.name });
+        entering.push({ fighter, side, name: fighter.name, id });
       }
 
       // One at a time, each announced by name: the brief asks for a reveal,
@@ -137,11 +149,14 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       for (const { fighter, side } of entering) {
         fighter.setPosition(stage.offstageX(side), stage.height * engine.GROUND_Y);
       }
-      for (const { fighter, side, name } of entering) {
+      for (const { fighter, side, name, id } of entering) {
         if (disposed) return;
-        caption.textContent = name;
-        await stage.announce(name, side);
-        if (disposed) return;
+        if (!introduced.has(id)) {
+          introduced.add(id);
+          caption.textContent = name;
+          await stage.announce(name, side);
+          if (disposed) return;
+        }
         await stage.enterStage(fighter, side);
       }
     }

@@ -65,9 +65,16 @@ await wait(300);
 check('creation finished', state(host).phase === 'battleground', state(host).phase);
 
 // A phone must not be able to pull the artwork.
+// A phone gets its own artwork — its move screen shows each weapon as the
+// player drew it — and nobody else's.
 a.send(JSON.stringify({ type: 'requestArt' }));
-await wait(200);
-check('a phone cannot pull the artwork', last(a, 'art') === undefined);
+await wait(250);
+const mine = last(a, 'art')?.art;
+check('a phone receives its own artwork', Array.isArray(mine) && mine.length === 1,
+  JSON.stringify(mine?.length));
+check('and only its own', mine?.[0]?.playerId === ids[0], mine?.[0]?.playerId);
+check('with the weapons it drew', mine?.[0]?.weapons.length === 3,
+  String(mine?.[0]?.weapons.length));
 
 host.send(JSON.stringify({ type: 'requestArt' }));
 await wait(300);

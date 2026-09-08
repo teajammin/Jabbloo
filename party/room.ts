@@ -25,6 +25,7 @@ import {
   winningTeam,
   type ClientMessage,
   type Player,
+  type PlayerArt,
   type Role,
   type RoomState,
   type ServerMessage,
@@ -854,30 +855,42 @@ export default class Room implements Party.Server {
    * the shared screen draws with it. Phones never need it and would pay for it
    * in memory and bandwidth.
    */
+  /**
+   * Hands over finished artwork.
+   *
+   * The host gets everyone's, because it draws the fight. A player gets their
+   * own and nobody else's: their phone needs it to show which weapon is which
+   * when they pick one, and there is no reason for one player's drawings to
+   * sit in another player's memory.
+   */
   private onRequestArt(sender: Party.Connection): void {
-    if (!this.isHost(sender)) return;
+    if (!this.isHost(sender)) {
+      const player = this.state.players.find((p) => p.id === sender.id && !p.isHost);
+      if (player) this.send(sender, { type: 'art', art: [this.artFor(player.id)] });
+      return;
+    }
 
     // One message per player. Six characters and eighteen weapons together run
     // to several megabytes, and the platform closes a socket that carries a
     // message over a megabyte — which would take the host's screen down at the
     // exact moment the battle starts.
     for (const player of creators(this.state)) {
-      const pieces = this.creationsFor(player.id);
-      const character = pieces.find((p) => p.slot === 'character');
-      const weapons = pieces
+      this.send(sender, { type: 'art', art: [this.artFor(player.id)] });
+    }
+  }
+
+  /** One player's finished work, in the shape the wire carries. */
+  private artFor(playerId: string): PlayerArt {
+    const pieces = this.creationsFor(playerId);
+    const character = pieces.find((p) => p.slot === 'character');
+    return {
+      playerId,
+      character: character ? { png: character.png, name: character.name } : null,
+      weapons: pieces
         .filter((p) => p.slot.startsWith('weapon'))
         .sort((a, b) => a.slot.localeCompare(b.slot))
-        .map((w) => ({ png: w.png, name: w.name }));
-
-      this.send(sender, {
-        type: 'art',
-        art: [{
-          playerId: player.id,
-          character: character ? { png: character.png, name: character.name } : null,
-          weapons,
-        }],
-      });
-    }
+        .map((w) => ({ png: w.png, name: w.name })),
+    };
   }
 
   /** The judges actually holding a phone right now. */

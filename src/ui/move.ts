@@ -28,7 +28,7 @@ export function moveScreen(
     const sentence = el('p', { class: 'move-sentence' });
     const status = el('p', { class: 'lede' }, '');
 
-    const weaponRow = el('div', { class: 'tool-row' });
+    const weaponRow = el('div', { class: 'tool-row weapon-row' });
     const weaponButtons: HTMLButtonElement[] = [];
 
     const prompt = el('textarea', {
@@ -71,12 +71,45 @@ export function moveScreen(
       for (const node of weaponButtons) node.disabled = true;
     }
 
+    /**
+     * Each weapon as its own drawing, not just its name.
+     *
+     * A player has three weapons and fifty words to describe using one of
+     * them; picking from a row of names means remembering which was which,
+     * when they drew all three ten minutes ago.
+     */
+    const previews: HTMLImageElement[] = [];
     weapons.forEach((w, index) => {
-      const node = button(w.name, () => pick(index), 'tool wide');
+      const preview = el('img', { class: 'weapon-preview', alt: '' });
+      preview.hidden = true;
+      previews.push(preview);
+
+      const node = el('button', { class: 'weapon-pick', type: 'button' },
+        preview,
+        el('span', { class: 'weapon-name' }, w.name),
+      );
       node.setAttribute('aria-pressed', String(index === 0));
+      node.addEventListener('click', () => pick(index));
       weaponButtons.push(node);
       weaponRow.appendChild(node);
     });
+
+    // The artwork is on the server; a phone asks for its own and nobody
+    // else's. Names are already on screen, so the pictures fill in when they
+    // arrive rather than holding the screen up.
+    connection.on({
+      onArt: (art) => {
+        const mine = art.find((entry) => entry.playerId === connection.playerId);
+        if (!mine) return;
+        for (const [index, preview] of previews.entries()) {
+          const png = mine.weapons[index]?.png;
+          if (!png) continue;
+          preview.src = png;
+          preview.hidden = false;
+        }
+      },
+    });
+    connection.send({ type: 'requestArt' });
 
     prompt.addEventListener('input', updateCount);
     describe();

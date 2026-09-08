@@ -190,7 +190,76 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     /** True while a placed photo is being moved or scaled. */
     let transformDrag = false;
 
+    /**
+     * Pinch to zoom, on a canvas the size of a hand.
+     *
+     * A 1024px drawing shown at phone width is a third of its own resolution,
+     * which is fine for a body and hopeless for an eye. Zooming is a CSS
+     * transform on the stage rather than anything the canvas knows about:
+     * pointer coordinates are worked out from the element's own bounding box,
+     * and a transform changes that box, so drawing keeps landing in the right
+     * place at any magnification with no arithmetic of its own.
+     */
+    const MAX_ZOOM = 4;
+    /** Only shown when there is something to go back from. */
+    const zoomOutButton = button('⤢', () => resetZoom(), 'tool zoom-out');
+    zoomOutButton.setAttribute('aria-label', 'Fit to screen');
+    zoomOutButton.title = 'Fit to screen';
+    zoomOutButton.hidden = true;
+
+    const pointers = new Map<number, { x: number; y: number }>();
+    let zoom = 1;
+    let panX = 0;
+    let panY = 0;
+    /** The pinch in progress: what the gesture started from. */
+    let pinch: { distance: number; zoom: number; x: number; y: number;
+      panX: number; panY: number } | null = null;
+
+    function applyZoom(): void {
+      // Held inside its own frame: panned far enough that the drawing left the
+      // screen, there would be nothing to pinch back.
+      const limit = (stage.clientWidth * (zoom - 1)) / 2;
+      panX = Math.max(-limit, Math.min(limit, panX));
+      panY = Math.max(-limit, Math.min(limit, panY));
+      stage.style.transform = zoom === 1 && panX === 0 && panY === 0
+        ? ''
+        : `translate(${panX}px, ${panY}px) scale(${zoom})`;
+      zoomOutButton.hidden = zoom === 1;
+    }
+
+    function resetZoom(): void {
+      zoom = 1;
+      panX = 0;
+      panY = 0;
+      applyZoom();
+      say('Back to fit');
+    }
+
+    const midpoint = () => {
+      const [a, b] = [...pointers.values()];
+      return a && b
+        ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, distance: Math.hypot(a.x - b.x, a.y - b.y) }
+        : null;
+    };
+
     const onDown = (event: PointerEvent) => {
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      // A second finger is a pinch, never a second stroke. Whatever the first
+      // finger had started is abandoned rather than left half-drawn.
+      if (pointers.size === 2) {
+        cancelHold();
+        canvas.abortStroke();
+        drawing = false;
+        croppingDrag = false;
+        transformDrag = false;
+        const centre = midpoint();
+        if (centre) {
+          pinch = { distance: centre.distance, zoom, x: centre.x, y: centre.y, panX, panY };
+        }
+        return;
+      }
+
       if (!event.isPrimary) return;
       // Right and middle buttons must not draw, drag or place anything: the
       // context menu handles them, and pointerdown fires first.
@@ -266,6 +335,23 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     };
 
     const onMove = (event: PointerEvent) => {
+      if (pointers.has(event.pointerId)) {
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      }
+
+      if (pinch) {
+        event.preventDefault();
+        const centre = midpoint();
+        if (!centre || pinch.distance === 0) return;
+        zoom = Math.max(1, Math.min(MAX_ZOOM, pinch.zoom * (centre.distance / pinch.distance)));
+        // The pinch moves the drawing as well as scaling it, so two fingers
+        // can carry the canvas to the corner they want to work on.
+        panX = pinch.panX + (centre.x - pinch.x);
+        panY = pinch.panY + (centre.y - pinch.y);
+        applyZoom();
+        return;
+      }
+
       if (croppingDrag) {
         event.preventDefault();
         canvas.dragCrop(canvas.toCanvas(event));
@@ -293,6 +379,16 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     };
 
     const onUp = (event: PointerEvent) => {
+      pointers.delete(event.pointerId);
+      if (pinch && pointers.size < 2) {
+        pinch = null;
+        // The finger still down would otherwise start a stroke from wherever
+        // the pinch left it.
+        canvas.abortStroke();
+        drawing = false;
+        return;
+      }
+
       cancelHold();
       if (croppingDrag || transformDrag) {
         croppingDrag = false;
@@ -715,6 +811,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     shell.append(
       el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),
       area,
+      zoomOutButton,
         el('div', { class: 'toolbar' },
           toolRow,
           sizeRow,
@@ -723,7 +820,10 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
             uploadButton, smallerButton, biggerButton,
             undoButton, redoButton, copyButton, pasteButton),
           cropBar,
-          el('div', { class: 'tool-row' }, helpButton, clearButton, doneButton),
+          // Marked as the actions row so it can be pinned: on a laptop the
+          // toolbar is a column that can outgrow the window, and Done was
+          // scrolling off the bottom of it.
+          el('div', { class: 'tool-row actions' }, helpButton, clearButton, doneButton),
           fileInput,
           status,
         ),

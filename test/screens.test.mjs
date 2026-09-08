@@ -363,6 +363,50 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   });
 }
 
+// --- picking a weapon by sight, not by name ---------------------------------
+
+{
+  const connection = fakeConnection('a', roomState({ phase: 'battle', turn: turn('picking') }));
+  mounts('weapon previews', ui.moveScreen(connection, [
+    { name: 'Butter Sword' }, { name: 'Axe' }, { name: 'Hammer' },
+  ], 'Bonkalot'), (root) => {
+    check('the phone asks for its own artwork',
+      connection.sent.some((m) => m.type === 'requestArt'), JSON.stringify(connection.sent));
+
+    const picks = root.querySelectorAll('.weapon-pick');
+    check('there is a button per weapon', picks.length === 3, String(picks.length));
+    check('each names its weapon',
+      [...picks].every((p) => p.textContent.trim().length > 0));
+    check('and none shows a picture yet',
+      [...root.querySelectorAll('.weapon-preview')].every((img) => img.hidden));
+
+    // The artwork arrives a moment later, as it does over a real connection.
+    connection.art([{
+      playerId: 'a',
+      character: { png: 'data:image/png;base64,AAA', name: 'Bonkalot' },
+      weapons: [
+        { png: 'data:image/png;base64,SWORD', name: 'Butter Sword' },
+        { png: 'data:image/png;base64,AXE', name: 'Axe' },
+        { png: 'data:image/png;base64,HAMMER', name: 'Hammer' },
+      ],
+    }]);
+
+    const shown = [...root.querySelectorAll('.weapon-preview')].filter((img) => !img.hidden);
+    check('every weapon then shows its drawing', shown.length === 3, String(shown.length));
+    check('each the right way round',
+      shown[1]?.src.includes('AXE'), shown[1]?.src);
+
+    // Another player's artwork must not be drawn onto this phone.
+    connection.art([{
+      playerId: 'b',
+      character: null,
+      weapons: [{ png: 'data:image/png;base64,SOMEONEELSE', name: 'Theirs' }],
+    }]);
+    check('someone else\u2019s artwork is ignored',
+      [...root.querySelectorAll('.weapon-preview')].every((img) => !img.src.includes('SOMEONEELSE')));
+  });
+}
+
 // --- results ----------------------------------------------------------------
 
 {

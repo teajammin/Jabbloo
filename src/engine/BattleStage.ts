@@ -136,21 +136,32 @@ export class BattleStage {
    * the entrance can shake the world underneath it without the name wobbling.
    */
   async announce(name: string, side: Side, seconds = 1.6): Promise<void> {
-    const text = await BubbleText.create(name.toUpperCase().slice(0, 14), {
+    const text = await BubbleText.create(name.toUpperCase().slice(0, 18), {
       height: this.height * 0.16,
       jitter: 4,
     });
-    // Placed over the half of the stage the fighter is walking onto, so the
-    // name and the character arrive in the same place.
-    text.x = this.homeX(side) - text.width / 2;
+
+    // Shrunk to fit before it is placed. A name is as long as a player made it,
+    // and lettering sized for a short one runs off both edges of the screen on
+    // a long one — which is what "NAMELESS" did.
+    const room = this.width * 0.86;
+    if (text.width > room) text.scale.set(room / text.width);
+
+    // Centred over the half of the stage the fighter is walking onto, so the
+    // name and the character arrive in the same place — but never so far over
+    // that it leaves the screen.
+    const margin = this.width * 0.04;
+    const wanted = this.homeX(side) - text.width / 2;
+    text.x = Math.max(margin, Math.min(this.width - margin - text.width, wanted));
     text.y = this.height * 0.24;
     text.alpha = 0;
-    text.scale.set(0.7);
+    const full = text.scale.x;
+    text.scale.set(full * 0.7);
     this.overlay.addChild(text);
 
     const tl = gsap.timeline();
     tl.to(text, { alpha: 1, duration: 0.25, ease: 'power2.out' });
-    tl.to(text.scale, { x: 1, y: 1, duration: 0.45, ease: 'back.out(2)' }, '<');
+    tl.to(text.scale, { x: full, y: full, duration: 0.45, ease: 'back.out(2)' }, '<');
     tl.to(text, { alpha: 0, duration: 0.3 }, `+=${Math.max(0.1, seconds - 0.75)}`);
 
     await new Promise<void>((resolve) => {
