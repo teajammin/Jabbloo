@@ -130,7 +130,8 @@ becomes an ULT — only exist as behaviour of the running server.
 
 ## Deploying
 
-One command puts the whole game on the internet:
+**Live at https://jabbloo.teajammin.partykit.dev** — anyone, anywhere, with a
+room code. One command puts a new build there:
 
 ```sh
 npm run deploy
