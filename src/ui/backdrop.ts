@@ -29,8 +29,14 @@ const PATHS = [
   [[76, 84], [14, 62], [34, 12], [88, 40], [76, 84]],
 ];
 
-/** One full circuit. Long enough to be scenery, short enough to be seen moving. */
-const CYCLE_SECONDS = 22;
+/**
+ * One full circuit.
+ *
+ * Slow on purpose: the colours cross most of the screen, so they do not also
+ * need to hurry. At forty seconds a glance shows a still image and a minute
+ * shows a different one, which is what scenery should do.
+ */
+const CYCLE_SECONDS = 40;
 
 export function mountBackdrop(): () => void {
   const root = document.createElement('div');
