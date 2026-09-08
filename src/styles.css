@@ -459,25 +459,34 @@ input[type='text'] {
  * player can see at a glance which side they are on. Each now has a saturated
  * ground and a solid edge in a deeper shade of itself.
  */
+/*
+ * Coral, teal, violet, marigold — vivid without being primary.
+ *
+ * The first attempt reached for red, blue, purple and yellow, which is the
+ * palette a computer picks rather than a person: saturated, evenly spaced, and
+ * cold. These are the same four positions moved off the primaries and warmed,
+ * so the zones stay instantly distinguishable while still belonging to a game
+ * drawn in pastel bubble letters.
+ */
 .zone-teamA {
-  background: #f6cfcf;
-  box-shadow: inset 0 0 0 3px #d4736f, var(--shadow);
+  background: #f8b3ac;
+  box-shadow: inset 0 0 0 3px #d9685d, var(--shadow);
 }
 
 .zone-teamB {
-  background: #c9dcf5;
-  box-shadow: inset 0 0 0 3px #5b87c2, var(--shadow);
+  background: #9fd6e2;
+  box-shadow: inset 0 0 0 3px #3e93ab, var(--shadow);
 }
 
 .zone-judge {
-  background: #ddd2f3;
-  box-shadow: inset 0 0 0 3px #7f6bb8, var(--shadow);
+  background: #cbb8ef;
+  box-shadow: inset 0 0 0 3px #7358bd, var(--shadow);
   min-height: 118px;
 }
 
 .zone-unassigned {
-  background: #f7e6bd;
-  box-shadow: inset 0 0 0 3px #c2a052, var(--shadow);
+  background: #fbdd97;
+  box-shadow: inset 0 0 0 3px #d29a35, var(--shadow);
   min-height: 168px;
 }
 
