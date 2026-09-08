@@ -109,7 +109,10 @@ paths, tried in that order:
 3. **The browser itself** — `src/draw/cutout.ts` floods inward from the border,
    which never fails and needs nothing configured, but wants a plain backdrop.
 
-The deployed game cannot reach a laptop's rembg, so it uses 2 or 3.
+The deployed game cannot reach a laptop's local service, so it uses 2 or 3.
+`REMBG_URL` therefore belongs in `.env` and never in the deploy: `partykit
+deploy` sends local variables only when asked with `--with-vars`, and
+`npm run deploy` does not ask.
 
 ### Tests
 
