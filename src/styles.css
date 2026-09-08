@@ -52,20 +52,16 @@ html, body {
 }
 
 /*
- * One sheet, four gradients, oversized so a colour can wander off the screen
- * and back. The softness is in the gradients themselves, so the blur only has
- * to take the last hard edge off — a fraction of the work a blur doing all of
- * it would cost, which matters on a phone.
+ * Twice the width of the window, so one pass of the gradient can slide by
+ * without a seam. No blur: a gradient is already nothing but soft edges, and
+ * blurring it is paying every frame for something already true.
  */
 .backdrop-sheet {
   position: absolute;
-  inset: -25%;
-  filter: blur(22px);
-  will-change: transform, background-position;
-}
-
-@media (max-width: 480px) {
-  .backdrop-sheet { filter: blur(14px); }
+  inset: 0;
+  background-size: 200% 100%;
+  background-repeat: repeat-x;
+  will-change: background-position;
 }
 
 body {
