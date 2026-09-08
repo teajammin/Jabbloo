@@ -51,18 +51,21 @@ html, body {
   pointer-events: none;
 }
 
+/*
+ * The colour is carried by a radial gradient rather than by transparency, so
+ * the blur only has to soften an edge that is already soft. A quarter of the
+ * radius the flat circles needed, which is a quarter of the work per frame.
+ */
 .backdrop-blob {
   position: absolute;
   aspect-ratio: 1;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.62;
+  filter: blur(26px);
   will-change: transform;
 }
 
 /* A phone has a fraction of the pixels and all of the same blur to compute. */
 @media (max-width: 480px) {
-  .backdrop-blob { filter: blur(64px); }
+  .backdrop-blob { filter: blur(18px); }
 }
 
 body {

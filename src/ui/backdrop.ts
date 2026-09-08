@@ -39,11 +39,15 @@ export function mountBackdrop(): () => void {
   COLOURS.forEach((colour, i) => {
     const blob = document.createElement('div');
     blob.className = 'backdrop-blob';
-    blob.style.background = colour;
-    blob.style.width = `${40 + i * 6}%`;
-    // The purple is the darkest of the four, so a little less of it goes as
-    // far as more of the others.
-    if (i === 0) blob.style.opacity = '0.5';
+    blob.style.width = `${44 + i * 6}%`;
+    // Solid through the middle and fading only at the rim.
+    //
+    // See-through colours average where they overlap, and the average of four
+    // hues is grey — which is what four translucent circles were quietly
+    // producing. Given an opaque centre, an overlap takes the front colour
+    // whole and the palette stays a palette.
+    blob.style.background =
+      `radial-gradient(circle at 50% 50%, ${colour} 0%, ${colour} 42%, ${colour}00 70%)`;
     root.appendChild(blob);
 
     const path = [
