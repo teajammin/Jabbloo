@@ -1,43 +1,52 @@
 import { getSettings, onSettingsChange } from '../settings';
 
 /**
- * The drifting background behind every menu screen.
+ * The background behind every menu screen: a slow wash of colour over grain.
  *
- * One wide gradient, slid slowly sideways. Nothing moves independently and
- * nothing overlaps: the colours simply arrive and leave, which is the calmest
- * motion available and the cheapest — a single background-position on a single
- * element, and no blur at all.
+ * Two layers. Underneath, one wide gradient sliding sideways — nothing moves
+ * independently and nothing overlaps, so nothing can average into grey, and
+ * the run is written out twice so the loop has no seam. Over it, a fixed film
+ * of noise, which is what stops a large area of flat dark looking like an
+ * empty div.
  *
- * The palette is the one that was chosen from the photographs, taken from the
- * images themselves rather than approximated: the warm creams, pinks and
- * purples are P4's own colours, the blues are P1's, and two greens bridge them
- * so the run from cool to warm has something in the middle.
+ * The colours are deep versions of the game's own: the ink the page is drawn
+ * on, warmed toward plum on one side and cooled toward indigo and teal on the
+ * other. They are meant to be noticed only if you look for them — the accents
+ * and the players' drawings are what should carry colour.
  *
- * The battle stage and the drawing screen opt out — both cover the window with
+ * The battle stage and the drawing screen opt out. Both cover the window with
  * their own thing, and a background nobody can see still costs every frame.
  */
 
-/**
- * The run of colour, left to right, doubled so the loop is seamless.
- *
- * Proportions are set by how much of the run each colour occupies, which is
- * why the stops are written as they are: blues about a third, greens a sixth,
- * and the rest P4's warm end.
- */
+/** The run of colour, left to right. Deep, and close enough to blend. */
 const RUN = [
-  '#cb6ac8',  // P4 · orchid
-  '#e790ae',  // P4 · rose
-  '#f2eebb',  // P4 · pale butter
-  '#a8dfae',  // green · leaf
-  '#6fc8b4',  // green · sea
-  '#8fd9ea',  // P1 · pale teal
-  '#7cc3ee',  // P1 · sky
-  '#9fb6ef',  // P1 · periwinkle, back toward the purple
-  '#c38ec0',  // P4 · mauve, closing the circle
+  '#241f33',  // ink, warmed
+  '#2f2440',  // plum
+  '#272b4a',  // indigo
+  '#22354a',  // slate blue
+  '#1f3a3f',  // deep teal
+  '#26283f',  // back toward indigo
 ];
 
 /** One pass of the whole run. Slow enough to be scenery. */
-const CYCLE_SECONDS = 70;
+const CYCLE_SECONDS = 90;
+
+/**
+ * Film grain, as a data URI.
+ *
+ * Generated rather than downloaded: it is a hundred and fifty bytes of SVG
+ * against a texture file's tens of kilobytes, it tiles perfectly, and it
+ * scales with the screen instead of being resampled on a phone.
+ */
+const GRAIN = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140">
+     <filter id="n">
+       <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/>
+       <feColorMatrix type="saturate" values="0"/>
+     </filter>
+     <rect width="140" height="140" filter="url(#n)" opacity="0.55"/>
+   </svg>`.replace(/\s+/g, ' '),
+);
 
 export function mountBackdrop(): () => void {
   const root = document.createElement('div');
@@ -46,13 +55,16 @@ export function mountBackdrop(): () => void {
 
   const sheet = document.createElement('div');
   sheet.className = 'backdrop-sheet';
-
   // Written out twice so the end meets the beginning: sliding exactly one
-  // copy's width returns to where it started, with no seam to hide.
-  const stops = [...RUN, ...RUN, RUN[0]!].join(', ');
-  sheet.style.backgroundImage = `linear-gradient(100deg, ${stops})`;
+  // copy's width returns to where it started, with nothing to hide.
+  sheet.style.backgroundImage =
+    `linear-gradient(100deg, ${[...RUN, ...RUN, RUN[0]!].join(', ')})`;
 
-  root.appendChild(sheet);
+  const grain = document.createElement('div');
+  grain.className = 'backdrop-grain';
+  grain.style.backgroundImage = `url("data:image/svg+xml,${GRAIN}")`;
+
+  root.append(sheet, grain);
   document.body.prepend(root);
 
   const animations = [sheet.animate(

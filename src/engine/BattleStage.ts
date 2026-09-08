@@ -38,6 +38,8 @@ export class BattleStage {
   /** The battleground photograph, behind everything and covering the stage. */
   private readonly scene = new Sprite(Texture.EMPTY);
   private readonly ground = new Graphics();
+  /** Darkened bands at top and bottom, so the overlay reads over any photo. */
+  private readonly vignette = new Graphics();
   private readonly parent: HTMLElement;
   /** Which side each fighter was placed on, so the stage can restore them. */
   private readonly sides = new Map<Fighter, Side>();
@@ -68,6 +70,7 @@ export class BattleStage {
 
     this.world.addChild(this.backdrop);
     this.world.addChild(this.scene);
+    this.world.addChild(this.vignette);
     this.world.addChild(this.ground);
     this.world.addChild(this.fighters);
     this.world.addChild(this.effects);
@@ -94,6 +97,17 @@ export class BattleStage {
     this.backdrop.endFill();
 
     void this.loadScene(ground.image);
+
+    // A vignette: the photographs are bright at the edges and the overlay is
+    // not, so the corners are pulled down to give the health bars, the name
+    // cards and the damage numbers something to sit against.
+    this.vignette.clear();
+    this.vignette.beginFill(0x000000, 0.34);
+    this.vignette.drawRect(0, 0, this.width, this.height * 0.26);
+    this.vignette.endFill();
+    this.vignette.beginFill(0x000000, 0.22);
+    this.vignette.drawRect(0, this.height * 0.82, this.width, this.height * 0.18);
+    this.vignette.endFill();
 
     // A soft darker band for the floor, so fighters read as standing on something.
     const groundY = this.height * GROUND_Y;

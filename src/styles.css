@@ -5,7 +5,46 @@
  * and bubbly, and most players are on a phone.
  */
 
+/*
+ * Ink and candy.
+ *
+ * Every party game worth copying — Jackbox, Kahoot, Fall Guys, skribbl — puts
+ * a few saturated accents on a deep, desaturated ground. Pastels on a pale
+ * page is the one combination none of them use, and it is what made this read
+ * as a children's app rather than a fighting game.
+ *
+ * The bubble lettering did not change and did not need to. Pastel on dark
+ * reads as neon sweets; the letters are the same drawings, against something
+ * they can finally glow against.
+ *
+ * Names are what a colour is FOR rather than what it looks like, so a future
+ * change of mind is a change here and nowhere else.
+ */
 :root {
+  /* Surfaces, from the back of the screen forward. */
+  --paper: #211d2c;
+  --panel: #2c2739;
+  --panel-high: #383049;
+  --line: rgba(244, 238, 251, 0.14);
+
+  /* Type. */
+  --text: #f4eefb;
+  --text-dim: #a79cba;
+  --on-accent: #1a1622;
+
+  /* Accents. One does the leading; the rest are for meaning. */
+  --accent: #9a7bf0;
+  --team-a: #e8746a;
+  --team-b: #3fb6c4;
+  --judge: #9a7bf0;
+  --waiting: #e8b155;
+  --good: #7ed39b;
+
+  /*
+   * The pastels stay: they are what the letters, the effects and the
+   * placeholder artwork are drawn in, and they belong to the game rather than
+   * to the interface.
+   */
   --cream: #fffdf7;
   --ink: #4a4458;
   --butter: #fbd87f;
@@ -17,8 +56,10 @@
   --peach: #ffc49b;
 
   --radius: 28px;
-  --shadow: 0 4px 0 rgba(74, 68, 88, 0.16);
-  color-scheme: light;
+  /* On a dark ground a chunky ink shadow disappears; depth comes from a lift
+     of light along the top edge and a real shadow below. */
+  --shadow: 0 4px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -47,7 +88,7 @@ html, body {
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  background: var(--cream);
+  background: var(--paper);
   pointer-events: none;
 }
 
@@ -64,9 +105,31 @@ html, body {
   will-change: background-position;
 }
 
+/*
+ * Grain over the wash.
+ *
+ * A large area of flat dark reads as an empty div; the same area with a film
+ * of noise on it reads as a surface. It does not move — grain that drifts with
+ * the colour underneath looks like a dirty lens — and it is faint enough to be
+ * felt rather than seen.
+ */
+.backdrop-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+/* Retina screens render the same grain at half the size, which reads as
+   sharper rather than finer; a touch more of it keeps the texture even. */
+@media (min-resolution: 2dppx) {
+  .backdrop-grain { opacity: 0.62; }
+}
+
 body {
-  background: var(--cream);
-  color: var(--ink);
+  background: var(--paper);
+  color: var(--text);
   font-family: 'Baloo 2', 'Quicksand', ui-rounded, system-ui, -apple-system, sans-serif;
   /* Read across a living room from a laptop on a coffee table, and at arm's
      length on a phone. Everything else here is sized in proportion to it. */
@@ -160,8 +223,8 @@ body {
   margin: 0;
   padding: 10px 16px;
   border-radius: 999px;
-  background: var(--coral);
-  color: #fff;
+  background: var(--team-a);
+  color: var(--on-accent);
   font-size: 15px;
 }
 .help-note { margin: 0; max-width: 40ch; font-size: 14px; opacity: 0.6; line-height: 1.5; }
@@ -209,19 +272,19 @@ button {
   /* The bubble is drawn around the text, not around the space available. Any
      button that should span its container asks for it with .fill. */
   width: fit-content;
-  color: var(--ink);
+  color: var(--text);
   padding: 14px 28px;
   border: none;
   border-radius: 999px;
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
   transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
   /* Comfortably tappable on a phone. */
   min-height: 52px;
 }
 
-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 0 rgba(74, 68, 88, 0.16); }
-button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(74, 68, 88, 0.16); }
+button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4); }
+button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4); }
 button:disabled { opacity: 0.42; box-shadow: none; }
 button:focus-visible, input:focus-visible, a:focus-visible {
   outline: 3px solid var(--coral);
@@ -230,10 +293,10 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 
 /* Wide enough to breathe around the word, and not a pixel wider. */
 .big { font-size: 22px; padding: 16px 32px; min-height: 62px; }
-.primary { background: var(--lavender); }
-.ghost { background: transparent; box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.16); }
+.primary { background: var(--accent); color: var(--on-accent); }
+.ghost { background: transparent; box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.4); }
 .count { min-width: 60px; font-size: 19px; }
-.count[aria-pressed='true'] { background: var(--mint); }
+.count[aria-pressed='true'] { background: var(--good); color: var(--on-accent); }
 
 @media (prefers-reduced-motion: reduce) {
   button { transition: none; }
@@ -247,13 +310,15 @@ label { font-size: 14px; font-weight: 600; opacity: 0.7; margin-bottom: -6px; }
 
 input[type='text'] {
   font: inherit;
+  color: var(--text);
+  background: var(--panel);
   font-size: 20px;
-  color: var(--ink);
+  color: var(--text);
   padding: 14px 20px;
   border: none;
   border-radius: 999px;
-  background: #fff;
-  box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.12);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
   width: 100%;
 }
 
@@ -272,7 +337,7 @@ input[type='text'] {
   border-radius: 50%;
   object-fit: cover;
   align-self: center;
-  box-shadow: 0 0 0 4px #fff, var(--shadow);
+  box-shadow: 0 0 0 4px var(--panel-high), var(--shadow);
 }
 
 /* ------------------------------------------------------------------- lobby */
@@ -280,7 +345,7 @@ input[type='text'] {
 .code-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .code-block .join-qr { width: min(200px, 46vw); }
 .join-url { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
-.join-link { color: var(--ink); opacity: 0.55; font-size: 14px; }
+.join-link { color: var(--text); opacity: 0.55; font-size: 14px; }
 
 .roster {
   list-style: none;
@@ -299,14 +364,14 @@ input[type='text'] {
   gap: 10px;
   padding: 8px 18px 8px 8px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
   font-weight: 600;
 }
 
 .player.empty {
   background: transparent;
-  box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.12);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
   opacity: 0.5;
   padding: 8px 18px;
   font-weight: 500;
@@ -320,7 +385,8 @@ input[type='text'] {
   object-fit: cover;
   display: grid;
   place-items: center;
-  background: var(--butter);
+  background: var(--waiting);
+  color: var(--on-accent);
   font-weight: 700;
 }
 
@@ -341,7 +407,8 @@ input[type='text'] {
   padding: 0;
   font-size: 24px;
   font-weight: 700;
-  background: var(--butter);
+  background: var(--waiting);
+  color: var(--on-accent);
 }
 
 .help {
@@ -349,12 +416,12 @@ input[type='text'] {
   border-radius: var(--radius);
   padding: 32px;
   max-width: 520px;
-  background: var(--cream);
-  color: var(--ink);
-  box-shadow: 0 20px 60px rgba(74, 68, 88, 0.28);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
-.help::backdrop { background: rgba(74, 68, 88, 0.35); }
+.help::backdrop { background: rgba(0, 0, 0, 0.6); }
 .help h2 { margin: 0 0 12px; }
 .help-steps { margin: 0; padding-left: 22px; line-height: 1.6; }
 .help-steps li { margin-bottom: 6px; }
@@ -456,7 +523,7 @@ input[type='text'] {
   min-height: 168px;
   padding: 16px;
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
   transition: box-shadow 0.15s ease, background 0.15s ease;
 }
@@ -478,25 +545,31 @@ input[type='text'] {
  * so the zones stay instantly distinguishable while still belonging to a game
  * drawn in pastel bubble letters.
  */
+/*
+ * Each zone is its own colour laid thinly over the panel, with a solid edge in
+ * the colour at full strength. On a dark ground a tint carries further than a
+ * fill: the zone reads as belonging to that colour without the cards inside it
+ * having to fight a bright background.
+ */
 .zone-teamA {
-  background: #f8b3ac;
-  box-shadow: inset 0 0 0 3px #d9685d, var(--shadow);
+  background: color-mix(in srgb, var(--team-a) 22%, var(--panel));
+  box-shadow: inset 0 0 0 3px var(--team-a), var(--shadow);
 }
 
 .zone-teamB {
-  background: #9fd6e2;
-  box-shadow: inset 0 0 0 3px #3e93ab, var(--shadow);
+  background: color-mix(in srgb, var(--team-b) 22%, var(--panel));
+  box-shadow: inset 0 0 0 3px var(--team-b), var(--shadow);
 }
 
 .zone-judge {
-  background: #cbb8ef;
-  box-shadow: inset 0 0 0 3px #7358bd, var(--shadow);
+  background: color-mix(in srgb, var(--judge) 22%, var(--panel));
+  box-shadow: inset 0 0 0 3px var(--judge), var(--shadow);
   min-height: 118px;
 }
 
 .zone-unassigned {
-  background: #fbdd97;
-  box-shadow: inset 0 0 0 3px #d29a35, var(--shadow);
+  background: color-mix(in srgb, var(--waiting) 20%, var(--panel));
+  box-shadow: inset 0 0 0 3px var(--waiting), var(--shadow);
   min-height: 168px;
 }
 
@@ -511,12 +584,12 @@ input[type='text'] {
   font-size: 17px;
   font-weight: 700;
   text-align: center;
-  color: var(--ink);
+  color: var(--text);
   padding: 8px 12px;
   border: none;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.75);
-  box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.1);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
   width: 100%;
 }
 
@@ -548,7 +621,7 @@ input[type='text'] {
   gap: 9px;
   padding: 6px 16px 6px 6px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
   font-weight: 600;
   font-size: 15px;
@@ -626,7 +699,7 @@ input[type='text'] {
   max-height: 100%;
   aspect-ratio: 1;
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
   overflow: hidden;
   /* The marquee lives on a second canvas stacked over the artwork. */
@@ -692,8 +765,8 @@ input[type='text'] {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  background: var(--cream);
-  box-shadow: 0 -6px 10px var(--cream);
+  background: var(--paper);
+  box-shadow: 0 -8px 12px var(--paper);
 }
 
 .tool-row::-webkit-scrollbar { display: none; }
@@ -716,7 +789,7 @@ input[type='text'] {
 }
 
 .tool.wide { min-width: 84px; font-size: 15px; }
-.tool[aria-pressed='true'] { background: var(--lavender); }
+.tool[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
 
 .size {
   width: 52px;
@@ -725,13 +798,13 @@ input[type='text'] {
   display: grid;
   place-items: center;
   border-radius: 18px;
-  background: #fff;
+  background: var(--panel);
   border: none;
   box-shadow: var(--shadow);
 }
 
-.size[aria-pressed='true'] { background: var(--mint); }
-.size-dot { display: block; border-radius: 50%; background: var(--ink); }
+.size[aria-pressed='true'] { background: var(--good); }
+.size-dot { display: block; border-radius: 50%; background: var(--text); }
 
 .swatch {
   width: 40px;
@@ -746,9 +819,9 @@ input[type='text'] {
 /* Ring drawn both inside and out, so a selected colour still reads as
    selected if a container ever clips the outer half. */
 .swatch[aria-pressed='true'] {
-  box-shadow: inset 0 0 0 2px var(--cream), 0 0 0 3px var(--ink), var(--shadow);
+  box-shadow: inset 0 0 0 2px var(--paper), 0 0 0 3px var(--text), var(--shadow);
 }
-.swatch.custom { padding: 2px; background: #fff; }
+.swatch.custom { padding: 2px; background: var(--panel); }
 
 /* On a phone the toolbar is trimmed so the canvas keeps as much height as
    possible, while every control stays at a comfortable tap size. */
@@ -794,7 +867,8 @@ input[type='text'] {
   right: 14px;
   bottom: 96px;
   z-index: 3;
-  background: var(--butter);
+  background: var(--waiting);
+  color: var(--on-accent);
 }
 
 /* --------------------------------------------------- desktop drawing layout */
@@ -875,7 +949,7 @@ input[type='text'] {
   font-size: 12px;
   padding: 3px 8px;
   border-radius: 8px;
-  background: rgba(74, 68, 88, 0.08);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* ------------------------------------------------------- pointer tooltip */
@@ -890,12 +964,13 @@ input[type='text'] {
   max-width: 260px;
   padding: 8px 12px;
   border-radius: 14px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--panel-high);
+  color: var(--text);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
   font-size: 13px;
   line-height: 1.35;
   pointer-events: none;
-  box-shadow: 0 6px 20px rgba(74, 68, 88, 0.28);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 /* ------------------------------------------------------ rainbow colour well */
@@ -918,8 +993,8 @@ input[type='text'] {
   gap: 2px;
   padding: 8px;
   border-radius: 20px;
-  background: var(--cream);
-  box-shadow: 0 12px 36px rgba(74, 68, 88, 0.26);
+  background: var(--panel);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
   min-width: 216px;
 }
 
@@ -939,7 +1014,7 @@ input[type='text'] {
   box-shadow: none;
 }
 
-.photo-menu-item:hover { background: rgba(74, 68, 88, 0.07); transform: none; box-shadow: none; }
+.photo-menu-item:hover { background: rgba(255, 255, 255, 0.05); transform: none; box-shadow: none; }
 .photo-menu-item:active { transform: none; box-shadow: none; }
 .photo-menu-icon { font-size: 19px; width: 24px; text-align: center; }
 
@@ -948,7 +1023,7 @@ input[type='text'] {
 
 .photo-menu-item.is-separated {
   margin-top: 6px;
-  border-top: 1px solid rgba(74, 68, 88, 0.12);
+  border-top: 1px solid rgba(0, 0, 0, 0.35);
   padding-top: 12px;
   border-radius: 0 0 14px 14px;
 }
@@ -969,7 +1044,7 @@ input[type='text'] {
   flex: 1;
   height: 12px;
   border-radius: 999px;
-  background: rgba(74, 68, 88, 0.12);
+  background: rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
@@ -1077,7 +1152,7 @@ input[type='text'] {
   aspect-ratio: 1;
   object-fit: contain;
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -1088,17 +1163,17 @@ input[type='text'] {
   font-size: 22px;
   font-weight: 700;
   text-align: center;
-  color: var(--ink);
+  color: var(--text);
   padding: 14px 20px;
   border: none;
   border-radius: 999px;
-  background: #fff;
-  box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.12);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
   width: 100%;
 }
 
 .waiting { font-size: 18px; }
-.player.is-ready { background: var(--mint); }
+.player.is-ready { background: var(--good); color: var(--on-accent); }
 
 /* ---------------------------------------------------------- battleground */
 
@@ -1119,7 +1194,7 @@ input[type='text'] {
   gap: 8px;
   padding: 12px;
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
   min-height: 0;
 }
@@ -1155,7 +1230,7 @@ input[type='text'] {
   font-weight: 700;
 }
 
-.ground-card.is-mine { box-shadow: 0 0 0 3px var(--ink), var(--shadow); }
+.ground-card.is-mine { box-shadow: 0 0 0 3px var(--accent), var(--shadow); }
 
 /* The draw's spotlight. Scale only — moving cards would shift the grid. */
 .ground-card.is-spotlight {
@@ -1163,7 +1238,7 @@ input[type='text'] {
   box-shadow: 0 0 0 4px var(--coral), var(--shadow);
 }
 
-.ground-card.is-winner { box-shadow: 0 0 0 5px var(--mint), 0 10px 30px rgba(74, 68, 88, 0.24); }
+.ground-card.is-winner { box-shadow: 0 0 0 5px var(--good), 0 10px 30px rgba(0, 0, 0, 0.45); }
 
 @media (prefers-reduced-motion: reduce) {
   .ground-card.is-spotlight { transform: none; }
@@ -1184,7 +1259,7 @@ input[type='text'] {
   gap: 12px;
   padding: 16px;
   height: 100dvh;
-  background: var(--cream);
+  background: var(--paper);
 }
 
 body:has(.screen-battle) .backdrop { display: none; }
@@ -1203,7 +1278,7 @@ body:has(.screen-draw) .backdrop { display: none; }
 
 .battle-stage canvas {
   border-radius: var(--radius);
-  box-shadow: 0 10px 30px rgba(74, 68, 88, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   max-width: 100%;
   max-height: 100%;
 }
@@ -1224,13 +1299,13 @@ body:has(.screen-draw) .backdrop { display: none; }
   font: inherit;
   font-size: 17px;
   line-height: 1.45;
-  color: var(--ink);
+  color: var(--text);
   width: min(420px, 100%);
   padding: 14px 18px;
   border: none;
   border-radius: var(--radius);
-  background: #fff;
-  box-shadow: inset 0 0 0 2px rgba(74, 68, 88, 0.12);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
   resize: none;
 }
 
@@ -1262,7 +1337,7 @@ body:has(.screen-draw) .backdrop { display: none; }
   gap: 10px;
   padding: 16px;
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -1271,7 +1346,7 @@ body:has(.screen-draw) .backdrop { display: none; }
 .judge-slider {
   flex: 1;
   height: 40px;
-  accent-color: var(--lavender);
+  accent-color: var(--accent);
 }
 
 .judge-value {
@@ -1304,7 +1379,7 @@ body:has(.screen-draw) .backdrop { display: none; }
   gap: 10px;
   padding: 16px;
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -1318,7 +1393,7 @@ body:has(.screen-draw) .backdrop { display: none; }
   gap: 4px;
   padding: 10px 12px;
   border-radius: 18px;
-  background: rgba(74, 68, 88, 0.05);
+  background: rgba(255, 255, 255, 0.05);
   text-align: left;
 }
 
@@ -1344,7 +1419,8 @@ body:has(.screen-draw) .backdrop { display: none; }
   width: 52px; height: 52px;
   padding: 0;
   font-size: 22px;
-  background: var(--sky);
+  background: var(--team-b);
+  color: var(--on-accent);
   z-index: 40;
 }
 
@@ -1354,12 +1430,12 @@ body:has(.screen-draw) .backdrop { display: none; }
   padding: 26px 26px 22px;
   max-width: 460px;
   width: calc(100% - 32px);
-  background: var(--cream);
-  color: var(--ink);
-  box-shadow: 0 12px 40px rgba(74, 68, 88, 0.28);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
-.options::backdrop { background: rgba(74, 68, 88, 0.35); }
+.options::backdrop { background: rgba(0, 0, 0, 0.6); }
 .options h2 { margin: 0 0 6px; }
 
 .options-heading {
@@ -1376,7 +1452,7 @@ body:has(.screen-draw) .backdrop { display: none; }
   gap: 12px;
   padding: 8px 10px;
   border-radius: 16px;
-  background: rgba(74, 68, 88, 0.05);
+  background: rgba(255, 255, 255, 0.05);
   margin-bottom: 6px;
 }
 
@@ -1408,16 +1484,25 @@ body:has(.screen-draw) .help-open { display: none !important; }
   zoom: 1.12;
 }
 
+/*
+ * High contrast deepens the ground and lifts the type rather than inverting
+ * the scheme: someone who needs more contrast should get more of the same
+ * game, not a different-looking one.
+ */
 [data-high-contrast] {
-  --cream: #ffffff;
-  --ink: #1e1a28;
-  --shadow: 0 3px 0 rgba(30, 26, 40, 0.5);
+  --paper: #14111c;
+  --panel: #241f31;
+  --panel-high: #332b45;
+  --text: #ffffff;
+  --text-dim: #cdc4dd;
+  --line: rgba(255, 255, 255, 0.3);
+  --shadow: 0 3px 0 rgba(0, 0, 0, 0.6);
 }
 
 [data-high-contrast] button,
 [data-high-contrast] input,
 [data-high-contrast] textarea {
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line);
 }
 
 /*
@@ -1439,7 +1524,10 @@ body:has(.screen-draw) .help-open { display: none !important; }
   width: min(220px, 60vw);
   height: auto;
   border-radius: 18px;
+  /* Deliberately pale: a camera needs the quiet zone around a code to be
+     lighter than the code, and this one is drawn in ink on cream. */
   background: var(--cream);
+  padding: 8px;
   align-self: center;
 }
 
@@ -1458,9 +1546,9 @@ body:has(.screen-draw) .help-open { display: none !important; }
   padding: 10px 16px;
   text-align: center;
   font-weight: 700;
-  color: var(--ink);
+  color: var(--text);
   background: var(--butter);
-  box-shadow: 0 4px 16px rgba(74, 68, 88, 0.22);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 /* ------------------------------------------------------- weapon picker */
@@ -1476,8 +1564,8 @@ body:has(.screen-draw) .help-open { display: none !important; }
   padding: 8px 10px 10px;
   border: none;
   border-radius: 20px;
-  background: #fff;
-  color: var(--ink);
+  background: var(--panel);
+  color: var(--text);
   font: inherit;
   box-shadow: var(--shadow);
   cursor: pointer;
@@ -1485,7 +1573,7 @@ body:has(.screen-draw) .help-open { display: none !important; }
 
 .weapon-pick[aria-pressed='true'] {
   background: var(--lavender);
-  box-shadow: 0 0 0 3px var(--ink), var(--shadow);
+  box-shadow: 0 0 0 3px var(--accent), var(--shadow);
 }
 
 /* Reserved whether or not the drawing has arrived, so the row does not jump
