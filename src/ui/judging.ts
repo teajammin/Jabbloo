@@ -83,8 +83,11 @@ export function judgePanel(connection: RoomConnection): JudgePanel {
       if (!turn || !judging) return;
 
       // Rebuild only when the turn changes, or a slider being dragged would
-      // snap back every time another judge scored.
-      const key = turn.fighters.join('-') + Object.keys(turn.moves).length;
+      // snap back every time another judge scored. Keyed on the turn's own
+      // index: the same two fighters meeting again is a different turn, and
+      // keying on the pairing left judges holding a spent panel from round two
+      // onwards, its sliders already locked.
+      const key = `${turn.index}:${Object.keys(turn.moves).length}`;
       if (key === renderedFor) return;
       renderedFor = key;
       build(turn, state);

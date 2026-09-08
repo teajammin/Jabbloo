@@ -72,16 +72,57 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
       );
     }
 
-    if (isHost) {
+    const leave = () => {
+      connection.close();
+      goHome(go);
+    };
+
+    /**
+     * What each device offers when the fight is over.
+     *
+     * The host drives the room; everyone else decides for themselves. A player
+     * is never dragged into the next game by someone else pressing a button —
+     * they are told it has started and can follow or go home.
+     */
+    function showActions(state: RoomState): void {
+      actions.replaceChildren();
+
+      if (isHost) {
+        actions.append(
+          button('Rematch', () => connection.send({ type: 'rematch' }), 'big primary'),
+          button('New game', () => connection.send({ type: 'newGame' }), 'big'),
+          button('Back to menu', () => {
+            connection.send({ type: 'closeRoom' });
+            leave();
+          }, 'big ghost'),
+        );
+        return;
+      }
+
+      // A player waiting for the host to choose.
+      if (state.phase === 'results') {
+        actions.append(
+          el('p', { class: 'lede' }, 'The host is choosing what happens next.'),
+          button('Back to menu', leave, 'big ghost'),
+        );
+        return;
+      }
+
       actions.append(
-        button('Rematch', () => connection.send({ type: 'rematch' }), 'big primary'),
-        button('Back to menu', () => {
-          connection.close();
-          goHome(go);
-        }, 'big ghost'),
+        el('p', { class: 'lede' }, state.phase === 'creating'
+          ? 'A new game has started.'
+          : 'The next fight is being set up.'),
+        button('Join', () => {
+          void import('./creation').then(({ creationScreen }) => {
+            void import('./battleground').then(({ battlegroundScreen }) => {
+              go(state.phase === 'creating'
+                ? creationScreen(connection, false)
+                : battlegroundScreen(connection, false));
+            });
+          });
+        }, 'big primary'),
+        button('Back to menu', leave, 'big ghost'),
       );
-    } else {
-      actions.append(el('p', { class: 'lede' }, 'The host decides what happens next.'));
     }
 
     root.append(
@@ -89,17 +130,35 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
     );
 
     connection.on({
+      onClosed: leave,
       onState: (state) => {
-        if (state.phase === 'results') { render(state); return; }
-        // The host chose a rematch; everyone follows the room back.
-        if (state.phase === 'battleground') {
-          void import('./battleground').then(({ battlegroundScreen }) => {
-            go(battlegroundScreen(connection, isHost));
-          });
+        if (state.phase === 'results') {
+          render(state);
+          showActions(state);
+          return;
         }
+
+        // The host has moved the room on. The host's own screen follows
+        // immediately — it is the one driving — while a player is offered the
+        // choice rather than being pulled out of the results they are reading.
+        if (!isHost) {
+          showActions(state);
+          return;
+        }
+
+        void import('./battleground').then(({ battlegroundScreen }) => {
+          void import('./creation').then(({ creationScreen }) => {
+            go(state.phase === 'creating'
+              ? creationScreen(connection, true)
+              : battlegroundScreen(connection, true));
+          });
+        });
       },
     });
 
-    if (connection.state) render(connection.state);
+    if (connection.state) {
+      render(connection.state);
+      showActions(connection.state);
+    }
   };
 }

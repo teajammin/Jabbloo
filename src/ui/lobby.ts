@@ -165,31 +165,45 @@ export function lobbyScreen(
       })();
     }
 
+    /*
+     * Two columns on the host's screen: how to get in on the left, who is in
+     * on the right. The room has to fit a laptop window whole — a Start button
+     * you have to scroll to find is a Start button nobody presses.
+     */
     root.append(
       el('main', { class: 'screen screen-lobby' },
         isHost
-          ? el('div', { class: 'code-block' },
-              el('p', { class: 'lede' }, 'Join at'),
-              joinAddress,
-              el('p', { class: 'lede' }, 'with the code'),
-              bubbleText(code, { height: 104, jitter: 4, className: 'title' }),
-              joinQr,
-              el('a', { class: 'join-link', href: joinUrl, target: '_blank', rel: 'noreferrer' },
-                'or open the direct link'),
+          ? el('div', { class: 'lobby-split' },
+              el('div', { class: 'code-block' },
+                el('p', { class: 'lede' }, 'Join at'),
+                joinAddress,
+                joinQr,
+                el('p', { class: 'lede' }, 'with the code'),
+                bubbleText(code, { height: 84, jitter: 4, className: 'title' }),
+                el('a', { class: 'join-link', href: joinUrl, target: '_blank', rel: 'noreferrer' },
+                  'or open the direct link'),
+              ),
+              el('div', { class: 'lobby-room' },
+                status,
+                board ? board.root : roster,
+                error,
+                el('div', { class: 'stack' },
+                  blocked,
+                  startButton,
+                  button('Leave', () => {
+                    connection.close();
+                    goHome(go);
+                  }, 'ghost')),
+              ),
             )
-          : bubbleText(code, { height: 62, className: 'title' }),
-        status,
-        board ? board.root : roster,
-        error,
-        isHost
-          ? el('div', { class: 'stack' },
-              blocked,
-              startButton,
-              button('Leave', () => {
-                connection.close();
-                goHome(go);
-              }, 'ghost'))
-          : el('p', { class: 'help-note' }, 'Keep this page open — the game happens on the big screen.'),
+          : el('div', { class: 'lobby-player' },
+              bubbleText(code, { height: 62, className: 'title' }),
+              status,
+              roster,
+              error,
+              el('p', { class: 'help-note' },
+                'Keep this page open — the game happens on the big screen.'),
+            ),
       ),
     );
 

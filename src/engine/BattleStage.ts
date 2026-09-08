@@ -1,4 +1,4 @@
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, Text } from 'pixi.js';
 import gsap from 'gsap';
 import { getBattleground, palette } from './theme';
 import { GROUND_Y, type BattleStageOptions, type Side } from './types';
@@ -129,6 +129,39 @@ export class BattleStage {
   }
 
   /**
+   * The damage a hit did, thrown up over the fighter who took it.
+   *
+   * On the world layer, not the overlay: it belongs to a place on the stage
+   * rather than to the screen, and it should ride the screen shake that the
+   * same hit causes.
+   */
+  showDamage(fighter: Fighter, amount: number): void {
+    if (amount <= 0) return;
+
+    const text = new Text(`-${Math.round(amount)}`, {
+      fontFamily: 'Verdana, Geneva, sans-serif',
+      fontSize: 58,
+      fontWeight: 'bold',
+      fill: palette.coral,
+      stroke: palette.cream,
+      strokeThickness: 8,
+    });
+    text.anchor.set(0.5, 1);
+    text.x = fighter.root.x;
+    text.y = fighter.root.y - fighter.height - 14;
+    this.effects.addChild(text);
+
+    const tl = gsap.timeline();
+    // Punched up and out: big first, then settling as it rises, the way a
+    // fighting game reads a hit at a glance.
+    tl.fromTo(text.scale, { x: 0.4, y: 0.4 }, { x: 1.15, y: 1.15, duration: 0.18, ease: 'back.out(3)' });
+    tl.to(text.scale, { x: 1, y: 1, duration: 0.12 });
+    tl.to(text, { y: text.y - 90, duration: 1.1, ease: 'power2.out' }, 0);
+    tl.to(text, { alpha: 0, duration: 0.4, ease: 'power2.in' }, 0.7);
+    tl.eventCallback('onComplete', () => { if (!text.destroyed) text.destroy(); });
+  }
+
+  /**
    * Announces a fighter by name, in the game's own lettering.
    *
    * The brief asks for a reveal rather than two sprites simply being present:
@@ -156,13 +189,17 @@ export class BattleStage {
     text.y = this.height * 0.24;
     text.alpha = 0;
     const full = text.scale.x;
-    text.scale.set(full * 0.7);
     this.overlay.addChild(text);
 
+    // Deliberately plain: a fade and a small rise. The bouncing scale it had
+    // before animated dozens of letter sprites at once through an easing curve
+    // that overshoots, which on a laptop driving a WebGL canvas stuttered — and
+    // a stuttering title reads as the game struggling rather than as a flourish.
     const tl = gsap.timeline();
-    tl.to(text, { alpha: 1, duration: 0.25, ease: 'power2.out' });
-    tl.to(text.scale, { x: full, y: full, duration: 0.45, ease: 'back.out(2)' }, '<');
-    tl.to(text, { alpha: 0, duration: 0.3 }, `+=${Math.max(0.1, seconds - 0.75)}`);
+    text.y += 18;
+    text.scale.set(full);
+    tl.to(text, { alpha: 1, y: text.y - 18, duration: 0.3, ease: 'power2.out' });
+    tl.to(text, { alpha: 0, duration: 0.28 }, `+=${Math.max(0.1, seconds - 0.6)}`);
 
     await new Promise<void>((resolve) => {
       tl.eventCallback('onComplete', () => {

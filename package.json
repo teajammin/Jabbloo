@@ -29,6 +29,7 @@
     "test:bots": "node test/bots.test.mjs",
     "test:limits": "node test/limits.test.mjs",
     "test:cutout": "node test/cutout-service.test.mjs",
+    "test:endgame": "node test/endgame.test.mjs",
     "build:web": "vite build",
     "deploy": "npm run build && partykit deploy --serve dist",
     "deploy:preview": "npm run build && partykit deploy --serve dist --preview staging",

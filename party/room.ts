@@ -163,6 +163,8 @@ export default class Room implements Party.Server {
   private readonly names = new Map<string, string>();
   /** Timer that ends the current creation step. */
   private stepTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Turns fought in this room, so every turn has an identity of its own. */
+  private turnCount = 0;
 
   onConnect(connection: Party.Connection): void {
     // A returning phone keeps its socket id across a reconnect, so a locked
@@ -239,6 +241,12 @@ export default class Room implements Party.Server {
         // Same characters, same weapons, a fresh battleground vote — which is
         // where the brief's rematch button leads.
         if (this.isHost(sender)) this.beginVote();
+        break;
+      case 'newGame':
+        if (this.isHost(sender)) this.startOver();
+        break;
+      case 'closeRoom':
+        if (this.isHost(sender)) this.closeRoom();
         break;
       default:
         this.send(sender, { type: 'error', reason: 'Unknown message' });
@@ -543,6 +551,7 @@ export default class Room implements Party.Server {
     const b = right[Math.floor(Math.random() * right.length)]!;
 
     this.state.turn = {
+      index: this.turnCount += 1,
       fighters: [a.id, b.id],
       moves: {},
       judged: {},
@@ -601,6 +610,44 @@ export default class Room implements Party.Server {
 
     this.state.phase = 'results';
     this.broadcastState();
+  }
+
+  /**
+   * A whole new game: new characters, new weapons, everyone back to drawing.
+   *
+   * Distinct from a rematch, which keeps what people made. Everything a player
+   * built is dropped, because otherwise the creation steps would open with the
+   * last game's drawings sitting behind them.
+   */
+  private startOver(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    this.art.clear();
+    this.names.clear();
+    this.turnCount = 0;
+    this.state.ultRound = 0;
+    this.state.turn = null;
+    this.state.votes = {};
+    this.state.chosen = null;
+
+    for (const player of this.state.players) {
+      player.progress = { drawn: [], named: [], ready: false };
+      player.health = STARTING_HEALTH;
+      player.fights = 0;
+      player.characterName = '';
+      player.weaponNames = [];
+      player.damageDealt = 0;
+      player.damageTaken = 0;
+      player.best = null;
+    }
+
+    this.state.phase = 'creating';
+    this.beginStep(0);
+  }
+
+  /** Shuts the room: every device goes back to its own menu. */
+  private closeRoom(): void {
+    if (this.stepTimer) clearTimeout(this.stepTimer);
+    this.room.broadcast(JSON.stringify({ type: 'closed' } satisfies ServerMessage));
   }
 
   /** Sends everyone back to the drawing board for one more weapon. */

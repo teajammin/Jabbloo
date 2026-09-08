@@ -197,6 +197,7 @@ input[type='text'] {
 /* ------------------------------------------------------------------- lobby */
 
 .code-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.code-block .join-qr { width: min(200px, 46vw); }
 .join-url { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
 .join-link { color: var(--ink); opacity: 0.55; font-size: 14px; }
 
@@ -297,8 +298,58 @@ input[type='text'] {
 }
 
 /* Keep Start and Leave near the board rather than adrift below it. */
-.screen-lobby { gap: 14px; }
+/*
+ * The lobby fits the window, on both layouts.
+ *
+ * Everything here is needed at once — the address, the code, who has joined,
+ * and Start — so none of it may sit below the fold. The host's screen splits
+ * into how-to-get-in and who-is-in; the room side takes the space that is
+ * left rather than the page growing to fit it.
+ */
+.screen-lobby {
+  gap: 12px;
+  height: 100dvh;
+  justify-content: center;
+  overflow: hidden;
+  padding: 16px;
+}
+
 .screen-lobby .stack { gap: 8px; }
+
+.lobby-split {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+  width: min(1180px, 100%);
+  max-height: 100%;
+}
+
+.lobby-room,
+.lobby-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  max-height: 100%;
+}
+
+/* The roster is the one part that may run long, so it scrolls rather than
+   pushing Start off the bottom. */
+.lobby-room .roster,
+.lobby-room .board,
+.lobby-player .roster {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.lobby-player { justify-content: center; height: 100%; }
+
+@media (max-width: 900px) {
+  .lobby-split { grid-template-columns: 1fr; gap: 14px; }
+  .screen-lobby { padding: 10px; }
+}
 .board-hint { font-size: 13px; margin: 0; }
 
 .board {
@@ -831,14 +882,25 @@ input[type='text'] {
 
 /* --------------------------------------------------------------- creation */
 
+/*
+ * Creation fits the window on every device.
+ *
+ * The canvas takes whatever the heading and clock leave, and nothing here
+ * scrolls: a drawing step where the tools are below the fold is a step nobody
+ * finishes in ninety seconds.
+ */
 .screen-creation {
   justify-content: flex-start;
-  gap: 12px;
+  gap: 8px;
   height: 100dvh;
-  padding: max(10px, env(safe-area-inset-top)) 10px
-           max(12px, env(safe-area-inset-bottom)) 10px;
+  padding: max(8px, env(safe-area-inset-top)) 10px
+           max(8px, env(safe-area-inset-bottom)) 10px;
   overflow: hidden;
 }
+
+/* The heading and the clock are chrome; the canvas is the work. */
+.screen-creation .creation-title { margin: 0; font-size: 19px; }
+.screen-creation > .lede { margin: 0; }
 
 .creation-title { margin: 0; font-size: clamp(20px, 4vw, 30px); }
 
@@ -873,9 +935,26 @@ input[type='text'] {
  * infer — and the rest gives way.
  */
 @media (max-width: 480px) {
-  .screen-creation { gap: 8px; }
-  .creation-title { font-size: 17px; }
+  .screen-creation {
+    gap: 4px;
+    padding: max(4px, env(safe-area-inset-top)) 4px
+             max(6px, env(safe-area-inset-bottom)) 4px;
+  }
+  .screen-creation .creation-title { font-size: 15px; }
   .screen-creation > .lede { display: none; }
+  /* The naming step's preview gives way to the name box on a short screen. */
+  .creation-preview { width: min(150px, 40vh); }
+}
+
+/* The roster of who is finished is a waiting-room detail: it scrolls inside
+   its own space rather than pushing the work off the screen. */
+.creation-body .roster { overflow-y: auto; min-height: 0; flex-shrink: 1; }
+
+/* Laptop: the drawing tool has width to spare, so the naming step uses it too
+   rather than stacking a small preview above a small field. */
+@media (min-width: 900px) {
+  .creation-body > .stack { width: min(520px, 100%); }
+  .creation-preview { width: min(300px, 34vh); }
 }
 
 .creation-preview {

@@ -32,6 +32,23 @@ export interface BubbleTextOptions {
   basePath?: string;
 }
 
+/** Every glyph the alphabet has, for preloading. */
+const ALL_GLYPHS = [
+  ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)),
+  ...Object.values(GLYPH_ALIASES),
+];
+
+/**
+ * Loads the whole alphabet up front.
+ *
+ * A name card assembled from sprites that are still decoding appears letter by
+ * letter and janks the frame it lands on — the first introduction of a fight
+ * is exactly when nothing should stutter.
+ */
+export async function preloadGlyphs(basePath = '/letters'): Promise<void> {
+  await Promise.all(ALL_GLYPHS.map((name) => Assets.load<Texture>(`${basePath}/${name}.png`)));
+}
+
 export class BubbleText extends Container {
   private constructor() {
     super();

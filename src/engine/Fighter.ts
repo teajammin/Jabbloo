@@ -93,6 +93,9 @@ export class Fighter {
     this.body.addChild(this.bodySprite);
 
     this.weaponSprite = new Sprite(weaponTexture);
+    // Empty-handed until a weapon is chosen for the turn. A fighter holding
+    // something before anyone picked it is showing a weapon nobody chose.
+    this.weaponSprite.visible = false;
     // Anchored near the grip end, so rotation pivots where a hand would hold it.
     this.weaponSprite.anchor.set(0.5, 0.85);
     this.weaponSprite.scale.set(this.targetWeaponHeight / weaponTexture.height);
@@ -210,6 +213,29 @@ export class Fighter {
     // be reset or a swap mid-fight can leave the new weapon back to front.
     this.weaponSprite.scale.x = Math.abs(this.weaponSprite.scale.x);
     if (name !== undefined) this.heldWeaponName = name;
+  }
+
+  /**
+   * Draws the weapon, and returns a timeline that presents it.
+   *
+   * Separate from `setWeapon` because swapping the texture and revealing it are
+   * different moments: the swap happens as the move is prepared, the reveal is
+   * part of the show.
+   */
+  revealWeapon(): gsap.core.Timeline {
+    const tl = gsap.timeline();
+    this.weaponSprite.visible = true;
+    this.weaponSprite.alpha = 0;
+    tl.to(this.weaponSprite, { alpha: 1, duration: 0.22, ease: 'power2.out' });
+    tl.fromTo(this.hand, { rotation: -0.55 }, {
+      rotation: 0, duration: 0.42, ease: 'back.out(2.2)',
+    }, '<');
+    return tl;
+  }
+
+  /** Puts the weapon away — between turns, nobody is holding anything. */
+  holsterWeapon(): void {
+    this.weaponSprite.visible = false;
   }
 
   /** The weapon currently held, which changes as a player picks per turn. */

@@ -165,6 +165,15 @@ export interface Move {
 export type TurnPhase = 'entering' | 'picking' | 'playing' | 'judging' | 'over';
 
 export interface Turn {
+  /**
+   * Which turn of the battle this is, counting from one.
+   *
+   * Screens key their state on it. Without an identity, a second round between
+   * the same two fighters is indistinguishable from the first — which is
+   * exactly how the judges' sliders stopped rebuilding after round one, and
+   * why judges could not score again for the rest of the game.
+   */
+  index: number;
   /** The two players on stage: team A's fighter, then team B's. */
   fighters: [string, string];
   moves: Record<string, Move>;
@@ -256,7 +265,11 @@ export type ClientMessage =
   | { type: 'submitNote'; attackerId: string; note: string }
   | { type: 'turnDone' }
   /** Back to battleground selection, keeping the same characters. */
-  | { type: 'rematch' };
+  | { type: 'rematch' }
+  /** Everything again from scratch: new characters, new weapons. */
+  | { type: 'newGame' }
+  /** The host is closing the room; every device is sent back to the menu. */
+  | { type: 'closeRoom' };
 
 // --------------------------------------------------------------- server -> client
 
@@ -269,6 +282,8 @@ export interface PlayerArt {
 
 export type ServerMessage =
   | { type: 'art'; art: PlayerArt[] }
+  /** The room is over. Clients go back to the launch screen. */
+  | { type: 'closed' }
   | { type: 'state'; state: RoomState }
   | { type: 'welcome'; playerId: string; state: RoomState }
   | { type: 'error'; reason: string };

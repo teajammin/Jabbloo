@@ -168,5 +168,44 @@ async function setup(withJudge) {
   for (const ws of [host, a, b]) ws.close();
 }
 
+// --- judges can still score after the first round ---------------------------
+//
+// Turns used to be identified by which two fighters were in them, which is the
+// same every round of a 1v1 — so the judges' panel decided it had already been
+// built and left everyone holding a spent one from round two onwards.
+{
+  const { host, a, b, j, ids } = await setup(true);
+
+  const rounds = [];
+  for (let round = 0; round < 3; round++) {
+    a.send(JSON.stringify({ type: 'submitMove', weapon: 0, prompt: `swing ${round}` }));
+    b.send(JSON.stringify({ type: 'submitMove', weapon: 0, prompt: `poke ${round}` }));
+    await wait(220);
+    host.send(JSON.stringify({ type: 'turnPlayed' }));
+    await wait(200);
+
+    const turn = state(host).turn;
+    rounds.push(turn?.index);
+    check(`round ${round + 1} is judged`, turn?.phase === 'judging', turn?.phase);
+
+    j.send(JSON.stringify({ type: 'submitScore', attackerId: ids[0], score: 10 + round }));
+    j.send(JSON.stringify({ type: 'submitScore', attackerId: ids[1], score: 5 }));
+    await wait(260);
+    check(`round ${round + 1} accepts the judge's score`,
+      (state(host).turn?.damage?.[ids[0]] ?? 0) === 10 + round,
+      JSON.stringify(state(host).turn?.damage));
+
+    host.send(JSON.stringify({ type: 'turnDone' }));
+    await wait(240);
+  }
+
+  check('every turn has an identity of its own',
+    new Set(rounds).size === rounds.length, JSON.stringify(rounds));
+  check('and they count upward', rounds.every((n, i) => i === 0 || n > rounds[i - 1]),
+    JSON.stringify(rounds));
+
+  for (const ws of [host, a, b, j]) ws.close();
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

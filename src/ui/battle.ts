@@ -1,4 +1,4 @@
-import { el, type Screen } from './screens';
+import { el, type Screen, goHome } from './screens';
 import { moveScreen } from './move';
 import { requestChoreography, requestJudgement } from '../api';
 import { judgePanel } from './judging';
@@ -79,7 +79,9 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           parent: stageHost,
           battleground: (current.chosen ?? 'meadow') as BattlegroundId,
         });
-        await engine.preloadEffects();
+        // Effects and lettering together: both are needed the moment the
+        // first fighter is announced.
+        await Promise.all([engine.preloadEffects(), engine.preloadGlyphs()]);
         if (disposed) { stage.destroy(); return; }
 
         ready = { stage, engine };
@@ -197,6 +199,10 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         if (disposed) return;
 
         const weaponName = weapon?.name ?? attacker.weaponName;
+        // The weapon appears now, with what the player said they would do with
+        // it — the choice is the reveal, so nothing is held before it is made.
+        bars.get(attackerId)?.setMove(weaponName, move.prompt);
+        await attacker.revealWeapon().then();
         caption.textContent = `${attacker.name} will use the ${weaponName} by ${
           move.prompt || 'swinging it like an axe'
         }`;
@@ -218,6 +224,9 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       }
 
       if (disposed) return;
+      // Both moves are done: hands empty again until the next choice.
+      for (const fighter of onStage.values()) fighter.holsterWeapon();
+      for (const bar of bars.values()) bar.clearMove();
       caption.textContent = 'Judging…';
       connection.send({ type: 'turnPlayed' });
     }
@@ -316,6 +325,14 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (turn.phase === 'over' && playedTurn !== key) {
         playedTurn = key;
         play('hit');
+        // The number over the head of whoever took it, before the bar moves —
+        // the bar is the running total, this is the hit itself.
+        for (const id of turn.fighters) {
+          const defenderId = turn.fighters.find((other) => other !== id);
+          const dealt = turn.damage[id] ?? 0;
+          const defender = defenderId ? onStage.get(defenderId) : null;
+          if (defender && ready) ready.stage.showDamage(defender, dealt);
+        }
         refreshHealth(state);
         showDamage(turn);
         // A beat to read the damage before the next pair walk on.
@@ -417,7 +434,7 @@ function phoneView(
     }
   };
 
-  connection.on({ onState: handle });
+  connection.on({ onClosed: () => goHome(go), onState: handle });
 
   // Acted on immediately as well as on every update: a phone arriving here
   // from its own move screen during an ULT would otherwise sit on "watch the

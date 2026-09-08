@@ -101,12 +101,10 @@ function fakeConnection(playerId = 'a', state = roomState()) {
 
 setHome(ui.launchScreen);
 mounts('launch', ui.launchScreen, (root) => {
-  const phone = [...root.querySelectorAll('button')]
-    .find((b) => /phone/i.test(b.textContent ?? ''));
-  check('the launch screen offers a phone link', Boolean(phone));
-  phone?.click();
-  check('and it opens', document.querySelector('dialog.phone-link')?.open === true);
-  document.querySelector('dialog.phone-link')?.close();
+  const labels = [...root.querySelectorAll('button')].map((b) => b.textContent);
+  check('the launch screen offers exactly the two ways in',
+    labels.some((l) => /create room/i.test(l)) && labels.some((l) => /join room/i.test(l)),
+    JSON.stringify(labels));
 });
 mounts('create room', ui.createRoomScreen);
 mounts('join room', ui.joinRoomScreen);
@@ -579,6 +577,48 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     check('the team board renders the room', false, String(error?.message ?? error));
   }
   root.remove();
+}
+
+// --- what happens after the game -------------------------------------------
+
+{
+  const state = roomState({ phase: 'results' });
+  const connection = fakeConnection('h', state);
+  mounts('results (host actions)', ui.resultsScreen(connection, true), (root) => {
+    const labels = [...root.querySelectorAll('button')].map((b) => b.textContent);
+    check('the host is offered a rematch, a new game and the menu',
+      ['rematch', 'new game', 'back to menu'].every(
+        (want) => labels.some((l) => l.toLowerCase().includes(want))),
+      JSON.stringify(labels));
+
+    [...root.querySelectorAll('button')]
+      .find((b) => /new game/i.test(b.textContent))?.click();
+    check('new game asks the server for one',
+      connection.sent.some((m) => m.type === 'newGame'), JSON.stringify(connection.sent));
+
+    [...root.querySelectorAll('button')]
+      .find((b) => /back to menu/i.test(b.textContent))?.click();
+    check('leaving closes the room for everyone',
+      connection.sent.some((m) => m.type === 'closeRoom'));
+  });
+}
+
+{
+  // A player is never dragged into the next game by the host pressing a
+  // button: they are told, and choose.
+  const connection = fakeConnection('a', roomState({ phase: 'results' }));
+  mounts('results (player)', ui.resultsScreen(connection, false), (root) => {
+    check('a player can leave whenever they like',
+      [...root.querySelectorAll('button')].some((b) => /back to menu/i.test(b.textContent)));
+
+    connection.push({ phase: 'creating', step: 0 });
+    const labels = [...root.querySelectorAll('button')].map((b) => b.textContent);
+    check('a new game is offered, not forced',
+      labels.some((l) => /join/i.test(l)) && labels.some((l) => /back to menu/i.test(l)),
+      JSON.stringify(labels));
+    check('and the screen says what happened',
+      /new game/i.test(root.textContent ?? ''), root.textContent?.slice(0, 100));
+  });
 }
 
 // --- the options menu -------------------------------------------------------

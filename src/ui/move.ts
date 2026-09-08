@@ -1,4 +1,4 @@
-import { el, button, type Screen } from './screens';
+import { el, button, type Screen, goHome } from './screens';
 import { countdown } from './timer';
 import type { RoomConnection } from '../net/room';
 import {
@@ -142,6 +142,7 @@ export function moveScreen(
     }
 
     connection.on({
+      onClosed: () => goHome(go),
       onState: (state: RoomState) => {
         if (left) return;
         const turn = state.turn;

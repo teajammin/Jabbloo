@@ -1,4 +1,4 @@
-import { el, type Screen } from './screens';
+import { el, type Screen, goHome } from './screens';
 import { countdown } from './timer';
 import { bubbleText } from './bubbleText';
 import { battleScreen } from './battle';
@@ -119,6 +119,7 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
     }
 
     connection.on({
+      onClosed: () => goHome(go),
       onState: (state) => {
         if (state.phase === 'battle') {
           clock.stop();

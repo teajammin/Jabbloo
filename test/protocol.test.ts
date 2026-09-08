@@ -143,7 +143,7 @@ check('collapses whitespace', trimPrompt(' bonk\n  them ') === 'bonk them');
 import { averageScore, type Turn } from '../src/shared/protocol';
 
 const turnWith = (judged: Record<string, Record<string, number>>): Turn => ({
-  fighters: ['ann', 'bo'], moves: {}, judged, damage: {}, notes: {},
+  index: 1, fighters: ['ann', 'bo'], moves: {}, judged, damage: {}, notes: {},
   first: null, phase: 'judging',
 });
 

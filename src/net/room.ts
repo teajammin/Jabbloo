@@ -83,6 +83,8 @@ export interface RoomHandlers {
   onState?: (state: RoomState) => void;
   onWelcome?: (playerId: string, state: RoomState) => void;
   onError?: (reason: string) => void;
+  /** The host shut the room down. */
+  onClosed?: () => void;
   onClose?: () => void;
 }
 
@@ -143,6 +145,9 @@ export class RoomConnection {
           break;
         case 'error':
           this.handlers.onError?.(message.reason);
+          break;
+        case 'closed':
+          this.handlers.onClosed?.();
           break;
       }
     });

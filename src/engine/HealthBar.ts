@@ -21,10 +21,20 @@ const OUTLINE = 5;
 
 export type BarSide = 'left' | 'right';
 
+/** Cuts a sentence at a word boundary, with an ellipsis if it had to. */
+function trim(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
 export class HealthBar extends Container {
   private readonly fill = new Graphics();
   private readonly label: Text;
   private readonly amount: Text;
+  /** The weapon and what its owner said they would do with it. */
+  private readonly move: Text;
   private readonly side: BarSide;
   /** Tweened rather than assigned, so the fill can be animated toward it. */
   private readonly value = { fraction: 1 };
@@ -61,6 +71,20 @@ export class HealthBar extends Container {
       fill: palette.ink,
     });
 
+    // Under the bar: the weapon chosen and the sentence written about it, so
+    // the room can read what is about to happen while it happens.
+    this.move = new Text('', {
+      fontFamily: 'Verdana, Geneva, sans-serif',
+      fontSize: 17,
+      fill: palette.ink,
+      wordWrap: true,
+      wordWrapWidth: BAR_WIDTH,
+      align: side === 'right' ? 'right' : 'left',
+      lineHeight: 21,
+    });
+    this.move.y = BAR_HEIGHT + 8;
+    this.move.alpha = 0;
+
     // A long name must not run into the number at the other end.
     const maxLabel = BAR_WIDTH * 0.62;
     if (this.label.width > maxLabel) this.label.scale.set(maxLabel / this.label.width);
@@ -75,7 +99,7 @@ export class HealthBar extends Container {
       this.fill.x = BAR_WIDTH;
     }
 
-    this.addChild(track, this.fill, this.label, this.amount);
+    this.addChild(track, this.fill, this.label, this.amount, this.move);
     this.layoutText();
     this.redraw();
   }
@@ -95,6 +119,28 @@ export class HealthBar extends Container {
       this.label.x = BAR_WIDTH - this.label.width;
       this.amount.x = 0;
     }
+  }
+
+  /**
+   * Announces the weapon and the words behind it.
+   *
+   * Kept to two lines: this is a caption during a fight, not a transcript, and
+   * fifty words at readable size would cover the fighter it belongs to.
+   */
+  setMove(weapon: string, prompt: string): void {
+    const said = prompt.trim();
+    const text = said ? `${weapon} — “${trim(said, 90)}”` : weapon;
+    this.move.text = text;
+    if (this.side === 'right') this.move.x = BAR_WIDTH - this.move.width;
+    gsap.killTweensOf(this.move);
+    gsap.fromTo(this.move, { alpha: 0, y: BAR_HEIGHT + 2 },
+      { alpha: 1, y: BAR_HEIGHT + 8, duration: 0.3, ease: 'power2.out' });
+  }
+
+  /** Clears it again between turns. */
+  clearMove(): void {
+    gsap.killTweensOf(this.move);
+    gsap.to(this.move, { alpha: 0, duration: 0.25 });
   }
 
   /**

@@ -1,4 +1,4 @@
-import { el, button, type Screen } from './screens';
+import { el, button, type Screen, goHome } from './screens';
 import { countdown } from './timer';
 import { drawScreen } from './drawScreen';
 import { battlegroundScreen } from './battleground';
@@ -213,6 +213,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     );
 
     connection.on({
+      onClosed: () => goHome(go),
       onState: (state) => {
         if (state.phase === 'battleground') {
           clock.stop();
