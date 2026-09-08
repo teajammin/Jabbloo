@@ -96,7 +96,9 @@ export function mountOptions(): () => void {
     el('p', { class: 'options-credits' },
       'Jabbloo — a party game where the players draw everything. ',
       'Characters, weapons and moves by whoever is holding the device. ',
-      'Animation choreographed and moves judged by Claude.',
+      'Animation choreographed and moves judged by Claude. ',
+      'Battleground photographs from Pexels, under their free licence. ',
+      'Lettering, effects and stand-in artwork drawn procedurally for this game.',
     ),
 
     el('div', { class: 'tool-row' }, quit),

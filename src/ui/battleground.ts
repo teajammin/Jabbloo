@@ -32,7 +32,10 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
 
     for (const ground of battlegrounds) {
       const swatch = el('div', { class: 'ground-swatch' });
+      // The colour is what shows until the photograph loads, and if it never
+      // does, the card is still recognisably that battleground.
       swatch.style.background = toCss(ground.colour);
+      swatch.style.backgroundImage = `url('${ground.image}')`;
       const votersRow = el('div', { class: 'ground-voters' });
 
       const card = el('button', { class: 'ground-card', type: 'button' },

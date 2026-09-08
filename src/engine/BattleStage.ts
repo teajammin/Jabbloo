@@ -1,6 +1,6 @@
-import { Application, Container, Graphics, Text } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import gsap from 'gsap';
-import { getBattleground, palette } from './theme';
+import { battlegrounds, getBattleground, palette } from './theme';
 import { GROUND_Y, type BattleStageOptions, type Side } from './types';
 import type { BattlegroundId } from './theme';
 import type { Fighter } from './Fighter';
@@ -35,6 +35,8 @@ export class BattleStage {
   readonly overlay = new Container();
 
   private readonly backdrop = new Graphics();
+  /** The battleground photograph, behind everything and covering the stage. */
+  private readonly scene = new Sprite(Texture.EMPTY);
   private readonly ground = new Graphics();
   private readonly parent: HTMLElement;
   /** Which side each fighter was placed on, so the stage can restore them. */
@@ -44,12 +46,14 @@ export class BattleStage {
 
   readonly width: number;
   readonly height: number;
+  /** Set on teardown, so a photograph arriving late does not touch a dead stage. */
+  private destroyed = false;
 
   constructor(options: BattleStageOptions) {
     this.parent = options.parent;
     this.width = options.width ?? DESIGN_WIDTH;
     this.height = options.height ?? DESIGN_HEIGHT;
-    this.currentBattleground = options.battleground ?? 'meadow';
+    this.currentBattleground = options.battleground ?? battlegrounds[0].id;
 
     this.app = new Application({
       width: this.width,
@@ -63,6 +67,7 @@ export class BattleStage {
     this.parent.appendChild(this.app.view as HTMLCanvasElement);
 
     this.world.addChild(this.backdrop);
+    this.world.addChild(this.scene);
     this.world.addChild(this.ground);
     this.world.addChild(this.fighters);
     this.world.addChild(this.effects);
@@ -76,14 +81,19 @@ export class BattleStage {
     this.fit();
   }
 
-  /** Repaints the battleground fill and the ground line. */
+  /** Repaints the battleground and the ground line. */
   private drawBackdrop(): void {
-    const { colour } = getBattleground(this.currentBattleground);
+    const ground = getBattleground(this.currentBattleground);
 
+    // Painted first and kept underneath: it is what the stage looks like
+    // before the photograph has loaded, and what it falls back to if the
+    // photograph never does.
     this.backdrop.clear();
-    this.backdrop.beginFill(colour);
+    this.backdrop.beginFill(ground.colour);
     this.backdrop.drawRect(0, 0, this.width, this.height);
     this.backdrop.endFill();
+
+    void this.loadScene(ground.image);
 
     // A soft darker band for the floor, so fighters read as standing on something.
     const groundY = this.height * GROUND_Y;
@@ -97,6 +107,26 @@ export class BattleStage {
       48,
     );
     this.ground.endFill();
+  }
+
+  /**
+   * Fits the battleground photograph over the stage.
+   *
+   * Cover rather than stretch: a photograph squashed to 16:9 looks wrong in a
+   * way nobody can name but everybody sees.
+   */
+  private async loadScene(url: string): Promise<void> {
+    try {
+      const texture = await Assets.load<Texture>(url);
+      if (this.destroyed) return;
+      this.scene.texture = texture;
+      const scale = Math.max(this.width / texture.width, this.height / texture.height);
+      this.scene.scale.set(scale);
+      this.scene.x = (this.width - texture.width * scale) / 2;
+      this.scene.y = (this.height - texture.height * scale) / 2;
+    } catch {
+      // The flat colour underneath is a perfectly good battleground.
+    }
   }
 
   setBattleground(id: BattlegroundId): void {
@@ -305,6 +335,7 @@ export class BattleStage {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.resizeObserver.disconnect();
     this.app.destroy(true, { children: true });
   }

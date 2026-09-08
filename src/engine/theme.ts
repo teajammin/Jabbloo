@@ -29,15 +29,21 @@ export const palette = {
 export type PaletteColour = keyof typeof palette;
 
 /**
- * The four battlegrounds. Plain pastel fills for now — the brief says real
- * artwork replaces these later, so each entry keeps an id and a label so the
- * selection screen can render them without knowing they're currently just colours.
+ * The four battlegrounds: real places, photographed.
+ *
+ * Each keeps a colour as well as a photograph. The colour is what the stage
+ * paints while the image is still loading and what the selection screen tints
+ * a card with, so nothing anywhere has to cope with a missing picture — it
+ * just looks plainer for a moment.
+ *
+ * Photographs are from Pexels, whose licence allows commercial use without
+ * attribution; they are credited in the options menu regardless.
  */
 export const battlegrounds = [
-  { id: 'meadow', label: 'Meadow', colour: 0xcfefc4 },
-  { id: 'sky', label: 'Sky', colour: 0xc6e4f7 },
-  { id: 'blossom', label: 'Blossom', colour: 0xfbd3e2 },
-  { id: 'butter', label: 'Butter', colour: 0xfdebb8 },
+  { id: 'cliffs', label: 'Cliffs', colour: 0x8fb8c9, image: '/battlegrounds/cliffs.jpg' },
+  { id: 'forest', label: 'Forest', colour: 0xd8a86a, image: '/battlegrounds/forest.jpg' },
+  { id: 'volcano', label: 'Volcano', colour: 0xc4562f, image: '/battlegrounds/volcano.jpg' },
+  { id: 'dunes', label: 'Dunes', colour: 0xe0b877, image: '/battlegrounds/dunes.jpg' },
 ] as const;
 
 export type BattlegroundId = (typeof battlegrounds)[number]['id'];

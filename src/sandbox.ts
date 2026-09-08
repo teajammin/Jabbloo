@@ -36,7 +36,7 @@ const $ = <T extends HTMLElement>(sel: string): T => {
   return el;
 };
 
-const stage = new BattleStage({ parent: $('#stage'), battleground: 'meadow' });
+const stage = new BattleStage({ parent: $('#stage'), battleground: battlegrounds[0].id });
 
 // Effects are preloaded so a move never has to await mid-timeline.
 await preloadEffects();
@@ -366,7 +366,7 @@ for (const ground of battlegrounds) {
   const button = document.createElement('button');
   button.textContent = ground.label;
   button.style.background = toCss(ground.colour);
-  button.setAttribute('aria-pressed', String(ground.id === 'meadow'));
+  button.setAttribute('aria-pressed', String(ground.id === battlegrounds[0].id));
   button.addEventListener('click', () => {
     stage.setBattleground(ground.id as BattlegroundId);
     for (const other of grounds.querySelectorAll('button')) {

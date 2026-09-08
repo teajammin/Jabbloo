@@ -9,6 +9,7 @@
  * ULT leads straight back into a fight, and that the loop is capped so a
  * perfectly even pair of teams eventually gets an answer.
  */
+import { GROUND_IDS } from './grounds.mjs';
 let room = '';
 const freshRoom = () => { room = 'ULT' + Math.floor(Math.random() * 900000 + 100000); };
 const url = () => `ws://127.0.0.1:1999/parties/main/${room}`;
@@ -54,8 +55,8 @@ async function setup() {
     if (state(host).phase !== 'creating') break;
   }
   await wait(200);
-  a.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
-  b.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
+  a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
+  b.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
   await wait(4600);
   return { host, a, b, ids };
 }

@@ -8,6 +8,7 @@
  * writes nothing still fights, prompts are trimmed to the brief's limit, and
  * nobody fights a fourth time.
  */
+import { GROUND_IDS } from './grounds.mjs';
 const ROOM = 'TRN' + Math.floor(Math.random() * 9000 + 1000);
 const URL_ = `ws://127.0.0.1:1999/parties/main/${ROOM}`;
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -65,8 +66,8 @@ check('names reach every screen',
   JSON.stringify(state(a).players.find((p) => p.id === ids[0])?.weaponNames));
 
 // Vote, then wait out the reveal into the battle.
-a.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
-b.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
+a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
+b.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
 await wait(4600);
 
 let s = state(host);

@@ -23,3 +23,4 @@ export { teamBoard } from '../src/ui/teams';
 export { loadSettings } from '../src/settings';
 export { DrawCanvas } from '../src/draw/DrawCanvas';
 export { deviceId, randomId } from '../src/net/room';
+export { battlegrounds } from '../src/engine/theme';

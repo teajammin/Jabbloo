@@ -9,6 +9,7 @@ import './styles.css';
 import { mount, setHome } from './ui/screens';
 import { mountOptions } from './ui/options';
 import { mountConnectionBanner } from './ui/connection';
+import { mountBackdrop } from './ui/backdrop';
 import { loadSettings } from './settings';
 import { launchScreen } from './ui/launch';
 import { joinRoomScreen } from './ui/joinRoom';
@@ -20,6 +21,9 @@ loadSettings();
 setHome(launchScreen);
 // Mounted on <body>, not inside a screen: the brief wants options reachable at
 // any point in the game, and screens come and go.
+// Behind everything, and before anything: the page should never be bare cream
+// even for the moment before the first screen mounts.
+mountBackdrop();
 mountOptions();
 // A dropped connection has to be visible wherever it happens, so this lives
 // on <body> alongside the options menu rather than inside any one screen.

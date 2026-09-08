@@ -44,6 +44,14 @@ export class HealthBar extends Container {
     super();
     this.side = side;
 
+    // A soft panel behind the whole group. Ink on a pale sky is readable; the
+    // same ink over a volcano is not, and the fight should not be legible only
+    // on some battlegrounds.
+    const panel = new Graphics();
+    panel.beginFill(palette.cream, 0.72);
+    panel.drawRoundedRect(-14, -46, BAR_WIDTH + 28, BAR_HEIGHT + 62, 24);
+    panel.endFill();
+
     const track = new Graphics();
     track.beginFill(palette.ink, 0.16);
     track.drawRoundedRect(0, 0, BAR_WIDTH, BAR_HEIGHT, RADIUS);
@@ -99,7 +107,7 @@ export class HealthBar extends Container {
       this.fill.x = BAR_WIDTH;
     }
 
-    this.addChild(track, this.fill, this.label, this.amount, this.move);
+    this.addChild(panel, track, this.fill, this.label, this.amount, this.move);
     this.layoutText();
     this.redraw();
   }

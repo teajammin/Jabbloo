@@ -7,6 +7,7 @@
  * fighter, judges are averaged, only judges may score a game that has them,
  * and health never goes below zero.
  */
+import { GROUND_IDS } from './grounds.mjs';
 // A room per scenario. PartyKit keeps a room alive, so sharing one means the
 // second setup meets a room that already has a host and every assertion after
 // that cascades — which is exactly how this suite first "failed".
@@ -58,9 +59,9 @@ async function setup(withJudge) {
     if (state(host).phase !== 'creating') break;
   }
   await wait(200);
-  a.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
-  b.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
-  if (j) j.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
+  a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
+  b.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
+  if (j) j.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
   await wait(4600);
   return { host, a, b, j, ids };
 }

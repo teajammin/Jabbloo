@@ -195,7 +195,7 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     first?.click();
     check('voting sends a vote',
       connection.sent.some((m) => m.type === 'voteBattleground'), JSON.stringify(connection.sent));
-    connection.push({ chosen: 'sky' });
+    connection.push({ chosen: ui.battlegrounds[0].id });
   });
 }
 

@@ -7,6 +7,7 @@
  * fights for them, and anything they never made becomes a stand-in Sword, Axe
  * or Hammer. Reconnecting hands the fighter straight back.
  */
+import { GROUND_IDS } from './grounds.mjs';
 let room = '';
 const freshRoom = () => { room = 'BOT' + Math.floor(Math.random() * 900000 + 100000); };
 const url = () => `ws://127.0.0.1:1999/parties/main/${room}`;
@@ -73,7 +74,7 @@ await wait(200);
 check('a room with one player left still reaches the vote',
   state(host).phase === 'battleground', state(host).phase);
 
-a.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
+a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
 await wait(4800);
 check('and the battle starts', state(host).phase === 'battle', state(host).phase);
 

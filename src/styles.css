@@ -36,6 +36,35 @@ html, body {
   min-height: 100%;
 }
 
+/*
+ * The drifting background, and the paper it drifts on.
+ *
+ * Fixed and behind everything, so screens scroll and change over it without
+ * it moving with them. The blur is what turns four circles into weather.
+ */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--cream);
+  pointer-events: none;
+}
+
+.backdrop-blob {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.62;
+  will-change: transform;
+}
+
+/* A phone has a fraction of the pixels and all of the same blur to compute. */
+@media (max-width: 480px) {
+  .backdrop-blob { filter: blur(64px); }
+}
+
 body {
   background: var(--cream);
   color: var(--ink);
@@ -1052,7 +1081,11 @@ input[type='text'] {
   width: 100%;
   aspect-ratio: 16 / 10;
   border-radius: 18px;
+  background-size: cover;
+  background-position: center;
 }
+
+.ground-name { text-shadow: none; }
 
 .ground-name { font-weight: 700; font-size: 16px; }
 
@@ -1095,12 +1128,23 @@ input[type='text'] {
 
 /* ------------------------------------------------------------------ battle */
 
+/*
+ * The stage covers the window and brings its own scenery, so the drifting
+ * colours behind it would only be a cost. A fight is busy enough.
+ */
 .screen-battle {
   justify-content: center;
   gap: 12px;
   padding: 16px;
   height: 100dvh;
+  background: var(--cream);
 }
+
+body:has(.screen-battle) .backdrop { display: none; }
+
+/* The drawing screen is the same case: a canvas edge to edge, and a blur
+   behind it that nobody can see but every frame has to pay for. */
+body:has(.screen-draw) .backdrop { display: none; }
 
 .battle-stage {
   flex: 1 1 auto;

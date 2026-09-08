@@ -8,6 +8,7 @@
  * replaces rather than stacks, and the result is held on screen before the
  * battle rather than snapping straight past it.
  */
+import { GROUND_IDS } from './grounds.mjs';
 const ROOM = 'BGX' + Math.floor(Math.random() * 9000 + 1000);
 const URL_ = `ws://127.0.0.1:1999/parties/main/${ROOM}`;
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -59,31 +60,31 @@ check('creation leads to the vote', s.phase === 'battleground', s.phase);
 check('the vote has a deadline', s.stepEndsAt > Date.now());
 check('nothing is drawn yet', s.chosen === null, String(s.chosen));
 
-a.send(JSON.stringify({ type: 'voteBattleground', id: 'sky' }));
+a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
 await wait(150);
-check('a vote is recorded', state(host).votes[ids[0]] === 'sky');
+check('a vote is recorded', state(host).votes[ids[0]] === GROUND_IDS[0]);
 check('one vote does not close it', state(host).chosen === null);
 
 // Voting again should move the ticket, not add a second one.
-a.send(JSON.stringify({ type: 'voteBattleground', id: 'meadow' }));
+a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[1] }));
 await wait(150);
-check('voting again replaces', state(host).votes[ids[0]] === 'meadow');
+check('voting again replaces', state(host).votes[ids[0]] === GROUND_IDS[1]);
 
 // A ground that does not exist must be refused outright.
 b.send(JSON.stringify({ type: 'voteBattleground', id: 'lava' }));
 await wait(150);
 check('an unknown ground is refused', state(host).votes[ids[1]] === undefined);
 
-b.send(JSON.stringify({ type: 'voteBattleground', id: 'meadow' }));
+b.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[1] }));
 await wait(150);
 check('two of three voted, still open', state(host).chosen === null);
 
 // The judge is the third voter: the brief gives them a say.
-j.send(JSON.stringify({ type: 'voteBattleground', id: 'meadow' }));
+j.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[1] }));
 await wait(250);
 s = state(host);
 check('the judge closes the vote', s.chosen !== null, String(s.chosen));
-check('draws only from what was picked', s.chosen === 'meadow', String(s.chosen));
+check('draws only from what was picked', s.chosen === GROUND_IDS[1], String(s.chosen));
 check('the result is held before the battle', s.phase === 'battleground', s.phase);
 check('the hold has a deadline', s.stepEndsAt > Date.now());
 

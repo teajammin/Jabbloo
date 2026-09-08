@@ -6,7 +6,7 @@ import { getSettings } from '../settings';
 import { play } from '../audio';
 import type { RoomConnection } from '../net/room';
 import {
-  judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
+  battlegrounds, judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
 } from '../shared/protocol';
 
 /**
@@ -77,7 +77,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
         const stage = new engine.BattleStage({
           parent: stageHost,
-          battleground: (current.chosen ?? 'meadow') as BattlegroundId,
+          battleground: (current.chosen ?? battlegrounds[0].id) as BattlegroundId,
         });
         // Effects and lettering together: both are needed the moment the
         // first fighter is announced.
