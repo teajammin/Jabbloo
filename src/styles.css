@@ -93,16 +93,15 @@ html, body {
 }
 
 /*
- * Twice the width of the window, so one pass of the gradient can slide by
- * without a seam. No blur: a gradient is already nothing but soft edges, and
- * blurring it is paying every frame for something already true.
+ * A light is a circle of colour that fades to nothing well inside its own box,
+ * so it has no edge to show and nothing to tile. It is placed by its centre
+ * and moved by transform, which never repaints the page.
  */
-.backdrop-sheet {
+.backdrop-light {
   position: absolute;
-  inset: 0;
-  background-size: 200% 100%;
-  background-repeat: repeat-x;
-  will-change: background-position;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  will-change: transform;
 }
 
 /*
