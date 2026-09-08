@@ -1,6 +1,5 @@
 import { choreograph } from './choreographer';
 import { judge } from './judge';
-import { cutoutImage } from './cutout';
 import { readConfig, type Env } from './ai';
 import type { FightContext } from './prompt';
 
@@ -61,9 +60,6 @@ export async function handleApi(
         body: {
           ok: true,
           keyConfigured: Boolean(config.apiKey),
-          // Which cutout is available, if any: the drawing tool words its
-          // message differently for a service and for the browser's own.
-          cutout: config.rembgUrl ? 'local' : config.removeBgKey ? 'removebg' : false,
           model: config.choreographer,
           fallback: config.choreographerFallback,
         },
@@ -86,11 +82,6 @@ export async function handleApi(
       const verdict = await judge(fight, config);
       console.log(`[judge] ${verdict.score} (${verdict.source}) "${verdict.reason}"`);
       return { status: 200, body: verdict };
-    }
-
-    case '/api/cutout': {
-      const result = await cutoutImage(body['image'], config);
-      return { status: result.status, body: result.body };
     }
 
     default:

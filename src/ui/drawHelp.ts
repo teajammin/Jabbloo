@@ -18,7 +18,7 @@ export interface ControlHelp {
 export const CONTROL_HELP: Record<string, ControlHelp> = {
   select: { icon: '⬚', name: 'Select', what: 'Drag a box around part of your drawing to copy it. Hold on something to select it whole, or tap a photo to move and resize it again.', key: 'V' },
   pen: { icon: '✏️', name: 'Pen', what: 'Draw freehand. Press harder with a stylus for a thicker line.', key: 'B' },
-  eraser: { icon: '🧽', name: 'Eraser', what: 'Rub things out. It erases to transparent, not to white.', key: 'E' },
+  eraser: { icon: '🧽', name: 'Eraser', what: 'Rub things out — drawings and photos alike. It erases to transparent, not to white, so you can carve a subject out of a photo by hand.', key: 'E' },
   fill: { icon: '🪣', name: 'Fill', what: 'Tap an area to flood it with the current colour.', key: 'G' },
   line: { icon: '╱', name: 'Line', what: 'Drag to draw a straight line.', key: 'L' },
   rect: { icon: '▭', name: 'Rectangle', what: 'Drag to draw a box.', key: 'R' },
@@ -26,7 +26,7 @@ export const CONTROL_HELP: Record<string, ControlHelp> = {
   filled: { icon: 'Filled', name: 'Filled shapes', what: 'Switches shapes between outline and solid.' },
 
   upload: { icon: '🖼️', name: 'Add a photo', what: 'Bring in a picture from your camera or library. Five per drawing.' },
-  cutout: { icon: '✂️', name: 'Photo options', what: 'Hold a placed photo (or right-click it) to resize, crop, cut out its background, place it or throw it away.' },
+  cutout: { icon: '🖼️', name: 'Photo options', what: 'Hold a placed photo (or right-click it) to resize, crop it to a shape, rub bits out, place it or throw it away.' },
   resize: { icon: '⬚', name: 'Resize and crop', what: 'Corners resize the photo and keep its shape. Edges trim that side away.' },
   smaller: { icon: '－', name: 'Shrink', what: 'Makes the photo you are placing smaller.' },
   bigger: { icon: '＋', name: 'Enlarge', what: 'Makes the photo you are placing bigger.' },

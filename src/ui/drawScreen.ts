@@ -2,8 +2,7 @@ import { el, button, type Screen } from './screens';
 import { DrawCanvas } from '../draw/DrawCanvas';
 import { THICKNESSES, type ToolName } from '../draw/types';
 import {
-  MAX_UPLOADS, cropImage, cutSubject, importFile, maskImage, placeOnCanvas,
-  type MaskShape,
+  MAX_UPLOADS, cropImage, importFile, maskImage, placeOnCanvas, type MaskShape,
 } from '../draw/images';
 import { CONTROL_HELP, drawHelpDialog } from './drawHelp';
 import { MAX_ARTWORK_BYTES, byteLength } from '../shared/protocol';
@@ -569,22 +568,15 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     const menu = photoMenu([
       {
-        icon: '✂️', label: 'Remove background', onPick: async () => {
-          const layer = canvas.floatingLayer;
-          if (!layer) return;
-          say('Cutting out…');
-          try {
-            const cut = await cutSubject({ data: layer.data, w: layer.w, h: layer.h });
-            canvas.replaceFloating(cut.data);
-            // Which one did it is worth saying: a rough cut on this device and
-            // a rough cut from a service want different responses from the
-            // player — try a plainer background, or try again.
-            say(cut.service
-              ? 'Background gone — drag it into place'
-              : 'Trimmed here — plainer backgrounds cut cleaner');
-          } catch {
-            say('Could not cut that one out');
-          }
+        // Trimming by hand, rather than a model guessing what the subject is.
+        // Placing the photo first is the whole point: once it is part of the
+        // drawing the eraser cuts into it like anything else, and the player
+        // decides what counts as background.
+        icon: '🧽', label: 'Rub bits out', onPick: () => {
+          canvas.commitFloating();
+          selectTool('eraser');
+          updateCropBar();
+          say('Rub away whatever you do not want — ← undoes it');
         },
       },
       {

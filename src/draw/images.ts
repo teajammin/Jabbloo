@@ -15,7 +15,6 @@ export const MAX_UPLOADS = 5;
 /** Longest edge kept after import. Comfortably above the canvas' own size. */
 const MAX_EDGE = 1400;
 
-import { cutBackground } from './cutout';
 
 export interface ImportedImage {
   data: string;
@@ -47,73 +46,6 @@ export function placeOnCanvas(image: ImportedImage): { x: number; y: number; w: 
   const w = image.w * scale;
   const h = image.h * scale;
   return { x: (CANVAS_W - w) / 2, y: (CANVAS_H - h) / 2, w, h };
-}
-
-/**
- * Cuts the subject out of an image.
- *
- * Tries the server's Remove.bg proxy first. If no key is configured, or the
- * service fails, falls back to a local cutout so a player is never blocked by
- * a missing credential — the brief's flow depends on this step working.
- */
-export interface CutResult extends ImportedImage {
-  /** Whether a cutout service did it, or this device did its best. */
-  service: boolean;
-}
-
-export async function cutSubject(image: ImportedImage): Promise<CutResult> {
-  try {
-    const response = await fetch('/api/cutout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: image.data }),
-    });
-    if (response.ok) {
-      const body = (await response.json()) as { available?: boolean; image?: string };
-      if (body.available && body.image) {
-        return { ...await measure(body.image), service: true };
-      }
-    }
-  } catch {
-    // Fall through to the local cutout.
-  }
-  return { ...await localCutout(image), service: false };
-}
-
-/**
- * Local fallback, when no cutout service is configured.
- *
- * The pixel work lives in `cutout.ts`, where it can be tested; this only moves
- * the image on and off a canvas.
- */
-export async function localCutout(image: ImportedImage, strength = 1): Promise<ImportedImage> {
-  const bitmap = await createImageBitmap(await (await fetch(image.data)).blob());
-  const { width: w, height: h } = bitmap;
-
-  const scratch = document.createElement('canvas');
-  scratch.width = w;
-  scratch.height = h;
-  const ctx = scratch.getContext('2d', { willReadFrequently: true });
-  if (!ctx) throw new Error('2D canvas unavailable');
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
-
-  const frame = ctx.getImageData(0, 0, w, h);
-  const cleared = cutBackground(frame.data, w, h, { strength });
-
-  // Nothing came off: the photo has no border the flood recognises as
-  // background, and returning it untouched is better than returning a hole.
-  if (cleared === 0) return image;
-
-  ctx.putImageData(frame, 0, 0);
-  return { data: scratch.toDataURL('image/png'), w, h };
-}
-
-async function measure(dataUrl: string): Promise<ImportedImage> {
-  const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
-  const out = { data: dataUrl, w: bitmap.width, h: bitmap.height };
-  bitmap.close();
-  return out;
 }
 
 // ---------------------------------------------------------------- cropping
