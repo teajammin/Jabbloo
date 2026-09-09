@@ -93,5 +93,33 @@ check('disconnect mid-game keeps the seat', after.length === 3 && after.some((p)
   JSON.stringify(after.map((p) => [p.name, p.connected])));
 
 for (const ws of [host, a, b]) ws.close();
+// --- a code that names no game --------------------------------------------
+//
+// Every four-letter code is a room the platform will create on demand, so a
+// typo does not fail: it opens an empty room and leaves the player waiting in
+// it for people who are somewhere else entirely.
+{
+  const stray = 'NON' + Math.floor(Math.random() * 900 + 100);
+  const lost = await new Promise((resolve) => {
+    const ws = new WebSocket(`ws://127.0.0.1:1999/parties/main/${stray}?_pk=lost`);
+    ws.inbox = [];
+    ws.addEventListener('message', (e) => ws.inbox.push(JSON.parse(e.data)));
+    ws.addEventListener('open', () => resolve(ws));
+  });
+  lost.send(JSON.stringify({ type: 'join', name: 'Lost' }));
+  await wait(500);
+
+  const said = lost.inbox.filter((m) => m.type === 'error').map((m) => m.reason);
+  check('joining a room nobody hosts is refused', said.length === 1, JSON.stringify(said));
+  check('and says which letters to check',
+    /check the letters/i.test(said[0] ?? ''), said[0]);
+
+  const after = [...lost.inbox].reverse().find((m) => m.type === 'state')?.state;
+  check('the player is not left sitting in an empty room',
+    !after?.players.some((p) => p.name === 'Lost'),
+    JSON.stringify(after?.players.map((p) => p.name)));
+  lost.close();
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

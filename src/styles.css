@@ -698,7 +698,10 @@ input[type='text'] {
   max-height: 100%;
   aspect-ratio: 1;
   border-radius: var(--radius);
-  background: var(--panel);
+  /* Paper, deliberately, on a dark interface: people draw in dark colours, and
+     the export keeps a transparent background, so a dark canvas would mean
+     drawing black on black and then showing nothing. */
+  background: var(--cream);
   box-shadow: var(--shadow);
   overflow: hidden;
   /* The marquee lives on a second canvas stacked over the artwork. */
@@ -1027,8 +1030,15 @@ input[type='text'] {
   border-radius: 0 0 14px 14px;
 }
 
-.photo-menu-item.is-confirm { color: #2f7d5e; }
-.photo-menu-item.is-danger { color: #c0392b; }
+/*
+ * Dark-ground versions of the two meanings.
+ *
+ * The old bottle green and brick red were chosen against a cream menu and
+ * measure 2.9 and 2.7 against this one — under the 4.5 a person needs to read
+ * a label comfortably. These are the same two meanings at 7.9 and 6.4.
+ */
+.photo-menu-item.is-confirm { color: #6fd39b; }
+.photo-menu-item.is-danger { color: #ff8b7d; }
 
 /* ------------------------------------------------------------------ timer */
 
@@ -1151,7 +1161,8 @@ input[type='text'] {
   aspect-ratio: 1;
   object-fit: contain;
   border-radius: var(--radius);
-  background: var(--panel);
+  /* Drawings are ink on transparency; they need paper to be seen against. */
+  background: var(--cream);
   box-shadow: var(--shadow);
 }
 
@@ -1576,11 +1587,15 @@ body:has(.screen-draw) .help-open { display: none !important; }
 }
 
 /* Reserved whether or not the drawing has arrived, so the row does not jump
-   when the pictures land. */
+   when the pictures land. Paper-backed, because a weapon is ink on
+   transparency and would otherwise be invisible on a dark button. */
 .weapon-preview {
   width: 64px;
   height: 64px;
   object-fit: contain;
+  background: var(--cream);
+  border-radius: 14px;
+  padding: 4px;
 }
 
 .weapon-name {

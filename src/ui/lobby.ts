@@ -4,6 +4,7 @@ import { RoomConnection } from '../net/room';
 import { creationScreen } from './creation';
 import { startBlockedBecause, type Player, type RoomState } from '../shared/protocol';
 import { teamBoard } from './teams';
+import { joinRoomScreen } from './joinRoom';
 
 interface JoinDetails {
   name: string;
@@ -92,6 +93,16 @@ export function lobbyScreen(
       },
       onError: (reason) => {
         error.textContent = reason;
+        // A code that names no game is not something to sit and wait on: the
+        // player is put back where they can type it again.
+        if (/no game with that code/i.test(reason)) {
+          window.setTimeout(() => {
+            if (!handedOver) {
+              connection.close();
+              go(joinRoomScreen);
+            }
+          }, 2200);
+        }
       },
       onClose: () => {
         status.textContent = 'Disconnected. Trying to reconnect…';
@@ -203,6 +214,12 @@ export function lobbyScreen(
               error,
               el('p', { class: 'help-note' },
                 'Keep this page open — the game happens on the big screen.'),
+              // A player who mistyped the code, or arrived after the game
+              // started, had no way out of this screen at all.
+              button('Leave', () => {
+                connection.close();
+                goHome(go);
+              }, 'ghost'),
             ),
       ),
     );

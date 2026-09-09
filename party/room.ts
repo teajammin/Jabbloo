@@ -310,7 +310,19 @@ export default class Room implements Party.Server {
     }
 
     if (this.state.phase !== 'lobby') {
-      this.send(sender, { type: 'error', reason: 'That game has already started' });
+      this.send(sender, { type: 'error', reason: 'That game has already started.' });
+      return;
+    }
+
+    // Every four-letter code is a room the platform will happily create, so a
+    // typo does not fail — it opens an empty room and leaves the player
+    // waiting in it for people who are elsewhere. A room without a host is not
+    // a room anyone meant to join.
+    if (!this.state.players.some((p) => p.isHost)) {
+      this.send(sender, {
+        type: 'error',
+        reason: 'No game with that code. Check the letters on the big screen.',
+      });
       return;
     }
 

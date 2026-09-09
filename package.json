@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Whimsical creative multiplayer fighting game",
   "scripts": {
-    "dev": "concurrently -n web,api,party -c cyan,magenta,yellow \"vite\" \"npm:dev:server\" \"npm:dev:party\"",
+    "dev": "concurrently -k -n web,api,party -c cyan,magenta,yellow \"vite\" \"npm:dev:server\" \"npm:dev:party\"",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -33,7 +33,8 @@
     "deploy": "npm run build && partykit deploy --serve dist",
     "deploy:preview": "npm run build && partykit deploy --serve dist --preview staging",
     "deploy:env": "partykit env add ANTHROPIC_API_KEY",
-    "logs": "partykit tail"
+    "logs": "partykit tail",
+    "stop": "pkill -f 'Jab/node_modules/.bin/(vite|tsx|partykit)' || true; pkill -f workerd || true; echo 'dev stack stopped'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
