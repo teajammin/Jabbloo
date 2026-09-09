@@ -1,173 +1,113 @@
 # Jabbloo
 
-A whimsical, Jackbox-style multiplayer party game for the browser. Players draw their own
-characters and weapons on their phones, then describe — in their own words — how they want
-to attack. An AI turns that description into a real animated move, and a judge scores it.
+A party game where the players draw everything. You sketch a character and
+three weapons on your phone, then describe in fifty words how you attack. An AI
+turns the sentence into a real animation, and a judge scores it out of 33.
 
-**Status:** playable end to end, and never yet run in a real browser — see
-[What has not been tested](#what-has-not-been-tested). Version 0.1.0.
+**Play: https://jabbloo.teajammin.partykit.dev** — one host screen, everyone
+else on their own device, anywhere in the world.
 
 ---
 
-## The Game
+## The game
 
-Each player draws a character and three weapons. Characters then fight in turns. On their
-turn, a player picks a weapon and writes up to 50 words describing how they'll use it. An AI
-choreographs that description into a short animation (max 7 seconds). If the description
-doesn't make sense, the weapon just bonks the opponent like a sword.
+Everyone draws a character and three weapons, names them, and votes on a
+battleground. Then the characters fight.
 
-A judge — either an AI or the non-fighting players — rates each move out of 33. Every player
-starts with 100 health. Games are best of 3 rounds; the team that takes the least damage wins.
-A tie forces both sides to create one more weapon as an ULT and fight one more
-round with it; after two ULTs a level game is declared a tie.
+On your turn you pick one of your weapons and finish the sentence
+*"<your character> will use the <weapon> by…"* in up to fifty words. The
+description goes to Claude, which returns a choreography — a list of moves from
+a fixed vocabulary — and the host screen plays it out with your drawings.
 
-### Player counts
+A judge scores each attack out of 33: either the players who are not fighting,
+or an AI when there are only two of you. Everyone starts on 100 health, each
+character fights three rounds, and **the side that takes the least damage
+wins** — so hitting hard is only half of it. A tie sends both sides back to
+draw one more weapon as an ULT and fight again; after two of those, a tie
+stands.
 
 | Players | Format |
 |---|---|
-| 2 | 1v1, AI acts as judge |
-| 3 / 5 | 2 or 4 players fight, the rest judge (scores averaged) |
-| 4 / 6 | Tag team — teams take turns sending characters out |
+| 2 | 1v1, an AI judges |
+| 3 or 5 | The players not fighting judge, scores averaged |
+| 4 or 6 | Tag team — each side sends one character out at a time |
 
-Maximum 6 players.
+Six players maximum, four-letter room codes.
 
-### Screens
+### The flow
 
-The host laptop shows the shared screen; phones are the controllers, Jackbox-style.
+1. **Launch** — create a room, or join one
+2. **Lobby** — the host sees a join address, a QR code and the room code; players are dragged into teams and the judges' bench
+3. **Creation** — draw a character (90s), name it (20s), then three weapons (45s and 20s each)
+4. **Battleground** — everyone votes; one vote is drawn at random, Mario Kart style
+5. **Battle** — fighters are announced by name and walk on, then each player writes their move and watches it play
+6. **Judging** — a slider per fighter, or the AI
+7. **Results** — damage given and taken per player, and the hardest hit quoted
+8. **Rematch, new game, or back to the menu**
 
-1. **Launch** — title, version, create room / join room, help
-2. **Create room** — pick player count, get a room code, assign teams and judges
-3. **Join room** — username, optional photo, room code (phone or laptop)
-4. **Character creation** — draw or upload (1.5 min), then name it (20 s)
-5. **Weapon creation** — three weapons, 45 s each, all must be named
-6. **Battleground selection** — every pick goes into a randomiser, Mario Kart style
-7. **Battle stage** — choose weapon, describe the attack, watch it animate, get scored
-8. **Results** — damage taken, damage given, best weapon + prompt. Rematch or menu.
-
-A ⚙ button sits on every screen: accessibility (reduced motion, larger text,
-high contrast), volume, how to play, credits, and quit. Sound is synthesised
-in `src/audio.ts` rather than sampled, so the game ships with no audio assets.
+A ⚙ on every screen holds accessibility settings (reduced motion, larger text,
+high contrast), volume, how to play, credits and quit.
 
 ---
 
-## Tech Stack
-
-| Concern | Choice |
-|---|---|
-| Canvas rendering | Pixi.js v7 |
-| Animation tweening | GSAP |
-| Move choreographer | Claude Haiku (Sonnet fallback) |
-| AI judge (2-player) | Claude Sonnet |
-| Subject isolation (drawing "cast") | Remove.bg API |
-| Multiplayer rooms | PartyKit |
-| Backend | Node.js / Express — all AI calls server-side |
-
-API keys live on the server. They are never shipped to the client.
-
----
-
-## Running It
+## Running it
 
 ```sh
 npm install
-cp .env.example .env.local      # then fill in ANTHROPIC_API_KEY
-npm run dev                     # vite + express + partykit, all three
+cp .env.example .env.local        # then fill in ANTHROPIC_API_KEY
+npm run dev                       # vite + express + partykit together
+npm run stop                      # stops all three
 ```
 
-Open the host screen on a laptop at the address Vite prints, create a room, and
-join from phones on the same network at `<laptop-ip>:5173`. The room code is the
-join code.
+Open the host screen on a laptop, then join from phones on the same wifi. The
+lobby shows the address and a QR code for it — don't use `localhost` on the
+host, because that address means something different on every device that
+reads it. The dev server asks the backend for the machine's real LAN address
+and shows that instead.
 
-Keys live in `.env.local`, never in `.env`: PartyKit reads `.env` when it deploys
-the multiplayer room, and that room needs no keys at all, so keeping them
+Keys live in `.env.local`, never in `.env`. PartyKit reads `.env` when it
+deploys, and the multiplayer server needs no keys at all, so keeping them
 elsewhere means a deploy cannot carry them off the machine. Both files are
-gitignored. Every AI call is made by the Express backend — no key ever reaches a
+gitignored, and every AI call is made server-side — no key ever reaches a
 browser.
-
-### Background removal
-
-Photos imported into the drawing tool can have their background cut out. Three
-paths, tried in that order:
-
-1. **A local service** — free, unmetered, offline, and started by
-   `npm run dev`. One-time setup:
-
-   ```sh
-   npm run setup:cutout     # a Python env and a 168MB model, both gitignored
-   ```
-
-   It runs the rembg model behind `scripts/cutout-server.py` rather than the
-   FastAPI server rembg ships with: that one accepts a multipart upload and
-   never answers it on Python 3.14 — the request does not even reach the
-   application, while inference itself is fine. Ours takes raw bytes and
-   returns a PNG, which removes multipart from both ends. Port 8788 rather
-   than rembg's default of 7000, which on macOS belongs to AirPlay Receiver:
-   it accepts the connection and never replies, so requests simply hang.
-
-2. **Remove.bg**, if `REMOVEBG_API_KEY` is set. The free tier is 50 calls a
-   month, which is about eight six-player games.
-3. **The browser itself** — `src/draw/cutout.ts` floods inward from the border,
-   which never fails and needs nothing configured, but wants a plain backdrop.
-
-The deployed game cannot reach a laptop's local service, so it uses 2 or 3.
-`REMBG_URL` therefore belongs in `.env` and never in the deploy: `partykit
-deploy` sends local variables only when asked with `--with-vars`, and
-`npm run deploy` does not ask.
 
 ### Tests
 
 ```sh
-npm test              # pure logic: protocol, parsing, settings, limb detection
-npm run dev:party     # in one terminal, then in another:
-npm run test:room     # and :creation :battleground :battle :turns :judging :ult :bots
+npm test                  # 219 checks: protocol, settings, limb detection, API, every screen
+npm run dev:party         # then, in another terminal:
+npm run test:room         # and :creation :battleground :battle :turns
+npm run test:judging      # and :ult :bots :limits :endgame
 ```
 
-The integration suites drive a real PartyKit room over a websocket, because the
-rules being checked — who may score, what happens when someone drops, when a tie
-becomes an ULT — only exist as behaviour of the running server.
+`npm test` needs nothing running. The ten integration suites drive a real
+PartyKit room over a websocket, because the rules they check — who may score,
+what happens when someone drops, when a tie becomes an ULT — exist only as
+behaviour of the running server. 154 checks across those.
+
+The screen tests deserve a mention: every screen is plain DOM, so they mount
+and drive it in Node against a stubbed browser — a stroke through the drawing
+tool with real pointer events, ⌘Z, an export, a move written and sent, a judge
+scoring. That harness is the only thing standing between a broken screen and a
+phone in someone's living room.
 
 ---
 
 ## Deploying
 
-**Live at https://jabbloo.teajammin.partykit.dev** — anyone, anywhere, with a
-room code. One command puts a new build there:
-
 ```sh
+npx partykit login        # once
+npm run deploy:env        # once — paste the Anthropic key
 npm run deploy
 ```
 
-That builds the site and hands it to PartyKit, which serves three things from
-one origin: the static page, the `/api` endpoints, and the multiplayer rooms.
-There is no second host to arrange and no CORS to configure — and because the
-page and the party server share an origin, the client finds the rooms without
+One worker serves three things from one origin: the static page, the `/api`
+endpoints and the multiplayer rooms. No second host, no CORS, and because the
+page and the party server share an origin the client finds the rooms without
 being told where they are.
 
-First time only:
-
-```sh
-npx partykit login          # GitHub, in a browser
-npm run deploy:env          # paste the Anthropic key when prompted
-```
-
-The key is stored by the platform, not by this repo. `partykit deploy` sends
-local variables only when asked with `--with-vars`, and `npm run deploy` never
-asks — which is also why secrets live in `.env.local` rather than `.env`.
-
-For the Remove.bg cutout in production, add that key too:
-
-```sh
-npx partykit env add REMOVEBG_API_KEY
-```
-
-Without it, uploads fall back to the local edge-flood cutout, exactly as they
-do in development.
-
-`npm run logs` streams the deployed server's output. `npm run deploy:preview`
-puts a build on a separate preview URL, for trying something without taking
-the live game down mid-party.
-
-### How it fits together
+`npm run logs` tails the deployed server. `npm run deploy:preview` puts a build
+on a separate URL, for trying something without disturbing a live game.
 
 | | Development | Deployed |
 |---|---|---|
@@ -179,93 +119,183 @@ the live game down mid-party.
 Both columns run the *same* API: `server/api.ts` is a function from a path and
 a body to a status and some JSON, with no reference to Express, Request or
 Response. The dev server and the worker are two thin shells around it, so
-there is no second implementation to drift.
+development exercises the code production runs rather than its twin.
 
 ---
 
-## What Has Not Been Tested
+## How it works
 
-The logic is covered by tests, including a jsdom pass that mounts and drives
-every screen. What that cannot cover is how any of it looks or feels.
-Specifically unverified:
+**The host screen draws; phones are controllers.** The brief's Jackbox shape,
+and it decides the architecture: the Pixi canvas, the choreography requests and
+the artwork all live on the host, and a phone only ever sends intents.
 
-- Anything visual: layout, the drawing tool's feel, the battle canvas
-- Phone browsers — iOS Safari's file picker and `<input type="color">` in
-  particular
-- A real deploy. The production shape — worker-served site, `/api` and rooms
-  from one origin — is verified locally against the same Cloudflare runtime it
-  deploys to, but nothing has been shipped from this machine.
+**The server owns the state.** Clients send messages and render whatever comes
+back — never their own optimistic copy — so the host screen and every phone
+always agree. Deadlines are absolute timestamps rather than durations, so a
+phone that slept or joined late lands on the same instant as everyone else.
 
----
+**One protocol module, imported by both sides.** `src/shared/protocol.ts` holds
+every message shape and every rule that both ends need — the creation steps,
+the win condition, the word limit. A change to it breaks the compile rather
+than surfacing as a silent mismatch between host and phone.
 
-## Battle Animation Engine
+**Artwork is kept out of the broadcast state.** A character PNG runs to
+hundreds of kilobytes; sending everyone's to everyone on every state change
+would swamp a phone. The server holds it aside and hands it over when the
+battle needs it — one message per player, because the platform closes a
+socket that carries more than a megabyte.
 
-Turns a player's text prompt into an animated fight sequence.
+### Layout
 
-A player submits up to 50 words. The backend sends it to Claude, which returns a
-**choreography JSON**. A Pixi.js engine plays that choreography back. The whole animation
-must complete within 7 seconds.
+```
+src/
+  engine/        the battle canvas: stage, fighter rig, primitives, playback
+  draw/          the drawing surface: strokes, images, masks
+  ui/            every screen, as plain DOM
+  net/           the client's room connection
+  shared/        the wire protocol, imported by client and server
+  settings.ts    accessibility and volume, persisted per device
+  audio.ts       every sound, synthesised — the game ships no audio files
+party/room.ts    the multiplayer server: one instance per room code
+server/          the AI backend, shared by the dev server and the worker
+scripts/         asset generators: letters, effects, placeholders
+test/            unit, screen and integration suites
+```
 
-### Sprites
+### The animation engine
 
-Characters and weapons are separate transparent PNGs. A weapon attaches to its character at
-a **hand anchor point** — a fixed offset from the character's centre — and can move
-independently of the body during an animation.
+`src/engine/` is standalone — it knows about sprites, anchors and a canvas, and
+nothing about rooms, players or scoring. That is what lets it be driven from a
+test, a replay or a multiplayer message just as easily as from a fetch.
 
-### Animation primitives
+Thirty primitives make up the vocabulary the choreographer may call:
 
-Thirty of them, grouped in `src/engine/primitives/`: locomotion, weapon work,
-melee, acrobatics, ranged, specials and effects. `PRIMITIVE_NAMES` is the list
-the choreographer is given and the list the parser accepts — one definition, so
-the prompt and the engine cannot drift apart.
+```
+move_to charge recoil jump          locomotion
+spin_weapon swing slam throw        weapon
+kick punch headbutt bite lick grab stomp   melee
+flip handspring teleport taunt      acrobatics
+projectile beam shockwave summon    ranged
+inhale grow shrink knockdown dizzy  special
+shake_screen idle                   effects
+```
 
-The set is deliberately broad enough for what players actually write: uppercuts,
-leg sweeps, roundhouses, handsprings, teleports, breathing fire, throwing the
-sun. A move marked `on: "enemy"` is applied to the other fighter, which is how
-one player's sentence can knock the other one down.
+A move marked `on: "enemy"` is applied to the other fighter, which is how one
+player's sentence can knock the other one down. Durations are in seconds and a
+whole choreography is capped at seven, with overruns time-scaled to fit rather
+than truncated. Anything unusable — a refused request, malformed JSON, an
+invented move name — becomes a default swing, so a fight never stalls on a
+model's bad day.
 
-All durations are in seconds and a whole choreography is capped at seven, with
-overruns time-scaled to fit rather than truncated. If the AI returns something
-unusable, the engine falls back to a default swing — the weapon hits the
-opponent like an axe.
-
-### Limbs
-
-Characters are flat PNGs with no skeleton, so kicks and punches have nothing to
+**Limbs.** Characters are flat PNGs with no skeleton, so kicks have nothing to
 articulate. The engine draws procedural bubble limbs, colour-sampled from the
-character's own artwork, which appear only for the duration of a melee move.
-
+character's own artwork, that appear only for the duration of a melee move.
 Player art is scanned first (`src/engine/limbs.ts`): legs read as two separated
 runs near the bottom of the silhouette, arms as rows markedly wider than the
 body. Where the drawing has its own, the procedural limb is suppressed and the
 weapon anchor moves onto the hand the player drew.
 
+### The AI
+
+Two models, per the brief. **Haiku** choreographs, because turning a sentence
+into a list of moves is structure and it is fast and cheap. **Sonnet** judges,
+because deciding whether a move is inventive and whether it would plausibly
+hurt is taste. Sonnet is also the choreographer's fallback.
+
+The system prompt is byte-stable so it can be cached, and documents every
+primitive with worked examples mapping the phrasings players actually use.
+
+---
+
+## Look and feel
+
+The interface is dark: an ink-plum page with a few saturated accents and cream
+type. That is not a style preference — it is what Jackbox, Kahoot, Fall Guys,
+skribbl and Gartic Phone all do, measured from their own stylesheets. Pastels
+on a pale page is the one combination none of them use, and it is what made
+this read as a children's app rather than a fighting game. The bubble lettering
+did not change: pastel on dark reads as neon sweets.
+
+Colour tokens are named for what a colour is *for* — `--paper`, `--panel`,
+`--text`, `--accent`, `--team-a` — so a change of mind is one block rather than
+a hundred edits. Every foreground/background pair in the scheme is measured
+against WCAG in `test/` terms: fifteen of fifteen pass, body text at 14.5:1.
+
+Behind the menus, four deep glows shift a little and come back, over fixed film
+grain. Not a pan: a sliding gradient has to tile, and a tile boundary at an
+angle crosses the screen as a visible line. The battle stage and the drawing
+screen opt out — both fill the window with their own thing, and a background
+nobody can see still costs every frame.
+
 ---
 
 ## Assets
 
-`public/letters/` and `public/effects/` are generated — `npm run gen:letters`,
-`npm run gen:effects`. Both are original artwork drawn procedurally, so they can
-be re-rendered at any resolution.
+Everything in `public/` is generated by this repo except the battlegrounds:
 
-`public/battlegrounds/*.jpg` are photographs from Pexels, used under their
-licence (commercial use, no attribution required) and credited in the options
-menu regardless. Everything else in `public/` is generated by this repo.
-
-`public/placeholder-*.png` are generated too (`npm run gen:placeholders`) and
-stand in for anything a player never drew — the Sword, Axe and Hammer the brief
-names as fallbacks.
+- `public/letters/` — the bubble alphabet, drawn as boolean geometry in
+  `scripts/generate-letters.mjs` and rasterised by a home-made PNG encoder.
+  `npm run gen:letters`.
+- `public/effects/` — fire, beams, shockwaves, anvils, pianos.
+  `npm run gen:effects`.
+- `public/placeholder-*.png` — the stand-in character and the Sword, Axe and
+  Hammer a player gets if they never drew their own. `npm run gen:placeholders`.
+- `public/battlegrounds/` — photographs from [Pexels](https://www.pexels.com),
+  used under their licence (commercial use, no attribution required) and
+  credited in the options menu regardless.
 
 Sound has no assets at all: every cue in `src/audio.ts` is synthesised from
 oscillators and an envelope.
 
+---
+
+## Decisions worth knowing
+
+Things that look odd until you know why.
+
+**Saving is not finishing.** The drawing tool autosaves every ten seconds, when
+a step ends and when the screen sleeps, so work survives a dead phone or an
+expired timer. Those saves must not mark the player ready, or the first stroke
+everyone makes would end a ninety-second step in seconds.
+
+**Identity is per tab, not per browser.** The server keys a player's seat on
+their connection id, which is kept in session storage. Local storage is shared
+across tabs, so a host screen and a player in another tab of the same browser
+handed the server the same identity and the second silently displaced the
+first.
+
+**Nothing may exceed a megabyte in one message.** The platform does not reject
+an oversized message, it closes the socket carrying it. Photos are shrunk to
+avatar size before sending, drawings are exported at the largest size that
+fits, and artwork is delivered one player per message.
+
+**Every turn carries an index.** Screens key their state on it. Without one, a
+second round between the same two fighters is indistinguishable from the
+first — which is how the judges' sliders stopped rebuilding after round one.
+
+**Bots write immediately.** A player whose phone dies keeps their seat and
+their drawings, and a bot takes their turns — the moment the turn opens, not
+after the move clock expires, because a bot that waits out the full minute
+leaves the player opposite staring at an empty stage.
+
+---
+
+## What has not been tested
+
+The logic is covered by tests, including a jsdom pass that mounts and drives
+every screen. What that cannot cover is how any of it looks or feels:
+
+- Phone browsers — iOS Safari's file picker and pinch handling in particular
+- The dark scheme in daylight, and whether the film grain is visible at all
+- Whether hand-erasing a photo is workable with a finger
+
+---
+
 ## Repository
 
-Branching follows a **main + dev** strategy.
+`main` is stable; `dev` is where work lands. Every completed task is a commit
+on `dev` with an explanation of *why* rather than what.
 
-- `main` — stable
-- `dev` — active development; each completed task is pushed here
-
-## Contributing
-
-Code should stay optimisable, low-coupling, high-cohesion, and easy to build on.
+Code should stay optimisable, low-coupling and high-cohesion — the engine
+knowing nothing about the network, the protocol knowing nothing about screens,
+and the API knowing nothing about which server is calling it.
