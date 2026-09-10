@@ -109,6 +109,54 @@ mounts('launch', ui.launchScreen, (root) => {
 mounts('create room', ui.createRoomScreen);
 mounts('join room', ui.joinRoomScreen);
 
+// --- what a player is told when something breaks ----------------------------
+
+{
+  ui.resetErrorLog();
+  const posted = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    posted.push({ url, body: JSON.parse(init?.body ?? '{}') });
+    return { ok: true, status: 202, json: async () => ({ logged: true }) };
+  };
+
+  let told = 0;
+  const stop = ui.watchForErrors(() => { told++; });
+
+  // The kind of failure that leaves a screen frozen with no explanation.
+  window.dispatchEvent(new window.ErrorEvent('error', {
+    error: new Error('the stage fell over'),
+    message: 'the stage fell over',
+  }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check('an uncaught error is reported', posted.length === 1, JSON.stringify(posted.length));
+  check('to the log endpoint', posted[0]?.url === '/api/log', String(posted[0]?.url));
+  check('carrying the message',
+    posted[0]?.body?.message === 'the stage fell over', posted[0]?.body?.message);
+  check('and the screen it happened on',
+    typeof posted[0]?.body?.screen === 'string', posted[0]?.body?.screen);
+  check('the player is told once', told === 1, String(told));
+
+  // A promise nobody caught is the same kind of event and must be caught too.
+  window.dispatchEvent(Object.assign(new window.Event('unhandledrejection'), {
+    reason: new Error('a promise nobody caught'),
+  }));
+  await new Promise((r) => setTimeout(r, 20));
+  check('an unhandled rejection is reported too', posted.length === 2,
+    JSON.stringify(posted.map((p) => p.body.message)));
+
+  stop();
+  window.dispatchEvent(new window.ErrorEvent('error', {
+    error: new Error('after teardown'), message: 'after teardown',
+  }));
+  await new Promise((r) => setTimeout(r, 20));
+  check('and nothing is reported once it is stopped', posted.length === 2);
+
+  globalThis.fetch = realFetch;
+  ui.resetErrorLog();
+}
+
 // --- a dropped connection has to be visible ---------------------------------
 
 {

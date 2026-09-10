@@ -100,6 +100,37 @@ export async function handleApi(
       };
     }
 
+    /*
+     * Whatever broke on somebody's phone.
+     *
+     * Deliberately outside the vouching: an error happens when the game is in
+     * a bad state, which is exactly when a device cannot prove it belongs to a
+     * fight. It spends nothing, so the worst a stranger can do is write a line
+     * in a log. What it accepts is capped for the same reason.
+     */
+    case '/api/log': {
+      const text = (key: string, max: number): string =>
+        typeof body[key] === 'string' ? (body[key] as string).slice(0, max) : '';
+
+      const message = text('message', 300);
+      if (!message) return { status: 400, body: { error: 'message required' } };
+
+      const where = [text('screen', 40), text('room', 8), text('version', 20)]
+        .filter(Boolean)
+        .join(' · ');
+      const times = Number(body['count']) > 1 ? ` (x${Number(body['count'])})` : '';
+
+      // One line per report, so `npm run logs` reads as a list of what has
+      // gone wrong rather than a wall of JSON.
+      console.error(`[client] ${where}${times}: ${message}`);
+      const stack = text('stack', 1200);
+      if (stack) console.error(stack);
+      const agent = text('agent', 200);
+      if (agent) console.error(`  on ${agent}`);
+
+      return { status: 202, body: { logged: true } };
+    }
+
     case '/api/judge': {
       const fight = fightFrom(body);
       if (!await allowed()) {

@@ -7,6 +7,12 @@ turns the sentence into a real animation, and a judge scores it out of 33.
 **Play: https://jabbloo.teajammin.partykit.dev** — one host screen, everyone
 else on their own device, anywhere in the world.
 
+**Status: 0.9.0-rc.1 — release candidate, for a private playtest.** Feature
+complete against the brief, deployed, and covered by 418 automated checks. What
+it has never had is a full game played by people who did not build it, which is
+the only thing standing between this and a beta. See
+[Playtesting](#playtesting).
+
 ---
 
 ## The game
@@ -74,16 +80,17 @@ browser.
 ### Tests
 
 ```sh
-npm test                  # 219 checks: protocol, settings, limb detection, API, every screen
+npm test                  # 249 checks: protocol, settings, limbs, API, errors, every screen
 npm run dev:party         # then, in another terminal:
 npm run test:room         # and :creation :battleground :battle :turns
-npm run test:judging      # and :ult :bots :limits :endgame
+npm run test:judging      # and :ult :bots :limits :endgame :tagteam
 ```
 
-`npm test` needs nothing running. The ten integration suites drive a real
+`npm test` needs nothing running. The eleven integration suites drive a real
 PartyKit room over a websocket, because the rules they check — who may score,
-what happens when someone drops, when a tie becomes an ULT — exist only as
-behaviour of the running server. 154 checks across those.
+what happens when someone drops, when a tie becomes an ULT, whether four and
+six players each fight three times — exist only as behaviour of the running
+server. 169 checks across those.
 
 The screen tests deserve a mention: every screen is plain DOM, so they mount
 and drive it in Node against a stubbed browser — a stroke through the drawing
@@ -280,14 +287,42 @@ leaves the player opposite staring at an empty stage.
 
 ---
 
-## What has not been tested
+## Playtesting
 
-The logic is covered by tests, including a jsdom pass that mounts and drives
-every screen. What that cannot cover is how any of it looks or feels:
+The plan for this build, in order.
 
-- Phone browsers — iOS Safari's file picker and pinch handling in particular
-- The dark scheme in daylight, and whether the film grain is visible at all
-- Whether hand-erasing a photo is workable with a finger
+**1. One complete game, four to six people, at least two on phones.** Every
+serious fault this game has had came out of play rather than out of tests — the
+judges' panel dying after round one, a photo closing the socket that carried
+it, a phone waking into a room that had forgotten it. Tests found none of
+those. Play finds them in minutes.
+
+**2. Watch the log while it happens.**
+
+```sh
+npm run logs           # everything the deployed server says
+npm run logs:errors    # only what broke on somebody's phone
+```
+
+Anything a player's device throws arrives there as one line: the screen, the
+room, the build, the message, then the stack. The player sees a bar offering a
+reload rather than a frozen game, so a fault costs a moment instead of the
+evening.
+
+**3. Write down what felt wrong, not just what broke.** Whether ninety seconds
+is enough to draw, whether the judging slider is fiddly on a phone, whether
+anyone understood that the least damage taken wins.
+
+### Known gaps
+
+- **Phone browsers are unverified.** iOS Safari especially: the file picker,
+  pinch-to-zoom on the canvas, and whether the synthesised audio starts.
+- **No cap on what a game can spend.** The AI endpoints are guarded — only the
+  screen actually mid-fight can call them — but a long session has no ceiling.
+- **Imported photos are trimmed by hand.** Background removal was taken out; the
+  eraser does the job, and nobody has tried it with a finger.
+- **Nothing is remembered between sessions.** Rooms, drawings and scores live
+  only as long as the game.
 
 ---
 

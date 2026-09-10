@@ -1,4 +1,5 @@
 import PartySocket from 'partysocket';
+import { setErrorContext } from '../errors';
 import {
   MAX_MESSAGE_BYTES,
   type ClientMessage, type PlayerArt, type RoomState, type ServerMessage,
@@ -126,6 +127,9 @@ export class RoomConnection {
       room: code.toUpperCase(),
       id: deviceId(code),
     });
+
+    // So a crash report can be tied to the game it happened in.
+    setErrorContext(code.toUpperCase());
 
     this.socket.addEventListener('message', (event) => {
       let message: ServerMessage;

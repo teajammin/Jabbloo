@@ -10,12 +10,43 @@ import { mount, setHome } from './ui/screens';
 import { mountOptions } from './ui/options';
 import { mountConnectionBanner } from './ui/connection';
 import { mountBackdrop } from './ui/backdrop';
+import { watchForErrors } from './errors';
 import { loadSettings } from './settings';
 import { launchScreen } from './ui/launch';
 import { joinRoomScreen } from './ui/joinRoom';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('#app missing');
+
+/**
+ * Tells the player when the game has broken.
+ *
+ * A screen that has stopped responding with no explanation is worse than an
+ * apology: the player does not know whether to wait, reload, or tell someone.
+ */
+function showBreakage(): void {
+  if (document.querySelector('.breakage')) return;
+  const banner = document.createElement('div');
+  banner.className = 'breakage';
+  banner.setAttribute('role', 'alert');
+  banner.textContent = 'Something went wrong. Reloading usually fixes it — '
+    + 'your drawings are on the server.';
+
+  const reload = document.createElement('button');
+  reload.type = 'button';
+  reload.textContent = 'Reload';
+  reload.addEventListener('click', () => location.reload());
+  banner.appendChild(reload);
+
+  document.body.appendChild(banner);
+}
+
+/*
+ * Listening before anything else runs, so a failure while the first screen is
+ * being built is caught too — that is precisely the failure nobody would
+ * otherwise hear about.
+ */
+watchForErrors(() => showBreakage());
 
 loadSettings();
 setHome(launchScreen);
