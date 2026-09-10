@@ -123,14 +123,56 @@ export default class Room implements Party.Server {
       }
     }
 
+    /*
+     * The room itself decides whether a call may spend money: the worker asks
+     * the party named in the request whether that device is the screen running
+     * a fight right now. A stranger with the URL has no room to name.
+     */
+    const vouch = async (roomId: string, device: string): Promise<boolean> => {
+      try {
+        const party = lobby.parties['main']?.get(roomId.toUpperCase());
+        if (!party) return false;
+        const answer = await party.fetch(
+          `https://party/?device=${encodeURIComponent(device)}`,
+        );
+        if (!answer.ok) return false;
+        const { ok } = await answer.json() as { ok?: boolean };
+        return ok === true;
+      } catch {
+        return false;
+      }
+    };
+
     try {
-      const result = await handleApi(url.pathname, body, lobby.env);
+      const result = await handleApi(url.pathname, body, lobby.env, vouch);
       if (!result) return Response.json({ error: 'no such endpoint' }, { status: 404 });
       return Response.json(result.body, { status: result.status });
     } catch (error) {
       console.error('[api]', error);
       return Response.json({ error: 'request failed' }, { status: 500 });
     }
+  }
+
+  /**
+   * Answers whether a caller belongs to a fight in progress.
+   *
+   * The AI endpoints cost money on every call, and they sit on a public URL.
+   * Rather than guard them with a secret the browser would have to hold, the
+   * worker asks the room: only the screen running a fight that has reached the
+   * playing or judging stage has any business asking for choreography.
+   */
+  onRequest(request: Party.Request): Response {
+    const id = new URL(request.url).searchParams.get('device') ?? '';
+    const turn = this.state.turn;
+    const host = this.state.players.find((p) => p.isHost);
+
+    const fighting = this.state.phase === 'battle'
+      && turn !== null
+      && (turn.phase === 'playing' || turn.phase === 'judging');
+
+    return Response.json({
+      ok: fighting && host?.id === id && host.connected,
+    });
   }
 
   private state: RoomState;
@@ -274,8 +316,32 @@ export default class Room implements Party.Server {
   // ------------------------------------------------------------------ handlers
 
   private onHost(capacity: number, sender: Party.Connection): void {
-    if (this.state.players.some((p) => p.isHost)) {
-      this.send(sender, { type: 'error', reason: 'This room already has a host' });
+    const existing = this.state.players.find((p) => p.isHost);
+
+    if (existing) {
+      /*
+       * The screen coming back, or a new one taking over.
+       *
+       * A host whose tab reloads mid-game used to be told the room already had
+       * a host — by itself — and the game became unrecoverable: no screen to
+       * run the fight, and players left waiting in a room nobody was driving.
+       *
+       * The same device always reclaims the seat. A different one may only
+       * take it when the old screen has actually gone, so a stray tab cannot
+       * steal a running game.
+       */
+      if (existing.id === sender.id || !existing.connected) {
+        existing.id = sender.id;
+        existing.connected = true;
+        this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
+        this.broadcastState();
+        return;
+      }
+
+      this.send(sender, {
+        type: 'error',
+        reason: 'This room already has a host screen.',
+      });
       return;
     }
 

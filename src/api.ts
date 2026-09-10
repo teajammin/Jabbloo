@@ -11,6 +11,15 @@ export interface ChoreographRequest {
   characterName?: string;
   weaponName?: string;
   enemyName?: string;
+  /**
+   * Which game this is for, and which screen is asking.
+   *
+   * The deployed backend takes these to the room and asks whether that screen
+   * is running a fight right now. Without them the endpoints would be a model
+   * anyone with the URL could run at somebody else's expense.
+   */
+  room?: string;
+  device?: string;
 }
 
 export interface ChoreographResponse {
@@ -69,6 +78,9 @@ export async function requestJudgement(request: {
   characterName: string;
   weaponName: string;
   enemyName: string;
+  /** As above: which game, and which screen is asking. */
+  room?: string;
+  device?: string;
 }): Promise<JudgeResponse> {
   try {
     const response = await fetch('/api/judge', {

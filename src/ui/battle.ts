@@ -60,6 +60,17 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
     const caption = el('p', { class: 'battle-caption' }, 'Bringing the fighters in…');
     root.append(el('main', { class: 'screen screen-battle' }, stageHost, caption));
 
+    /**
+     * Which game this is, and which screen is asking.
+     *
+     * The backend takes these to the room before spending a model call, so
+     * the endpoints are not a bill anybody with the URL can run up.
+     */
+    const credentials = () => ({
+      room: state?.code ?? '',
+      device: connection.playerId ?? '',
+    });
+
     const artFor = (id: string) => art?.find((a) => a.playerId === id) ?? null;
     const playerFor = (id: string) => state?.players.find((p) => p.id === id) ?? null;
 
@@ -231,6 +242,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           characterName: attacker.name,
           weaponName,
           enemyName: defender.name,
+          ...credentials(),
         });
         if (disposed) return;
 
@@ -274,6 +286,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           characterName: attacker.name,
           weaponName: entry?.weapons[move.weapon]?.name ?? attacker.weaponName,
           enemyName: defender.name,
+          ...credentials(),
         });
         if (disposed) return;
         connection.send({ type: 'submitNote', attackerId, note: verdict.reason });

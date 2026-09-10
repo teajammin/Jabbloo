@@ -40,6 +40,16 @@ export interface ApiResult {
 }
 
 /**
+ * Whether a caller is allowed to spend a model call.
+ *
+ * Passed in rather than looked up, because only the deployed worker can ask
+ * the room. In development there is nobody to guard against — the server is on
+ * the same laptop as the person using it — so nothing is passed and every call
+ * is allowed.
+ */
+export type Vouch = (room: string, device: string) => Promise<boolean>;
+
+/**
  * Handles one API call, or returns null for a path this does not own.
  *
  * Null rather than a 404 so the caller can pass the request on to whatever
@@ -49,8 +59,18 @@ export async function handleApi(
   path: string,
   body: Record<string, unknown>,
   env: Env,
+  vouch?: Vouch,
 ): Promise<ApiResult | null> {
   const config = readConfig(env);
+
+  /** The two endpoints that cost money, and who may call them. */
+  const allowed = async (): Promise<boolean> => {
+    if (!vouch) return true;
+    const room = typeof body['room'] === 'string' ? body['room'] : '';
+    const device = typeof body['device'] === 'string' ? body['device'] : '';
+    if (!room || !device) return false;
+    return vouch(room, device);
+  };
 
   switch (path) {
     case '/api/health':
@@ -68,6 +88,9 @@ export async function handleApi(
     case '/api/choreograph': {
       const fight = fightFrom(body);
       if (!fight.prompt) return { status: 400, body: { error: 'prompt required' } };
+      if (!await allowed()) {
+        return { status: 403, body: { error: 'not in a fight' } };
+      }
 
       const result = await choreograph(fight, config);
       console.log(`[choreograph] ${result.source} - ${result.ms}ms "${fight.prompt.slice(0, 60)}"`);
@@ -79,6 +102,9 @@ export async function handleApi(
 
     case '/api/judge': {
       const fight = fightFrom(body);
+      if (!await allowed()) {
+        return { status: 403, body: { error: 'not in a fight' } };
+      }
       const verdict = await judge(fight, config);
       console.log(`[judge] ${verdict.score} (${verdict.source}) "${verdict.reason}"`);
       return { status: 200, body: verdict };
