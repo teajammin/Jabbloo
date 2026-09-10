@@ -121,5 +121,52 @@ for (const ws of [host, a, b]) ws.close();
   lost.close();
 }
 
+// --- a phone that sleeps and wakes ----------------------------------------
+//
+// In the lobby a disconnect removes the player, which is right for someone who
+// closes the tab and wrong for a phone that locked in someone's hand. The
+// client says who it is again on every reconnect; this is the server half of
+// that, and it has to work for a seat the room has already forgotten.
+{
+  const code = 'WAKE' + Math.floor(Math.random() * 900 + 100);
+  const socket = (id) => new Promise((resolve) => {
+    const ws = new WebSocket(`ws://127.0.0.1:1999/parties/main/${code}?_pk=${id}`);
+    ws.inbox = [];
+    ws.addEventListener('message', (e) => ws.inbox.push(JSON.parse(e.data)));
+    ws.addEventListener('open', () => resolve(ws));
+  });
+  const seen = (ws) => [...ws.inbox].reverse()
+    .find((m) => m.type === 'state' || m.type === 'welcome')?.state;
+
+  const screen = await socket('screen');
+  screen.send(JSON.stringify({ type: 'host', capacity: 2 }));
+  await wait(300);
+
+  let phone = await socket('phone');
+  phone.send(JSON.stringify({ type: 'join', name: 'Ann' }));
+  await wait(400);
+  check('the phone is in the room', seen(screen).players.some((p) => p.name === 'Ann'));
+
+  phone.close();
+  await wait(400);
+  check('sleeping in the lobby gives up the seat',
+    !seen(screen).players.some((p) => p.name === 'Ann'));
+
+  // Waking: the same device id, saying who it is again.
+  phone = await socket('phone');
+  phone.send(JSON.stringify({ type: 'join', name: 'Ann' }));
+  await wait(400);
+  check('waking puts them back in the room',
+    seen(screen).players.some((p) => p.name === 'Ann'),
+    JSON.stringify(seen(screen).players.map((p) => p.name)));
+  check('and not twice',
+    seen(screen).players.filter((p) => p.name.startsWith('Ann')).length === 1,
+    JSON.stringify(seen(screen).players.map((p) => p.name)));
+  check('the phone can see the room too',
+    seen(phone)?.players.length === 2, JSON.stringify(seen(phone)?.players.map((p) => p.name)));
+
+  for (const ws of [screen, phone]) ws.close();
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

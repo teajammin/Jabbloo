@@ -100,6 +100,24 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (!ready || disposed) return;
       const { stage, engine } = ready;
 
+      // Already out there? Then they stay out there.
+      //
+      // In a one-a-side game the same two people fight every round, and
+      // walking them off and back on between rounds is ceremony for a change
+      // that has not happened. Tag team is the case this exists for: there,
+      // the pair really is different and the entrance says who is up.
+      const sameAsBefore = turn.fighters.every((id) => onStage.has(id))
+        && onStage.size === turn.fighters.length;
+      if (sameAsBefore) {
+        for (const fighter of onStage.values()) {
+          fighter.resetPose();
+          fighter.holsterWeapon();
+        }
+        for (const bar of bars.values()) bar.clearMove();
+        refreshHealth(state!);
+        return;
+      }
+
       for (const fighter of onStage.values()) {
         stage.removeFighter(fighter);
         fighter.destroy();

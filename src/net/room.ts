@@ -104,11 +104,21 @@ export const CONNECTION_EVENT = 'jabbloo:connection';
 export class RoomConnection {
   private readonly socket: PartySocket;
   private handlers: RoomHandlers = {};
+  private readonly onWake: () => void;
 
   /** Assigned by the server on welcome; identifies this client's player. */
   playerId: string | null = null;
   state: RoomState | null = null;
   private readonly artByPlayer = new Map<string, PlayerArt>();
+  /**
+   * How this device introduced itself.
+   *
+   * Kept so it can say it again. A socket that drops and comes back is a new
+   * conversation as far as the room is concerned: in the lobby a disconnect
+   * removes the player outright, so a phone that slept woke up connected to a
+   * room that had forgotten it — present on the wire and absent from the game.
+   */
+  private identity: ClientMessage | null = null;
 
   constructor(code: string) {
     this.socket = new PartySocket({
@@ -156,7 +166,29 @@ export class RoomConnection {
       announce(false);
       this.handlers.onClose?.();
     });
-    this.socket.addEventListener('open', () => announce(true));
+
+    this.socket.addEventListener('open', () => {
+      announce(true);
+      // Said again on every open, not just the first. The server answers a
+      // repeat from a seat it already knows with a welcome, so this costs
+      // nothing when the connection never dropped.
+      if (this.identity) this.socket.send(JSON.stringify(this.identity));
+    });
+
+    /*
+     * A phone that has been asleep does not always reconnect on its own: the
+     * page is frozen, its timers with it, and the socket is found closed on
+     * the way back with nothing scheduled to fix it. Waking the page is the
+     * moment to check.
+     */
+    this.onWake = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (this.socket.readyState === WebSocket.OPEN) return;
+      this.socket.reconnect();
+    };
+    document.addEventListener('visibilitychange', this.onWake);
+    window.addEventListener('pageshow', this.onWake);
+    window.addEventListener('online', this.onWake);
   }
 
   on(handlers: RoomHandlers): this {
@@ -173,6 +205,9 @@ export class RoomConnection {
    * send is the lesser failure, and the caller is told.
    */
   send(message: ClientMessage): boolean {
+    // Remembered so a reconnect can repeat it.
+    if (message.type === 'host' || message.type === 'join') this.identity = message;
+
     const encoded = JSON.stringify(message);
     if (encoded.length > MAX_MESSAGE_BYTES * 0.95) {
       console.warn(`[room] refusing to send ${message.type}: ${encoded.length} bytes`);
@@ -183,6 +218,9 @@ export class RoomConnection {
   }
 
   close(): void {
+    document.removeEventListener('visibilitychange', this.onWake);
+    window.removeEventListener('pageshow', this.onWake);
+    window.removeEventListener('online', this.onWake);
     this.socket.close();
   }
 }

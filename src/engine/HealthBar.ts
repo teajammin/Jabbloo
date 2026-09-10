@@ -35,6 +35,8 @@ export class HealthBar extends Container {
   private readonly amount: Text;
   /** The weapon and what its owner said they would do with it. */
   private readonly move: Text;
+  /** A plate behind that caption, redrawn to whatever the caption needs. */
+  private readonly movePlate = new Graphics();
   private readonly side: BarSide;
   /** Tweened rather than assigned, so the fill can be animated toward it. */
   private readonly value = { fraction: 1 };
@@ -90,8 +92,9 @@ export class HealthBar extends Container {
       align: side === 'right' ? 'right' : 'left',
       lineHeight: 21,
     });
-    this.move.y = BAR_HEIGHT + 8;
+    this.move.y = BAR_HEIGHT + 14;
     this.move.alpha = 0;
+    this.movePlate.alpha = 0;
 
     // A long name must not run into the number at the other end.
     const maxLabel = BAR_WIDTH * 0.62;
@@ -107,7 +110,7 @@ export class HealthBar extends Container {
       this.fill.x = BAR_WIDTH;
     }
 
-    this.addChild(panel, track, this.fill, this.label, this.amount, this.move);
+    this.addChild(panel, track, this.fill, this.label, this.amount, this.movePlate, this.move);
     this.layoutText();
     this.redraw();
   }
@@ -137,18 +140,37 @@ export class HealthBar extends Container {
    */
   setMove(weapon: string, prompt: string): void {
     const said = prompt.trim();
-    const text = said ? `${weapon} — “${trim(said, 90)}”` : weapon;
-    this.move.text = text;
-    if (this.side === 'right') this.move.x = BAR_WIDTH - this.move.width;
-    gsap.killTweensOf(this.move);
-    gsap.fromTo(this.move, { alpha: 0, y: BAR_HEIGHT + 2 },
-      { alpha: 1, y: BAR_HEIGHT + 8, duration: 0.3, ease: 'power2.out' });
+    this.move.text = said ? `${weapon} — “${trim(said, 90)}”` : weapon;
+
+    // Squared up under the bar: hard against the outer edge on both sides, so
+    // the caption and the name it belongs to line up rather than drifting.
+    this.move.x = this.side === 'right' ? BAR_WIDTH - this.move.width : 0;
+
+    // The plate is drawn to fit the caption rather than guessed at. The words
+    // are a player's, so their length is not something this can assume — a
+    // fixed panel left two lines of ink hanging over a photograph.
+    const pad = 12;
+    this.movePlate.clear();
+    this.movePlate.beginFill(palette.cream, 0.78);
+    this.movePlate.drawRoundedRect(
+      this.move.x - pad,
+      this.move.y - pad * 0.6,
+      this.move.width + pad * 2,
+      this.move.height + pad * 1.2,
+      16,
+    );
+    this.movePlate.endFill();
+
+    gsap.killTweensOf([this.move, this.movePlate]);
+    for (const part of [this.movePlate, this.move]) {
+      gsap.fromTo(part, { alpha: 0 }, { alpha: 1, duration: 0.3, ease: 'power2.out' });
+    }
   }
 
   /** Clears it again between turns. */
   clearMove(): void {
-    gsap.killTweensOf(this.move);
-    gsap.to(this.move, { alpha: 0, duration: 0.25 });
+    gsap.killTweensOf([this.move, this.movePlate]);
+    gsap.to([this.move, this.movePlate], { alpha: 0, duration: 0.25 });
   }
 
   /**

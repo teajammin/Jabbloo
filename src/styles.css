@@ -1187,35 +1187,63 @@ input[type='text'] {
 
 /* ---------------------------------------------------------- battleground */
 
-.screen-ground { gap: 16px; justify-content: center; }
-.ground-heading { display: flex; justify-content: center; }
+/*
+ * The vote is a picture-choosing screen, so the pictures get the room.
+ *
+ * It fills the window and gives whatever the heading and clock leave to the
+ * four photographs — a battleground shown at postage-stamp size is a name with
+ * a smudge next to it, which is not something to vote on.
+ */
+.screen-ground {
+  gap: 14px;
+  justify-content: center;
+  height: 100dvh;
+  padding: 16px 16px 20px;
+  overflow: hidden;
+}
+
+.ground-heading { display: flex; justify-content: center; flex: 0 0 auto; }
 
 .ground-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  width: min(680px, 100%);
+  gap: 16px;
+  width: min(1100px, 100%);
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: center;
 }
 
 .ground-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
-  padding: 12px;
+  padding: 10px;
   border-radius: var(--radius);
   background: var(--panel);
+  min-height: 0;
   box-shadow: var(--shadow);
   min-height: 0;
 }
 
+/*
+ * The photograph itself, as large as the card will allow. Grown rather than
+ * fixed: on a laptop that is most of the screen, and on a phone it is still
+ * big enough to tell a forest from a volcano at a glance.
+ */
 .ground-swatch {
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 96px;
   aspect-ratio: 16 / 10;
   border-radius: 18px;
   background-size: cover;
   background-position: center;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
+
+.ground-card .ground-name { font-size: 18px; }
 
 .ground-name { text-shadow: none; }
 
@@ -1255,7 +1283,20 @@ input[type='text'] {
 }
 
 @media (min-width: 900px) {
+  /* Four across, each one wide: the whole choice at a glance, no scrolling. */
   .ground-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ground-swatch { aspect-ratio: 3 / 4; }
+  .ground-card { padding: 12px; }
+}
+
+/* On a phone the four stack two by two and the photographs take the height
+   the toolbar and the clock leave them. */
+@media (max-width: 560px) {
+  .screen-ground { gap: 10px; padding: 10px; }
+  .ground-grid { gap: 10px; }
+  .ground-card { padding: 7px; gap: 6px; }
+  .ground-swatch { aspect-ratio: 4 / 3; min-height: 70px; }
+  .ground-card .ground-name { font-size: 15px; }
 }
 
 /* ------------------------------------------------------------------ battle */
