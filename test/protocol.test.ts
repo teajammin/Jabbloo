@@ -8,7 +8,7 @@
  *   npm test
  */
 
-import { startBlockedBecause, canStart, makeRoomCode, ROOM_CODE_LENGTH } from '../src/shared/protocol';
+import { isDuel, startBlockedBecause, canStart, makeRoomCode, ROOM_CODE_LENGTH } from '../src/shared/protocol';
 import type { Player, RoomState } from '../src/shared/protocol';
 
 let pass = 0, fail = 0;
@@ -49,8 +49,23 @@ const host = player('Host', 'unassigned', true);
 check('empty room blocked', startBlockedBecause(room([host]))!.includes('Waiting for'));
 check('one player blocked', startBlockedBecause(room([host, player('A', 'teamA')]))!.includes('Waiting'));
 
+/*
+ * Two players are a duel and arrange themselves, so none of the rules about
+ * places and sides apply until there are three. Each case below is therefore
+ * written with three or more.
+ */
+const duel = room([host, player('Ann', 'unassigned'), player('Bo', 'unassigned')]);
+check('two players need no arranging at all', startBlockedBecause(duel) === null,
+  String(startBlockedBecause(duel)));
+
+const duelSameSide = room([host, player('Ann', 'teamA'), player('Bo', 'teamA')]);
+check('and are not blocked for being on one side',
+  startBlockedBecause(duelSameSide) === null, String(startBlockedBecause(duelSameSide)));
+
 // Unassigned players
-const oneWaiting = room([host, player('Ann', 'teamA'), player('Bo', 'unassigned')]);
+const oneWaiting = room([
+  host, player('Ann', 'teamA'), player('Cy', 'teamB'), player('Bo', 'unassigned'),
+]);
 check('names the single unassigned player', startBlockedBecause(oneWaiting) === 'Bo still needs a place.',
   String(startBlockedBecause(oneWaiting)));
 
@@ -60,13 +75,17 @@ const twoWaiting = room([
 check('counts multiple unassigned', startBlockedBecause(twoWaiting) === '2 players still need a place.',
   String(startBlockedBecause(twoWaiting)));
 
-// Both teams must be populated
-const lopsided = room([host, player('Ann', 'teamA'), player('Bo', 'teamA')]);
+// Both teams must be populated, once there are enough players to have teams.
+const lopsided = room([
+  host, player('Ann', 'teamA'), player('Bo', 'teamA'), player('Cy', 'judge'),
+]);
 check('one-sided teams blocked',
   startBlockedBecause(lopsided) === 'Both teams need at least one fighter.',
   String(startBlockedBecause(lopsided)));
 
-const allJudges = room([host, player('Ann', 'judge'), player('Bo', 'judge')]);
+const allJudges = room([
+  host, player('Ann', 'judge'), player('Bo', 'judge'), player('Cy', 'judge'),
+]);
 check('all judges blocked', startBlockedBecause(allJudges) !== null);
 
 // Valid arrangements
@@ -189,6 +208,15 @@ check('and artwork under three quarters of it',
   MAX_ARTWORK_BYTES < MAX_MESSAGE_BYTES * 0.75);
 check('byte length counts bytes, not characters', byteLength('a\u00e9\u20ac') === 6,
   String(byteLength('a\u00e9\u20ac')));
+
+// Which rooms are duels.
+check('two players are a duel',
+  isDuel(room([host, player('Ann', 'teamA'), player('Bo', 'teamB')])));
+check('three are not',
+  !isDuel(room([host, player('Ann', 'teamA'), player('Bo', 'teamB'), player('Cy', 'judge')])));
+check('and one is not either', !isDuel(room([host, player('Ann', 'teamA')])));
+check('the host does not count toward it',
+  isDuel(room([host, player('Ann', 'teamA'), player('Bo', 'teamB')])));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
