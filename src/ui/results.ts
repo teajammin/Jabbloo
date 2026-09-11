@@ -36,7 +36,7 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
       verdict.textContent = winner
         ? `${winner === 'teamA' ? names.teamA : names.teamB} took the least damage.`
         : state.ultRound > 0
-          ? `Still level after ${state.ultRound} ULT${state.ultRound === 1 ? '' : 's'} — it stands as a tie.`
+          ? `Still level after ${state.ultRound} Ultimate${state.ultRound === 1 ? '' : 's'} — it stands as a tie.`
           : 'Level on damage — the game is a tie.';
 
       table.replaceChildren();

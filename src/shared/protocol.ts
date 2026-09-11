@@ -12,8 +12,13 @@ export { battlegrounds, type BattlegroundId } from '../engine/theme';
 
 /** The brief's cap on how much a player may write for one move. */
 export const MAX_PROMPT_WORDS = 50;
-/** How long a player has to choose a weapon and describe the move. */
-export const MOVE_SECONDS = 60;
+/**
+ * How long a player has to choose a weapon and describe the move.
+ *
+ * Shorter than it was: fifty words arrive long before a minute does, and the
+ * time left over is spent watching a timer rather than writing.
+ */
+export const MOVE_SECONDS = 50;
 /** Rounds each character fights. */
 export const ROUNDS_EACH = 3;
 /** Everyone starts here; a fighter at zero is knocked out. */
@@ -117,16 +122,16 @@ export interface CreationStep {
 }
 
 export const CREATION_STEPS: CreationStep[] = [
-  { slot: 'character', kind: 'draw', seconds: 90, prompt: 'Draw your character' },
+  { slot: 'character', kind: 'draw', seconds: 105, prompt: 'Draw your character' },
   { slot: 'character', kind: 'name', seconds: 20, prompt: 'Name your character' },
   ...Array.from({ length: WEAPON_COUNT }, (_, i) => [
-    { slot: `weapon${i}`, kind: 'draw' as const, seconds: 45, prompt: `Draw weapon ${i + 1}` },
+    { slot: `weapon${i}`, kind: 'draw' as const, seconds: 60, prompt: `Draw weapon ${i + 1}` },
     { slot: `weapon${i}`, kind: 'name' as const, seconds: 20, prompt: `Name weapon ${i + 1}` },
   ]).flat(),
 ];
 
 /**
- * How many ULTs a tie may force before the game accepts a draw.
+ * How many Ultimates a tie may force before the game accepts a draw.
  *
  * Without a cap two evenly matched teams could be sent back to the drawing
  * board forever; two extra weapons is already a long tail on a party game.
@@ -134,16 +139,16 @@ export const CREATION_STEPS: CreationStep[] = [
 export const MAX_ULTS = 2;
 
 /**
- * The ULT round: one more weapon, on the same clock as a normal weapon.
+ * The Ultimate round: one more weapon, on the same clock as a normal weapon.
  *
- * The slot continues the weapon numbering, so an ULT is simply a fourth (then
+ * The slot continues the weapon numbering, so an Ultimate is simply a fourth (then
  * fifth) weapon — nothing downstream has to learn a new kind of thing.
  */
 export function ultSteps(round: number): CreationStep[] {
   const slot = `weapon${WEAPON_COUNT + Math.max(0, round - 1)}`;
   return [
-    { slot, kind: 'draw', seconds: 45, prompt: 'Draw your ULT weapon' },
-    { slot, kind: 'name', seconds: 20, prompt: 'Name your ULT weapon' },
+    { slot, kind: 'draw', seconds: 60, prompt: 'Draw your Ultimate' },
+    { slot, kind: 'name', seconds: 20, prompt: 'Name your Ultimate' },
   ];
 }
 
@@ -215,9 +220,9 @@ export interface RoomState {
   capacity: number;
   players: Player[];
   teamNames: { teamA: string; teamB: string };
-  /** Index into the current step list while creating or in an ULT, else -1. */
+  /** Index into the current step list while creating or in an Ultimate, else -1. */
   step: number;
-  /** ULTs played so far; 0 until a tie forces one. */
+  /** Ultimates played so far; 0 until a tie forces one. */
   ultRound: number;
   /** Battleground picks, by player id. Everyone votes, judges included. */
   votes: Record<string, string>;
@@ -330,7 +335,7 @@ export function teamDamage(state: RoomState, team: Role): number {
     .reduce((sum, p) => sum + p.damageTaken, 0);
 }
 
-/** Which side won, or null when they are level and an ULT is owed. */
+/** Which side won, or null when they are level and an Ultimate is owed. */
 export function winningTeam(state: RoomState): Role | null {
   const a = teamDamage(state, 'teamA');
   const b = teamDamage(state, 'teamB');
@@ -390,6 +395,17 @@ export function currentStep(state: RoomState): CreationStep | null {
   return stepsFor(state)[state.step] ?? null;
 }
 
+/**
+ * Whether this room is a duel rather than a game of teams.
+ *
+ * Two people are not two teams. Asking them to drag each other into Team One
+ * and Team Two before they can start is a ceremony with no content — there is
+ * exactly one arrangement, and the room can make it itself.
+ */
+export function isDuel(state: RoomState): boolean {
+  return state.players.filter((p) => !p.isHost).length === 2;
+}
+
 export function startBlockedBecause(state: RoomState): string | null {
   const active = state.players.filter((p) => !p.isHost);
 
@@ -398,6 +414,9 @@ export function startBlockedBecause(state: RoomState): string | null {
       MIN_PLAYERS - active.length === 1 ? '' : 's'
     }.`;
   }
+
+  // A duel arranges itself when the game starts.
+  if (isDuel(state)) return null;
 
   const waiting = active.filter((p) => p.role === 'unassigned');
   if (waiting.length > 0) {

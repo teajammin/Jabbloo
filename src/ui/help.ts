@@ -23,7 +23,7 @@ export function helpDialog(): HTMLDialogElement {
       el('li', {}, 'On your turn, pick a weapon and describe how you use it — up to 50 words.'),
       el('li', {}, 'An AI animates your description. Nonsense still gets you a swing.'),
       el('li', {}, 'A judge scores each move out of 33. Everyone starts on 100 health.'),
-      el('li', {}, 'Best of three rounds. Least damage taken wins. A tie means one more weapon, as an ULT.'),
+      el('li', {}, 'Best of three rounds. Least damage taken wins. A tie means one more weapon each — an Ultimate — and another round.'),
     ),
     el('p', { class: 'help-note' },
       '2 players: an AI judges. 3 or 5: the players not fighting judge. 4 or 6: tag team. Six players max.'),

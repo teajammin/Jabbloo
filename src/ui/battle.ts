@@ -505,7 +505,7 @@ function phoneView(
   connection.on({ onClosed: () => goHome(go), onState: handle });
 
   // Acted on immediately as well as on every update: a phone arriving here
-  // from its own move screen during an ULT would otherwise sit on "watch the
+  // from its own move screen during an Ultimate would otherwise sit on "watch the
   // big screen" until the next broadcast, which can be most of a minute away.
   if (connection.state) handle(connection.state);
 }

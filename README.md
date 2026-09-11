@@ -29,7 +29,7 @@ A judge scores each attack out of 33: either the players who are not fighting,
 or an AI when there are only two of you. Everyone starts on 100 health, each
 character fights three rounds, and **the side that takes the least damage
 wins** — so hitting hard is only half of it. A tie sends both sides back to
-draw one more weapon as an ULT and fight again; after two of those, a tie
+draw one more weapon as an Ultimate and fight again; after two of those, a tie
 stands.
 
 | Players | Format |
@@ -88,7 +88,7 @@ npm run test:judging      # and :ult :bots :limits :endgame :tagteam
 
 `npm test` needs nothing running. The eleven integration suites drive a real
 PartyKit room over a websocket, because the rules they check — who may score,
-what happens when someone drops, when a tie becomes an ULT, whether four and
+what happens when someone drops, when a tie becomes an Ultimate, whether four and
 six players each fight three times — exist only as behaviour of the running
 server. 169 checks across those.
 

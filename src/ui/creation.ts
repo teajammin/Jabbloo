@@ -182,10 +182,10 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       heading.textContent = step.prompt;
       subheading.textContent = isHost
         ? ult
-          ? 'Level on damage — both sides are drawing an ULT.'
+          ? 'Level on damage — both sides are drawing an Ultimate.'
           : 'Everyone is drawing on their devices.'
         : ult
-          ? 'The scores are level. One more weapon decides it.'
+          ? 'The scores are level. One more weapon — your Ultimate — decides it.'
           : `Step ${state.step + 1} of ${stepsFor(state).length}`;
       clock.setDeadline(state.stepEndsAt, step.seconds);
 

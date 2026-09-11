@@ -168,5 +168,45 @@ for (const ws of [host, a, b]) ws.close();
   for (const ws of [screen, phone]) ws.close();
 }
 
+// --- two players are not two teams ----------------------------------------
+{
+  const code = 'DUEL' + Math.floor(Math.random() * 900 + 100);
+  const socket = (id) => new Promise((resolve) => {
+    const ws = new WebSocket(`ws://127.0.0.1:1999/parties/main/${code}?_pk=${id}`);
+    ws.inbox = [];
+    ws.addEventListener('message', (e) => ws.inbox.push(JSON.parse(e.data)));
+    ws.addEventListener('open', () => resolve(ws));
+  });
+  const seen = (ws) => [...ws.inbox].reverse()
+    .find((m) => m.type === 'state' || m.type === 'welcome')?.state;
+
+  const screen = await socket('screen');
+  screen.send(JSON.stringify({ type: 'host', capacity: 2 }));
+  await wait(300);
+  const one = await socket('one');
+  one.send(JSON.stringify({ type: 'join', name: 'Ann' }));
+  const two = await socket('two');
+  two.send(JSON.stringify({ type: 'join', name: 'Bo' }));
+  await wait(500);
+
+  check('nobody has been put anywhere',
+    seen(screen).players.filter((p) => p.role === 'unassigned' && !p.isHost).length === 2);
+
+  // No dragging, no teams: press start.
+  screen.send(JSON.stringify({ type: 'start' }));
+  await wait(500);
+  const s = seen(screen);
+  check('a duel starts with nobody assigned', s.phase === 'creating', s.phase);
+  check('and puts the two of them opposite each other',
+    s.players.filter((p) => p.role === 'teamA').length === 1
+    && s.players.filter((p) => p.role === 'teamB').length === 1,
+    JSON.stringify(s.players.map((p) => [p.name, p.role])));
+  check('the sides take their own names',
+    s.teamNames.teamA === 'Ann' && s.teamNames.teamB === 'Bo',
+    JSON.stringify(s.teamNames));
+
+  for (const ws of [screen, one, two]) ws.close();
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

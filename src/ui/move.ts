@@ -128,7 +128,7 @@ export function moveScreen(
      * Hands the phone back to the battle screen once the move is out of the
      * player's hands.
      *
-     * All the phase routing — the next turn, an ULT, the results — lives
+     * All the phase routing — the next turn, an Ultimate, the results — lives
      * there, so leaving a phone parked on this screen would strand it for the
      * rest of the game.
      */

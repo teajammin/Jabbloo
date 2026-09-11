@@ -2,7 +2,9 @@ import { bubbleText, titleHeight } from './bubbleText';
 import { el, button, goHome, type Screen } from './screens';
 import { RoomConnection } from '../net/room';
 import { creationScreen } from './creation';
-import { startBlockedBecause, type Player, type RoomState } from '../shared/protocol';
+import {
+  isDuel, startBlockedBecause, type Player, type RoomState,
+} from '../shared/protocol';
 import { teamBoard } from './teams';
 import { joinRoomScreen } from './joinRoom';
 
@@ -40,7 +42,15 @@ export function lobbyScreen(
     const startButton = button('Start', () => connection.send({ type: 'start' }), 'big primary');
     startButton.disabled = true;
 
+    /*
+     * The team board is for games that have teams.
+     *
+     * With two players there is one possible arrangement and the room makes it
+     * at kick-off, so the board would be a puzzle with a single solution
+     * standing between two people and their game.
+     */
     const board = isHost ? teamBoard(connection) : null;
+    const duelNote = el('p', { class: 'lede' }, '');
     const blocked = el('p', { class: 'help-note blocked' });
 
     function renderRoster(state: RoomState): void {
@@ -66,9 +76,21 @@ export function lobbyScreen(
         const players = state.players.filter((p) => !p.isHost);
         const target = state.capacity || capacity;
 
-        // The host arranges on the board; phones just see who is here.
-        if (board) board.update(state);
-        else renderRoster(state);
+        // The host arranges on the board; phones just see who is here. A duel
+        // has nothing to arrange, so the board gives way to the roster and a
+        // line saying what is about to happen.
+        const duel = isDuel(state);
+        if (board) {
+          board.root.hidden = duel;
+          if (duel) renderRoster(state); else board.update(state);
+        } else {
+          renderRoster(state);
+        }
+        roster.hidden = Boolean(board) && !duel;
+
+        duelNote.textContent = duel && isHost
+          ? `${players[0]?.name ?? 'One'} against ${players[1]?.name ?? 'the other'} — no teams needed.`
+          : '';
 
         status.textContent = isHost
           ? players.length >= target
@@ -196,7 +218,8 @@ export function lobbyScreen(
               ),
               el('div', { class: 'lobby-room' },
                 status,
-                board ? board.root : roster,
+                duelNote,
+                ...(board ? [board.root, roster] : [roster]),
                 error,
                 el('div', { class: 'stack' },
                   blocked,

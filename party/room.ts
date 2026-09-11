@@ -20,6 +20,7 @@ import {
   canStart,
   creators,
   drawBattleground,
+  isDuel,
   stepsFor,
   voters,
   winningTeam,
@@ -91,9 +92,9 @@ function botMove(player: Player): { weapon: number; prompt: string } {
 function defaultName(slot: string): string {
   if (slot === 'character') return 'Nameless';
   const index = Number(slot.replace('weapon', ''));
-  // Anything past the three made in creation is an ULT, and naming it 'ULT'
-  // reads better on a weapon button than a fourth stand-in noun would.
-  return FALLBACK_WEAPONS[index] ?? 'ULT';
+  // Anything past the three made in creation is an Ultimate, and naming it
+  // so reads better on a weapon button than a fourth stand-in noun would.
+  return FALLBACK_WEAPONS[index] ?? 'Ultimate';
 }
 
 export default class Room implements Party.Server {
@@ -463,6 +464,18 @@ export default class Room implements Party.Server {
       this.send(sender, { type: 'error', reason: 'Not everyone has a place yet' });
       return;
     }
+    // Two players are simply opposite each other. Done here rather than on
+    // joining, so a third arriving turns it back into a game of teams that the
+    // host arranges.
+    if (isDuel(this.state)) {
+      const pair = this.state.players.filter((p) => !p.isHost);
+      pair.forEach((player, i) => { player.role = i === 0 ? 'teamA' : 'teamB'; });
+      this.state.teamNames = {
+        teamA: pair[0]?.name ?? 'Team One',
+        teamB: pair[1]?.name ?? 'Team Two',
+      };
+    }
+
     this.state.phase = 'creating';
     this.beginStep(0);
   }
@@ -481,7 +494,7 @@ export default class Room implements Party.Server {
 
     const step = stepsFor(this.state)[index];
     if (!step) {
-      // Creation leads to the battleground vote; an ULT leads straight back
+      // Creation leads to the battleground vote; an Ultimate leads straight back
       // onto the ground already chosen — the tie is what is being settled,
       // not the venue.
       if (this.state.phase === 'ult') this.beginSuddenDeath();
@@ -542,7 +555,7 @@ export default class Room implements Party.Server {
     }
   }
 
-  /** Every weapon slot that exists so far, ULTs included. */
+  /** Every weapon slot that exists so far, Ultimates included. */
   private weaponSlots(): string[] {
     const count = WEAPON_COUNT + this.state.ultRound;
     return Array.from({ length: count }, (_, i) => `weapon${i}`);
@@ -718,6 +731,18 @@ export default class Room implements Party.Server {
       player.best = null;
     }
 
+    // Two players are simply opposite each other. Done here rather than on
+    // joining, so a third arriving turns it back into a game of teams that the
+    // host arranges.
+    if (isDuel(this.state)) {
+      const pair = this.state.players.filter((p) => !p.isHost);
+      pair.forEach((player, i) => { player.role = i === 0 ? 'teamA' : 'teamB'; });
+      this.state.teamNames = {
+        teamA: pair[0]?.name ?? 'Team One',
+        teamB: pair[1]?.name ?? 'Team Two',
+      };
+    }
+
     this.state.phase = 'creating';
     this.beginStep(0);
   }
@@ -737,7 +762,7 @@ export default class Room implements Party.Server {
   }
 
   /**
-   * One more fight each, with the ULT in hand.
+   * One more fight each, with the Ultimate in hand.
    *
    * Health is restored so a knocked-out fighter can still swing their ULT —
    * the tie is being settled on total damage taken, and sitting a player out
@@ -754,7 +779,7 @@ export default class Room implements Party.Server {
     this.beginTurn();
   }
 
-  /** True while players are making things, in creation or in an ULT. */
+  /** True while players are making things, in creation or in an Ultimate. */
   private isCreating(): boolean {
     return this.state.phase === 'creating' || this.state.phase === 'ult';
   }

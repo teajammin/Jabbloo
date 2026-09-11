@@ -1,11 +1,11 @@
 /**
- * ULT tiebreaker tests.
+ * Ultimate tiebreaker tests.
  *
  * Needs a live party: `npm run dev:party`.
  *
  * The brief's rule: a level score does not end the game — both sides draw one
  * more weapon and fight again with it. What is checked here is that a tie
- * routes into an ULT, that the extra weapon lands in the right slot, that the
+ * routes into an Ultimate, that the extra weapon lands in the right slot, that the
  * ULT leads straight back into a fight, and that the loop is capped so a
  * perfectly even pair of teams eventually gets an answer.
  */
@@ -82,9 +82,9 @@ for (let round = 0; round < 3; round++) await evenRound(host, a, b, ids);
 
 const tied = state(host);
 check('a level score does not end the game', tied.phase === 'ult', tied.phase);
-check('the ULT is counted', tied.ultRound === 1, String(tied.ultRound));
+check('the Ultimate is counted', tied.ultRound === 1, String(tied.ultRound));
 check('it starts at the first step', tied.step === 0, String(tied.step));
-check('the ULT has its own deadline', tied.stepEndsAt > Date.now(), String(tied.stepEndsAt));
+check('the Ultimate has its own deadline', tied.stepEndsAt > Date.now(), String(tied.stepEndsAt));
 check('nobody carries a stale ready flag',
   tied.players.every((p) => !p.progress.ready));
 
@@ -92,7 +92,7 @@ check('nobody carries a stale ready flag',
 a.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon3', png: PNG, done: true }));
 b.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon3', png: PNG, done: true }));
 await wait(250);
-check('the ULT drawing lands in a fourth slot',
+check('the Ultimate drawing lands in a fourth slot',
   state(host).players.find((p) => p.id === ids[0])?.progress.drawn.includes('weapon3'));
 check('the naming step follows', state(host).step === 1, String(state(host).step));
 
@@ -101,11 +101,11 @@ b.send(JSON.stringify({ type: 'submitName', slot: 'weapon3', name: '' }));
 await wait(300);
 
 const fighting = state(host);
-check('the ULT leads straight back into a fight', fighting.phase === 'battle', fighting.phase);
-check('the ULT is theirs to swing',
+check('the Ultimate leads straight back into a fight', fighting.phase === 'battle', fighting.phase);
+check('the Ultimate is theirs to swing',
   fighting.players.find((p) => p.id === ids[0])?.weaponNames[3] === 'Sun Thrower');
-check('an unnamed ULT still gets a name',
-  fighting.players.find((p) => p.id === ids[1])?.weaponNames[3] === 'ULT',
+check('an unnamed Ultimate still gets a name',
+  fighting.players.find((p) => p.id === ids[1])?.weaponNames[3] === 'Ultimate',
   fighting.players.find((p) => p.id === ids[1])?.weaponNames[3]);
 check('the sudden-death round is one fight each',
   fighting.players.filter((p) => !p.isHost).every((p) => p.fights === 2),
@@ -133,8 +133,8 @@ check('a knocked-out fighter is back on their feet',
 
 // Still level after the ULT: one more is allowed, then the game accepts a tie.
 await evenRound(host, a, b, ids);
-check('a second tie forces a second ULT', state(host).phase === 'ult', state(host).phase);
-check('the second ULT takes the next slot up',
+check('a second tie forces a second Ultimate', state(host).phase === 'ult', state(host).phase);
+check('the second Ultimate takes the next slot up',
   state(host).ultRound === 2, String(state(host).ultRound));
 
 a.send(JSON.stringify({ type: 'submitDrawing', slot: 'weapon4', png: PNG, done: true }));
@@ -143,7 +143,7 @@ await wait(250);
 a.send(JSON.stringify({ type: 'submitName', slot: 'weapon4', name: 'Last Word' }));
 b.send(JSON.stringify({ type: 'submitName', slot: 'weapon4', name: 'Final Say' }));
 await wait(300);
-check('the second ULT fights too', state(host).phase === 'battle', state(host).phase);
+check('the second Ultimate fights too', state(host).phase === 'battle', state(host).phase);
 
 await evenRound(host, a, b, ids);
 const done = state(host);

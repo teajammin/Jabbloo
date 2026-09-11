@@ -777,6 +777,15 @@ input[type='text'] {
   justify-content: center;
   /* Scrolls sideways rather than wrapping: a wrapping row changes height
      unpredictably, and every wrap steals height from the canvas. */
+  /*
+   * Centred while it fits, from the left once it does not.
+   *
+   * A centred flex row that overflows pushes content off BOTH ends, and the
+   * start of it cannot even be scrolled back to — which is why the colours
+   * looked cut off. `safe` is the whole fix: it means "centre unless that
+   * would lose something".
+   */
+  justify-content: safe center;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
