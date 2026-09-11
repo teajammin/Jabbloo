@@ -3,6 +3,7 @@ import { moveScreen } from './move';
 import { requestChoreography, requestJudgement } from '../api';
 import { judgePanel } from './judging';
 import { getSettings } from '../settings';
+import { report } from '../errors';
 import { play } from '../audio';
 import type { RoomConnection } from '../net/room';
 import {
@@ -80,6 +81,18 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
       building = (async () => {
         const engine = await import('../engine');
+        if (disposed) return;
+
+        // A battleground that fails to load is invisible on screen: the stage
+        // simply stays the flat colour underneath. Sending those failures to
+        // the crash log is the only way anyone finds out.
+        engine.reportAssetFailures((url, error) => {
+          report(new Error(`asset failed: ${url} — ${String(error).slice(0, 120)}`));
+        });
+        // Initialised once, before anything asks for a texture: several loads
+        // racing the loader's own start-up is how a battleground quietly
+        // failed to appear.
+        await engine.prepareAssets();
         if (disposed) return;
 
         // A player who asked for less motion gets a faster, shorter fight
@@ -174,22 +187,46 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         entering.push({ fighter, side, name: fighter.name, id });
       }
 
-      // One at a time, each announced by name: the brief asks for a reveal,
-      // and two fighters arriving together is a scene rather than an entrance.
-      // They wait offstage until called so nobody is standing around unnamed.
+      /*
+       * The sequence between two people appearing and a fight starting.
+       *
+       * Each fighter is named, then walks on, then the two of them are put
+       * against each other, and only then does the fight start. Every beat
+       * says what it is — a room watching a big screen should never have to
+       * infer that something has changed — and the whole thing is deliberately
+       * unhurried: this is the part of a fighting game people look forward to.
+       */
       for (const { fighter, side } of entering) {
         fighter.setPosition(stage.offstageX(side), stage.height * engine.GROUND_Y);
       }
+
+      const newcomers = entering.filter(({ id }) => !introduced.has(id));
+
       for (const { fighter, side, name, id } of entering) {
         if (disposed) return;
         if (!introduced.has(id)) {
           introduced.add(id);
-          caption.textContent = name;
+          caption.textContent = `${name} steps up`;
           await stage.announce(name, side);
           if (disposed) return;
         }
         await stage.enterStage(fighter, side);
       }
+
+      if (disposed) return;
+
+      // Both sides are out: the moment worth a card of its own. Only when
+      // somebody new has arrived — in a one-a-side game the pair has not
+      // changed and saying "versus" again every round is noise.
+      if (newcomers.length > 0) {
+        const names = entering.map((e) => e.name);
+        caption.textContent = `${names[0]} versus ${names[1]}`;
+        await stage.proclaim('versus', 1.1);
+        if (disposed) return;
+      }
+
+      await stage.proclaim('fight', 0.9);
+      if (!disposed) stage.shake(7, 0.4);
     }
 
     /** Moves every bar to the health the server last reported. */
@@ -336,7 +373,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           caption.textContent = 'Entering the arena…';
           await setUpFighters(turn);
           if (disposed) return;
-          caption.textContent = `${names[0]} versus ${names[1]}`;
+          caption.textContent = `${names[0]} versus ${names[1]} — pick your weapon`;
         }
         return;
       }

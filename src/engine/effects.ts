@@ -1,3 +1,4 @@
+import { loadTexture } from './assets';
 import { Assets, Container, Sprite, Texture } from 'pixi.js';
 
 /**
@@ -40,7 +41,7 @@ export function effectUrl(kind: EffectKind): string {
  * existence a few frames late and miss its own impact.
  */
 export async function preloadEffects(): Promise<void> {
-  await Promise.all(EFFECT_KINDS.map((kind) => Assets.load<Texture>(effectUrl(kind))));
+  await Promise.all(EFFECT_KINDS.map((kind) => loadTexture(effectUrl(kind))));
 }
 
 export interface SpawnOptions {

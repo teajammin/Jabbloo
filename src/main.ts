@@ -48,6 +48,24 @@ function showBreakage(): void {
  */
 watchForErrors(() => showBreakage());
 
+/*
+ * Safari's pinch zoom is not covered by touch-action, and it fires on the
+ * two-finger gestures the drawing tool uses to zoom the canvas itself — so a
+ * pinch meant for the drawing zoomed the whole page instead, leaving the
+ * canvas somewhere off screen.
+ */
+for (const gesture of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(gesture, (event) => event.preventDefault(), { passive: false });
+}
+
+// A double tap is a tap, twice. Without this, the second one zooms.
+let lastTap = 0;
+document.addEventListener('touchend', (event) => {
+  const now = Date.now();
+  if (now - lastTap < 320) event.preventDefault();
+  lastTap = now;
+}, { passive: false });
+
 loadSettings();
 setHome(launchScreen);
 // Mounted on <body>, not inside a screen: the brief wants options reachable at

@@ -113,6 +113,24 @@ check('the sudden-death round is one fight each',
 check('a knocked-out fighter is back on their feet',
   fighting.players.filter((p) => !p.isHost).every((p) => p.health > 0));
 
+// The Ultimate is a fourth weapon, and picking it must actually swing it. A
+// ceiling of three silently turned every Ultimate into the third weapon.
+{
+  a.send(JSON.stringify({ type: 'submitMove', weapon: 3, prompt: 'the ultimate' }));
+  b.send(JSON.stringify({ type: 'submitMove', weapon: 3, prompt: 'theirs too' }));
+  await wait(300);
+  const chosen = state(host).turn?.moves[ids[0]]?.weapon;
+  check('choosing the Ultimate keeps the Ultimate', chosen === 3, String(chosen));
+
+  host.send(JSON.stringify({ type: 'turnPlayed' }));
+  await wait(200);
+  host.send(JSON.stringify({ type: 'submitScore', attackerId: ids[0], score: 8 }));
+  host.send(JSON.stringify({ type: 'submitScore', attackerId: ids[1], score: 8 }));
+  await wait(260);
+  host.send(JSON.stringify({ type: 'turnDone' }));
+  await wait(260);
+}
+
 // Still level after the ULT: one more is allowed, then the game accepts a tie.
 await evenRound(host, a, b, ids);
 check('a second tie forces a second ULT', state(host).phase === 'ult', state(host).phase);

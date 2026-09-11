@@ -65,6 +65,38 @@
 * { box-sizing: border-box; }
 
 /*
+ * A game, not a document.
+ *
+ * A phone treats a web page as text by default: a long press selects a word
+ * and offers to copy it, a double tap zooms, two fingers pinch the whole
+ * interface. All three fire constantly while someone is drawing with a finger,
+ * and every one of them interrupts the stroke.
+ *
+ * Selection is turned off everywhere except the places people actually type,
+ * and `touch-action: manipulation` tells the browser a tap is a tap rather
+ * than the first half of a double-tap zoom.
+ */
+html, body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* The canvas takes every touch itself: no scrolling, no zooming, no gestures
+   the drawing tool has not asked for. */
+.draw-canvas, .draw-overlay, .draw-stage, .battle-stage canvas {
+  touch-action: none;
+}
+
+/*
  * The browser's own [hidden] rule is just `display: none`, so any class that
  * sets a display — .photo-menu is flex, .tool-row is flex — silently beats it
  * and the element stays on screen with `hidden` set. This makes the attribute
@@ -1305,12 +1337,21 @@ input[type='text'] {
  * The stage covers the window and brings its own scenery, so the drifting
  * colours behind it would only be a cost. A fight is busy enough.
  */
+/*
+ * The battleground is the screen.
+ *
+ * It was a canvas with a margin round it on a dark page, which makes a
+ * photograph look like a picture of a place rather than the place. No padding,
+ * no rounding, no shadow: the fight fills the window and the caption sits over
+ * it.
+ */
 .screen-battle {
   justify-content: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 0;
+  padding: 0;
   height: 100dvh;
-  background: var(--paper);
+  background: #000;
+  position: relative;
 }
 
 body:has(.screen-battle) .backdrop { display: none; }
@@ -1320,18 +1361,35 @@ body:has(.screen-battle) .backdrop { display: none; }
 body:has(.screen-draw) .backdrop { display: none; }
 
 .battle-stage {
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
 }
 
 .battle-stage canvas {
-  border-radius: var(--radius);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   max-width: 100%;
   max-height: 100%;
+}
+
+/* Over the stage rather than under it, so the picture keeps the whole window
+   and the words still have somewhere to live. */
+.battle-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 3vh;
+  transform: translateX(-50%);
+  z-index: 3;
+  max-width: min(900px, 92vw);
+  margin: 0;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: rgba(20, 17, 28, 0.72);
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 600;
+  text-align: center;
+  backdrop-filter: blur(6px);
 }
 
 /* -------------------------------------------------------------- move screen */
@@ -1363,14 +1421,7 @@ body:has(.screen-draw) .backdrop { display: none; }
 .move-count { font-size: 14px; opacity: 0.6; font-variant-numeric: tabular-nums; }
 .move-count.is-over { color: var(--coral); opacity: 1; font-weight: 700; }
 
-.battle-caption {
-  margin: 0;
-  max-width: 60ch;
-  text-align: center;
-  font-size: 16px;
-  line-height: 1.45;
-  opacity: 0.8;
-}
+
 
 /* ----------------------------------------------------------------- judging */
 

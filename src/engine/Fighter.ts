@@ -1,4 +1,5 @@
-import { Container, Sprite, Texture, Assets } from 'pixi.js';
+import { Container, Sprite, Texture } from 'pixi.js';
+import { loadTexture } from './assets';
 import gsap from 'gsap';
 import { Limb } from './Limb';
 import { sampleDominantColour } from './colour';
@@ -77,10 +78,12 @@ export class Fighter {
   static async create(options: FighterOptions): Promise<Fighter> {
     const fighter = new Fighter(options);
     const [characterTexture, weaponTexture] = await Promise.all([
-      Assets.load<Texture>(options.character),
-      Assets.load<Texture>(options.weapon),
+      loadTexture(options.character),
+      loadTexture(options.weapon),
     ]);
-    fighter.build(characterTexture, weaponTexture);
+    // A fighter with no picture still fights: an empty texture draws nothing,
+    // and the rig, the limbs and the weapon arm all carry on regardless.
+    fighter.build(characterTexture ?? Texture.EMPTY, weaponTexture ?? Texture.EMPTY);
     return fighter;
   }
 
@@ -206,7 +209,8 @@ export class Fighter {
    * and restart the entrance.
    */
   async setWeapon(url: string, name?: string): Promise<void> {
-    const texture = await Assets.load<Texture>(url);
+    const texture = await loadTexture(url);
+    if (!texture) return;
     this.weaponSprite.texture = texture;
     this.weaponSprite.scale.set(this.targetWeaponHeight / texture.height);
     // Facing is applied by mirroring the root, so the sprite's own sign has to

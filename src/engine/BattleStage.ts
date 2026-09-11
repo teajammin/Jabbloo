@@ -1,4 +1,5 @@
-import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { loadTexture } from './assets';
 import gsap from 'gsap';
 import { battlegrounds, getBattleground, palette } from './theme';
 import { GROUND_Y, type BattleStageOptions, type Side } from './types';
@@ -130,17 +131,23 @@ export class BattleStage {
    * way nobody can name but everybody sees.
    */
   private async loadScene(url: string): Promise<void> {
-    try {
-      const texture = await Assets.load<Texture>(url);
-      if (this.destroyed) return;
-      this.scene.texture = texture;
-      const scale = Math.max(this.width / texture.width, this.height / texture.height);
-      this.scene.scale.set(scale);
-      this.scene.x = (this.width - texture.width * scale) / 2;
-      this.scene.y = (this.height - texture.height * scale) / 2;
-    } catch {
-      // The flat colour underneath is a perfectly good battleground.
-    }
+    const texture = await loadTexture(url);
+    // The flat colour underneath is a perfectly good battleground, and the
+    // failure has already been reported by whoever tried to load it.
+    if (!texture || this.destroyed) return;
+
+    this.scene.texture = texture;
+    this.fitScene();
+  }
+
+  /** Covers the stage with the photograph, whatever shape either of them is. */
+  private fitScene(): void {
+    const { texture } = this.scene;
+    if (texture === Texture.EMPTY || texture.width === 0) return;
+    const scale = Math.max(this.width / texture.width, this.height / texture.height);
+    this.scene.scale.set(scale);
+    this.scene.x = (this.width - texture.width * scale) / 2;
+    this.scene.y = (this.height - texture.height * scale) / 2;
   }
 
   setBattleground(id: BattlegroundId): void {
@@ -212,6 +219,76 @@ export class BattleStage {
    * a name big on the screen, one fighter at a time. It sits on the overlay so
    * the entrance can shake the world underneath it without the name wobbling.
    */
+  /**
+   * Rattles the world layer.
+   *
+   * The overlay does not move with it, so names, health and damage stay
+   * readable while the ground under the fight does not.
+   */
+  shake(intensity = 5, seconds = 0.4): void {
+    const strength = Math.max(1, Math.min(10, intensity)) * 3;
+    gsap.killTweensOf(this.world.position);
+    const tl = gsap.timeline({
+      onComplete: () => { this.world.position.set(0, 0); },
+    });
+    const steps = Math.max(3, Math.round(seconds / 0.05));
+    for (let i = 0; i < steps; i++) {
+      const falloff = 1 - i / steps;
+      tl.to(this.world.position, {
+        x: (Math.random() - 0.5) * strength * falloff,
+        y: (Math.random() - 0.5) * strength * falloff,
+        duration: seconds / steps,
+        ease: 'none',
+      });
+    }
+    tl.to(this.world.position, { x: 0, y: 0, duration: 0.08 });
+  }
+
+  /**
+   * A full-width card across the middle of the screen.
+   *
+   * Used for the beats between fighters arriving and the fight starting —
+   * "versus", "fight" — which the stage had no way of saying before, so the
+   * room had to work out from the animation alone that anything had changed.
+   */
+  async proclaim(text: string, seconds = 1.1): Promise<void> {
+    const card = new Graphics();
+    const height = this.height * 0.2;
+    card.beginFill(0x000000, 0.62);
+    card.drawRect(-this.width, this.height / 2 - height / 2, this.width * 3, height);
+    card.endFill();
+    card.alpha = 0;
+    this.overlay.addChild(card);
+
+    const letters = await BubbleText.create(text.toUpperCase().slice(0, 12), {
+      height: height * 0.62,
+      jitter: 3,
+    });
+    const room = this.width * 0.84;
+    if (letters.width > room) letters.scale.set(room / letters.width);
+    letters.x = this.width / 2 - letters.width / 2;
+    letters.y = this.height / 2 - letters.height / 2;
+    letters.alpha = 0;
+    this.overlay.addChild(letters);
+
+    const tl = gsap.timeline();
+    // The band arrives first and wide, the word lands into it: two movements
+    // rather than one is what makes it read as an announcement.
+    tl.fromTo(card, { alpha: 0 }, { alpha: 1, duration: 0.16, ease: 'power2.out' });
+    tl.fromTo(card.scale, { y: 0.2 }, { y: 1, duration: 0.22, ease: 'power3.out' }, '<');
+    tl.fromTo(letters, { alpha: 0, x: letters.x - this.width * 0.06 },
+      { alpha: 1, x: letters.x, duration: 0.26, ease: 'back.out(1.8)' }, '-=0.06');
+    tl.to([card, letters], { alpha: 0, duration: 0.24 }, `+=${Math.max(0.15, seconds - 0.7)}`);
+
+    await new Promise<void>((resolve) => {
+      tl.eventCallback('onComplete', () => {
+        if (!card.destroyed) card.destroy();
+        if (!letters.destroyed) letters.destroy({ children: true });
+        resolve();
+      });
+    });
+  }
+
   async announce(name: string, side: Side, seconds = 1.6): Promise<void> {
     const text = await BubbleText.create(name.toUpperCase().slice(0, 18), {
       height: this.height * 0.16,
@@ -272,18 +349,22 @@ export class BattleStage {
     fighter.setPosition(this.offstageX(side), ground);
 
     const tl = gsap.timeline();
-    // Two hops in rather than a slide: a slide reads as the sprite being
-    // dragged, hops read as the character arriving under its own power.
-    tl.to(fighter.root, { x: home, duration: 0.9, ease: 'power2.out' });
-    for (const at of [0, 0.32]) {
-      tl.to(fighter.root, { y: ground - 90, duration: 0.24, ease: 'power2.out' }, at);
-      tl.to(fighter.root, { y: ground, duration: 0.26, ease: 'power2.in' }, at + 0.24);
-      tl.to(fighter.body, { scaleY: 0.88, scaleX: 1.1, duration: 0.1 }, at + 0.5);
-      tl.to(fighter.body, { scaleY: 1, scaleX: 1, duration: 0.14 }, at + 0.6);
+    // Three hops rather than two, over a longer walk: an entrance that is over
+    // before the room has looked up is not an entrance. A slide would read as
+    // the sprite being dragged; hops read as a character arriving under its
+    // own power.
+    tl.to(fighter.root, { x: home, duration: 1.5, ease: 'power2.out' });
+    for (const at of [0, 0.42, 0.84]) {
+      tl.to(fighter.root, { y: ground - 105, duration: 0.28, ease: 'power2.out' }, at);
+      tl.to(fighter.root, { y: ground, duration: 0.3, ease: 'power2.in' }, at + 0.28);
+      tl.to(fighter.body, { scaleY: 0.86, scaleX: 1.12, duration: 0.1 }, at + 0.58);
+      tl.to(fighter.body, { scaleY: 1, scaleX: 1, duration: 0.16 }, at + 0.68);
     }
-    // A flourish of the weapon to finish, so the thing they drew gets a look.
-    tl.to(fighter.hand, { rotation: -0.9, duration: 0.18, ease: 'power2.out' }, 0.95);
-    tl.to(fighter.hand, { rotation: 0, duration: 0.3, ease: 'elastic.out(1, 0.5)' });
+
+    // Landing: a squash deeper than the hops, and the stage takes it.
+    tl.to(fighter.body, { scaleY: 0.8, scaleX: 1.2, duration: 0.1 }, 1.5);
+    tl.to(fighter.body, { scaleY: 1, scaleX: 1, duration: 0.26, ease: 'elastic.out(1, 0.45)' });
+    tl.call(() => this.shake(6, 0.3), undefined, 1.5);
 
     return new Promise((resolve) => { tl.eventCallback('onComplete', () => resolve()); });
   }

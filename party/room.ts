@@ -764,8 +764,16 @@ export default class Room implements Party.Server {
     if (!turn || turn.phase !== 'picking') return;
     if (!turn.fighters.includes(sender.id)) return;
 
+    // Clamped to what this player actually has, not to three.
+    //
+    // An Ultimate is a fourth weapon, and a hardcoded ceiling of two quietly
+    // turned every Ultimate into the third weapon instead — the player picked
+    // the thing they had just drawn and watched something else swing.
+    const player = this.state.players.find((p) => p.id === sender.id);
+    const owned = Math.max(1, player?.weaponNames.length ?? WEAPON_COUNT);
+
     turn.moves[sender.id] = {
-      weapon: Math.max(0, Math.min(2, Math.floor(weapon) || 0)),
+      weapon: Math.max(0, Math.min(owned - 1, Math.floor(weapon) || 0)),
       prompt: trimPrompt(prompt),
     };
     this.broadcastState();

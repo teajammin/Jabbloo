@@ -1,4 +1,5 @@
 import { Container, Sprite, Texture, Assets } from 'pixi.js';
+import { loadTexture } from './assets';
 
 /**
  * Text rendered from the game's own bubble-letter artwork.
@@ -46,7 +47,7 @@ const ALL_GLYPHS = [
  * is exactly when nothing should stutter.
  */
 export async function preloadGlyphs(basePath = '/letters'): Promise<void> {
-  await Promise.all(ALL_GLYPHS.map((name) => Assets.load<Texture>(`${basePath}/${name}.png`)));
+  await Promise.all(ALL_GLYPHS.map((name) => loadTexture(`${basePath}/${name}.png`)));
 }
 
 export class BubbleText extends Container {

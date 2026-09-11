@@ -10,6 +10,7 @@
  */
 
 export { BattleStage } from './BattleStage';
+export { prepareAssets, loadTexture, reportAssetFailures } from './assets';
 export { Fighter } from './Fighter';
 export { HealthBar, type BarSide } from './HealthBar';
 export { BubbleText, preloadGlyphs, type BubbleTextOptions } from './BubbleText';
