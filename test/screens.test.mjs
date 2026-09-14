@@ -572,6 +572,15 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
         root.querySelectorAll('.duel-icon').length === 2);
     });
     mounts('lobby (player)', ui.lobbyScreen('ABCD', 2, false, { name: 'Ann' }));
+
+    // A room opened for four still has a board to arrange, and the face-off is
+    // held back until it is actually a duel.
+    mounts('lobby (four seats)', ui.lobbyScreen('EFGH', 4, true), (root) => {
+      check('a bigger game keeps its team board',
+        root.querySelector('.zone input') !== null);
+      check('with the face-off waiting out of sight',
+        root.querySelector('.duel-board')?.hidden !== false);
+    });
   } finally {
     globalThis.WebSocket = realSocket;
     window.WebSocket = realSocket;

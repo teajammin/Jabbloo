@@ -3,5 +3,9 @@
   "name": "jabbloo",
   "main": "party/room.ts",
   "compatibilityDate": "2025-01-01",
-  "port": 1999
+  "port": 1999,
+  "serve": {
+    "path": "dist",
+    "browserTTL": 0
+  }
 }

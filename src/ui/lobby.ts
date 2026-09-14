@@ -58,7 +58,14 @@ export function lobbyScreen(
      */
     const duel = capacity === 2;
     const board = isHost && !duel ? teamBoard(connection, capacity) : null;
-    const versus = isHost && duel ? duelBoard() : null;
+    // Built for every host, not only a room opened for two: a game opened for
+    // four that only two people turn up to is still a duel, and gets the same
+    // face-off rather than a board it can no longer use.
+    const versus = isHost ? duelBoard() : null;
+    // Laid out right before the room answers, like the board beside it: a
+    // face-off that appears and then vanishes when the first state arrives is
+    // the same flicker the judges' bench used to have.
+    if (versus) versus.root.hidden = !duel;
     const duelNote = el('p', { class: 'lede' }, '');
     const blocked = el('p', { class: 'help-note blocked' });
 
@@ -89,14 +96,17 @@ export function lobbyScreen(
         // has nothing to arrange, so the two of them simply face each other.
         const twoPlayers = duel || isDuel(state);
         if (versus) {
-          versus.update(state);
-        } else if (board) {
-          board.root.hidden = twoPlayers;
-          if (twoPlayers) renderRoster(state); else board.update(state);
-        } else {
-          renderRoster(state);
+          versus.root.hidden = !twoPlayers;
+          if (twoPlayers) versus.update(state);
         }
-        roster.hidden = Boolean(versus) || (Boolean(board) && !twoPlayers);
+        if (board) {
+          board.root.hidden = twoPlayers;
+          if (!twoPlayers) board.update(state);
+        }
+        // The host sees the arrangement, one way or the other; the roster is
+        // for the phones, which have nothing to arrange.
+        if (!isHost) renderRoster(state);
+        roster.hidden = isHost;
 
         duelNote.textContent = twoPlayers && isHost && players.length === 2
           ? `${players[0]?.name} v ${players[1]?.name}`
@@ -229,7 +239,9 @@ export function lobbyScreen(
               el('div', { class: 'lobby-room' },
                 status,
                 duelNote,
-                ...(versus ? [versus.root] : board ? [board.root, roster] : [roster]),
+                ...(versus ? [versus.root] : []),
+                ...(board ? [board.root] : []),
+                roster,
                 error,
                 el('div', { class: 'stack' },
                   blocked,

@@ -116,6 +116,13 @@ being told where they are.
 `npm run logs` tails the deployed server. `npm run deploy:preview` puts a build
 on a separate URL, for trying something without disturbing a live game.
 
+`partykit.json` sets `serve.browserTTL` to 0, which matters more than it looks.
+PartyKit's default is two days, and the file being cached is `index.html` — the
+one thing that names the hashed bundles. Every device that had opened the game
+went on loading the old page for forty-eight hours, so deploying a fix changed
+nothing for anyone who had already played: the fix was live, the phone was not
+asking for it, and the bug was still there in the room.
+
 | | Development | Deployed |
 |---|---|---|
 | Page | Vite on :5173 | PartyKit static assets |
