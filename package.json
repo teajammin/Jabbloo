@@ -30,6 +30,7 @@
     "test:limits": "node test/limits.test.mjs",
     "test:endgame": "node test/endgame.test.mjs",
     "test:tagteam": "node test/tagteam.test.mjs",
+    "test:e2e": "node scripts/e2e.mjs",
     "build:web": "vite build",
     "deploy": "npm run build && partykit deploy",
     "deploy:preview": "npm run build && partykit deploy --preview staging",

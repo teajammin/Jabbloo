@@ -340,6 +340,10 @@ export default class Room implements Party.Server {
     player.connected = false;
     player.leftAt = Date.now();
     this.startGraceClock();
+    // A rematch waits on everyone who is here, and the answer to "who is here"
+    // just changed. Without this a phone that locked during the ready check
+    // held the whole room for the full grace period.
+    this.startRematchIfReady();
     this.broadcastState();
     // If they walked out mid-turn, the bot picks up their move now rather than
     // holding the fight open for a minute of nothing.

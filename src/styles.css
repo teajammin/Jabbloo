@@ -967,7 +967,8 @@ input[type='text'] {
  * about.
  */
 @media (max-height: 820px) {
-  .screen-draw { gap: 5px; padding: 6px 8px 8px; }
+  .screen-draw:not(.is-embedded) { gap: 5px; padding: 6px 8px 8px; }
+  .screen-draw.is-embedded { gap: 5px; }
   .draw-title { display: none; }
   .draw-hint { display: none; }
   .tool { min-width: 46px; min-height: 46px; font-size: 18px; padding: 6px 9px; }
@@ -1021,6 +1022,12 @@ input[type='text'] {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* The canvas area centres its children, and an absolutely positioned box in
+     a grid that does that gets stretched to the whole area rather than left at
+     the size of the three buttons in it. */
+  height: fit-content;
+  align-self: end;
+  justify-self: end;
 }
 
 .zoom-controls .tool {
@@ -1323,9 +1330,21 @@ input[type='text'] {
   width: auto;
 }
 
+/*
+ * Embedded, it fills its slot rather than claiming the viewport.
+ *
+ * `height: auto`, emphatically — and the reason is worth keeping. The slot is
+ * a flex item whose own height comes from flex distribution, which is not a
+ * definite height a percentage can resolve against; `height: 100%` therefore
+ * fell back to the content height, AND, because the specified value was no
+ * longer `auto`, it stopped the parent from stretching this to fill the slot.
+ * Two ways of asking for the same thing cancelling each other out: the section
+ * came out as tall as its toolbar and the canvas inside it collapsed to
+ * nothing. Asking once, by letting it stretch, gives it the whole slot.
+ */
 .screen-draw.is-embedded {
   position: relative;
-  height: 100%;
+  height: auto;
   width: 100%;
   padding: 0;
 }
