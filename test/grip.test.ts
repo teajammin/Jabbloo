@@ -91,17 +91,67 @@ function pointsAwayAfterTurning(mask: Silhouette, grip: { x: number; y: number; 
     `turn ${(grip.rotation * 180 / Math.PI).toFixed(0)}deg`);
 }
 
-// An axe drawn lying on its side, head to the left.
+// An axe drawn lying on its side the way the screen asks for it: pointing at
+// the opponent, which is to the right.
 {
   const p = sheet();
-  p.rect(30, 46, 56, 6);   // handle running right
-  p.disc(26, 48, 14);      // head on the left
+  p.rect(10, 46, 56, 6);   // handle running left
+  p.disc(70, 48, 14);      // head on the right, where it is aimed
   const grip = findGrip(p);
 
   check('a sideways axe is understood', grip.confidence > 0.2, String(grip.confidence.toFixed(2)));
-  check('held along the handle, away from the head', grip.x > 0.6, String(grip.x.toFixed(2)));
+  check('held along the handle, away from the head', grip.x < 0.4, String(grip.x.toFixed(2)));
   check('and turned so the head leads', pointsAwayAfterTurning(p, grip),
     `turn ${(grip.rotation * 180 / Math.PI).toFixed(0)}deg`);
+}
+
+/*
+ * A pistol, and the reason a flat drawing is taken at its word.
+ *
+ * It is the same silhouette as the axe above with the ends swapped: a long
+ * thin shaft and a chunky blob. Every measurement of the shape says the blob
+ * is the business end, which is true of the axe and false of this — so a gun
+ * came out held by the barrel with the grip pointed at the enemy. Nothing in
+ * the picture can tell the two apart. Which way it was drawn can.
+ */
+{
+  const p = sheet();
+  p.rect(30, 44, 44, 5);   // barrel, running right
+  p.rect(26, 42, 12, 10);  // body
+  p.rect(26, 50, 10, 20);  // grip, hanging down at the back
+  const grip = findGrip(p);
+
+  check('a gun drawn pointing right is understood',
+    grip.confidence > 0.2, String(grip.confidence.toFixed(2)));
+  check('held at the back, not by the barrel', grip.x < 0.45, String(grip.x.toFixed(2)));
+  check('and left pointing where it was drawn to point',
+    Math.abs(grip.rotation) < 0.5,
+    `turn ${(grip.rotation * 180 / Math.PI).toFixed(0)}deg`);
+}
+
+/*
+ * The same gun drawn backwards, and the limit of what any of this can do.
+ *
+ * Nothing in a silhouette says which end of a blob-and-shaft is the dangerous
+ * one — that is the whole point of the pistol above. So a flat drawing is read
+ * left to right and left that way: whatever was drawn on the left is the end
+ * held, and the weapon aims right, at the opponent.
+ *
+ * Which means a gun drawn backwards comes out held by its barrel. There is no
+ * measurement that would catch it, so the drawing screen asks for it pointing
+ * right instead, and this pins down what happens to somebody who does not.
+ */
+{
+  const p = sheet();
+  p.rect(22, 44, 44, 5);   // barrel, running left
+  p.rect(58, 42, 12, 10);  // body
+  p.rect(60, 50, 10, 20);  // grip at the back, which is now the right
+  const grip = findGrip(p);
+
+  check('a backwards gun is still aimed at the opponent',
+    Math.abs(grip.rotation) < 0.5, `turn ${(grip.rotation * 180 / Math.PI).toFixed(0)}deg`);
+  check('and held at the end that was drawn nearest its owner',
+    grip.x < 0.45, String(grip.x.toFixed(2)));
 }
 
 // A hammer drawn diagonally.

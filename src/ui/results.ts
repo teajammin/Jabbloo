@@ -3,7 +3,7 @@ import { bubbleText, titleHeight } from './bubbleText';
 import type { RoomConnection } from '../net/room';
 import { play } from '../audio';
 import {
-  creators, teamDamage, winningTeam, type Player, type RoomState,
+  creators, holdingUpRematch, teamDamage, winningTeam, type Player, type RoomState,
 } from '../shared/protocol';
 
 /**
@@ -87,9 +87,19 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
     function showActions(state: RoomState): void {
       actions.replaceChildren();
 
+      const waitingOn = holdingUpRematch(state);
+      const called = state.rematchReady !== null;
+
       if (isHost) {
+        // A called rematch is a question the room is still answering, so the
+        // screen shows who has not answered rather than a button that appears
+        // to have done nothing.
+        actions.append(called
+          ? el('p', { class: 'lede' }, waitingOn.length > 0
+              ? `Waiting for ${waitingOn.map((p) => p.name).join(', ')} to rejoin…`
+              : 'Everyone is in — setting up…')
+          : button('Rematch', () => connection.send({ type: 'rematch' }), 'big primary'));
         actions.append(
-          button('Rematch', () => connection.send({ type: 'rematch' }), 'big primary'),
           button('New game', () => connection.send({ type: 'newGame' }), 'big'),
           button('Back to menu', () => {
             connection.send({ type: 'closeRoom' });
@@ -101,10 +111,19 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
 
       // A player waiting for the host to choose.
       if (state.phase === 'results') {
-        actions.append(
-          el('p', { class: 'lede' }, 'The host is choosing what happens next.'),
-          button('Back to menu', leave, 'big ghost'),
-        );
+        const you = connection.playerId;
+        const mine = you !== null && state.rematchReady?.includes(you) === true;
+
+        actions.append(called
+          ? mine
+            ? el('p', { class: 'lede' }, waitingOn.length > 0
+                ? `You're in. Waiting for ${waitingOn.map((p) => p.name).join(', ')}…`
+                : "You're in.")
+            : el('div', { class: 'stack' },
+                el('p', { class: 'lede' }, 'Rematch! Same character, same weapons.'),
+                button('Rejoin', () => connection.send({ type: 'rejoin' }), 'big primary'))
+          : el('p', { class: 'lede' }, 'The host is choosing what happens next.'));
+        actions.append(button('Back to menu', leave, 'big ghost'));
         return;
       }
 

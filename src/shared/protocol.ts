@@ -311,6 +311,15 @@ export interface RoomState {
   votes: Record<string, string>;
   /** The drawn battleground, once the vote has closed. */
   chosen: string | null;
+  /**
+   * Who has said they are up for another one, while a rematch is being called.
+   *
+   * Null when none is. The host pressing Rematch does not start one: everybody
+   * still in the room has to say they are in first, or a player who had put
+   * their phone down to talk to somebody arrives to find round one already
+   * being fought without them.
+   */
+  rematchReady: string[] | null;
   /** The turn being fought, or null outside the battle. */
   turn: Turn | null;
   /**
@@ -363,6 +372,8 @@ export type ClientMessage =
   | { type: 'turnDone' }
   /** Back to battleground selection, keeping the same characters. */
   | { type: 'rematch' }
+  /** "I am in" — the answer to a rematch the host has called. */
+  | { type: 'rejoin' }
   /** Everything again from scratch: new characters, new weapons. */
   | { type: 'newGame' }
   /** The host is closing the room; every device is sent back to the menu. */
@@ -494,6 +505,21 @@ export function currentStep(state: RoomState): CreationStep | null {
  * and Team Two before they can start is a ceremony with no content — there is
  * exactly one arrangement, and the room can make it itself.
  */
+/**
+ * Who a called rematch is still waiting on.
+ *
+ * Only players who are actually here: somebody whose phone has gone should not
+ * be able to hold the room hostage, and the grace period has already decided
+ * whether they are coming back.
+ */
+export function holdingUpRematch(state: RoomState): Player[] {
+  const ready = state.rematchReady;
+  if (ready === null) return [];
+  return state.players.filter(
+    (p) => !p.isHost && p.connected && !ready.includes(p.id),
+  );
+}
+
 export function isDuel(state: RoomState): boolean {
   return state.players.filter((p) => !p.isHost).length === 2;
 }

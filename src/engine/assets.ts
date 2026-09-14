@@ -35,6 +35,17 @@ export function reportAssetFailures(handler: AssetFailure): void {
 }
 
 /**
+ * Reports something that was wanted and was not there.
+ *
+ * Separate from `loadTexture` because not every miss is a failed download: a
+ * texture asked for synchronously and found absent from the cache never threw
+ * anything, and had no way to say so.
+ */
+export function reportMissingAsset(url: string, error: unknown): void {
+  onFailure(url, error);
+}
+
+/**
  * Loads a texture, waiting for the loader to be ready first.
  *
  * Returns null rather than throwing: every caller has something sensible to do

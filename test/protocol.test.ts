@@ -40,6 +40,7 @@ const room = (players: Player[]): RoomState => ({
   stepEndsAt: 0,
   votes: {},
   chosen: null,
+  rematchReady: null,
   turn: null,
 });
 

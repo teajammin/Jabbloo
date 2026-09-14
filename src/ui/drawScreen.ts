@@ -44,6 +44,16 @@ export interface DrawScreenOptions {
    * with two competing landmarks, so an embedded tool is a <section>.
    */
   embedded?: boolean;
+  /**
+   * Marks this as a weapon, which has a direction.
+   *
+   * The rig points a weapon at the opponent by reading the drawing, and a long
+   * thin shaft with a lump on one end is the same silhouette whether the lump
+   * is an axe head or a pistol grip — so nothing in the picture says which end
+   * is the dangerous one. Being told is the only way to know, so players are
+   * asked, on the canvas, where the enemy is standing.
+   */
+  aim?: boolean;
 }
 
 export function drawScreen(options: DrawScreenOptions = {}): Screen {
@@ -833,6 +843,15 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     const shell = options.embedded
       ? el('section', { class: 'screen screen-draw is-embedded' })
       : el('main', { class: 'screen screen-draw' });
+
+    // Floated over the canvas rather than stacked above it: a phone hides the
+    // title to give the drawing room, and this is needed most on a phone.
+    if (options.aim) {
+      area.appendChild(el('div', { class: 'aim-guide' },
+        el('span', { class: 'aim-arrow' }, '➜'),
+        el('span', {}, 'your enemy'),
+      ));
+    }
 
     shell.append(
       el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),

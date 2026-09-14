@@ -80,6 +80,8 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       const teardown = drawScreen({
         title: prompt,
         embedded: true,
+        // Weapons have a business end; a character does not.
+        aim: slot.startsWith('weapon'),
         onSnapshot: (read) => { readDrawing = read; },
         onDone: (png) => {
           submitDrawing(png, slot);

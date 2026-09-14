@@ -67,7 +67,7 @@ const roomState = (over = {}) => ({
     player('b', 'Bo', 'teamB'),
   ],
   teamNames: { teamA: 'Team One', teamB: 'Team Two' },
-  step: -1, ultRound: 0, votes: {}, chosen: null, turn: null,
+  step: -1, ultRound: 0, votes: {}, chosen: null, rematchReady: null, turn: null,
   stepEndsAt: Date.now() + 30000,
   ...over,
 });
@@ -592,6 +592,18 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   }
 }
 
+// --- weapons have a direction, characters do not -----------------------------
+
+{
+  mounts('draw (a weapon)', ui.drawScreen({ title: 'Draw weapon 1', aim: true }), (root) => {
+    check('a weapon is told where the enemy is',
+      root.querySelector('.aim-guide') !== null);
+  });
+  mounts('draw (a character)', ui.drawScreen({ title: 'Draw your character' }), (root) => {
+    check('a character is not', root.querySelector('.aim-guide') === null);
+  });
+}
+
 // --- leaving a room is not a connection problem ------------------------------
 //
 // Every exit from the lobby closes the socket, and a closing socket fires the
@@ -801,6 +813,37 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
 // --- what happens after the game -------------------------------------------
 
 {
+  // A rematch is a question, not a command: the host asks and the room answers.
+  {
+    const pending = roomState({ phase: 'results', rematchReady: [] });
+    const asHost = fakeConnection('h', pending);
+    mounts('results (rematch called)', ui.resultsScreen(asHost, true), (root) => {
+      check('the host is told who has not answered',
+        /waiting for ann, bo/i.test(root.textContent ?? ''), root.textContent?.slice(0, 120));
+      check('and is not offered the button again',
+        ![...root.querySelectorAll('button')].some((b) => /^rematch$/i.test(b.textContent ?? '')));
+    });
+
+    const asPlayer = fakeConnection('a', pending);
+    mounts('results (rematch asked)', ui.resultsScreen(asPlayer, false), (root) => {
+      const rejoin = [...root.querySelectorAll('button')]
+        .find((b) => /rejoin/i.test(b.textContent ?? ''));
+      check('a player is asked to rejoin', Boolean(rejoin));
+      rejoin?.click();
+      check('and says so', asPlayer.sent.some((m) => m.type === 'rejoin'),
+        JSON.stringify(asPlayer.sent));
+    });
+
+    const answered = roomState({ phase: 'results', rematchReady: ['a'] });
+    const alreadyIn = fakeConnection('a', answered);
+    mounts('results (already in)', ui.resultsScreen(alreadyIn, false), (root) => {
+      check('somebody who has answered waits on the rest',
+        /you're in/i.test(root.textContent ?? ''), root.textContent?.slice(0, 120));
+      check('and is not asked twice',
+        ![...root.querySelectorAll('button')].some((b) => /rejoin/i.test(b.textContent ?? '')));
+    });
+  }
+
   const state = roomState({ phase: 'results' });
   const connection = fakeConnection('h', state);
   mounts('results (host actions)', ui.resultsScreen(connection, true), (root) => {

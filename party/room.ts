@@ -24,6 +24,7 @@ import {
   drawBattleground,
   GRACE_SECONDS,
   graceExpired,
+  holdingUpRematch,
   isDuel,
   stepsFor,
   voters,
@@ -194,6 +195,7 @@ export default class Room implements Party.Server {
       stepEndsAt: 0,
       votes: {},
       chosen: null,
+      rematchReady: null,
       turn: null,
     };
   }
@@ -305,9 +307,10 @@ export default class Room implements Party.Server {
         if (this.isHost(sender)) this.endTurn();
         break;
       case 'rematch':
-        // Same characters, same weapons, a fresh battleground vote — which is
-        // where the brief's rematch button leads.
-        if (this.isHost(sender)) this.beginVote();
+        if (this.isHost(sender)) this.callRematch();
+        break;
+      case 'rejoin':
+        this.onRejoin(sender);
         break;
       case 'newGame':
         if (this.isHost(sender)) this.startOver();
@@ -758,6 +761,8 @@ export default class Room implements Party.Server {
       return true;
     }
 
+    // A rematch waits on everyone who is here, and they are not any more.
+    this.startRematchIfReady();
     return false;
   }
 
@@ -1002,6 +1007,52 @@ export default class Room implements Party.Server {
   }
 
   /**
+   * The host asks the room whether it wants another one.
+   *
+   * Asking, not starting. Pressing Rematch used to drop everyone straight into
+   * a battleground vote from whatever they had wandered off to do — and the
+   * end of a game is exactly when people put their phones down. Same
+   * characters, same weapons, once everybody has said they are in.
+   */
+  private callRematch(): void {
+    this.state.rematchReady = [];
+    this.broadcastState();
+    this.startRematchIfReady();
+  }
+
+  /** One player saying they are in. */
+  private onRejoin(sender: Party.Connection): void {
+    const ready = this.state.rematchReady;
+    if (ready === null) return;
+
+    const player = this.state.players.find((p) => p.id === sender.id);
+    if (!player || player.isHost || ready.includes(player.id)) return;
+
+    ready.push(player.id);
+    this.broadcastState();
+    this.startRematchIfReady();
+  }
+
+  /**
+   * Goes, once nobody is left to wait for.
+   *
+   * Also reached when somebody leaves, because the answer changes: a room
+   * waiting on four people is waiting on three the moment one goes home.
+   */
+  private startRematchIfReady(): void {
+    if (this.state.rematchReady === null) return;
+    if (holdingUpRematch(this.state).length > 0) return;
+
+    // Nobody at all is not a room that can fight. Wait for someone to come
+    // back rather than starting a game with no players in it.
+    const playing = this.state.players.filter((p) => !p.isHost && p.connected);
+    if (playing.length === 0) return;
+
+    this.state.rematchReady = null;
+    this.beginVote();
+  }
+
+  /**
    * A whole new game: new characters, new weapons, everyone back to drawing.
    *
    * Distinct from a rematch, which keeps what people made. Everything a player
@@ -1017,6 +1068,8 @@ export default class Room implements Party.Server {
     this.state.turn = null;
     this.state.votes = {};
     this.state.chosen = null;
+    // Whatever the room was deciding about a rematch, it is moot now.
+    this.state.rematchReady = null;
 
     for (const player of this.state.players) {
       player.progress = { drawn: [], named: [], step: 0, endsAt: 0, done: false };

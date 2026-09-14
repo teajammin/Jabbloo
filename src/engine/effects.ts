@@ -1,4 +1,4 @@
-import { loadTexture } from './assets';
+import { loadTexture, reportMissingAsset } from './assets';
 import { Assets, Container, Sprite, Texture } from 'pixi.js';
 
 /**
@@ -73,7 +73,20 @@ export function spawnEffect(
   kind: EffectKind,
   options: SpawnOptions,
 ): Sprite {
-  const texture = Assets.get<Texture>(effectUrl(kind)) ?? Texture.EMPTY;
+  /*
+   * The cache, synchronously — every effect is preloaded before a fight starts
+   * precisely so a move never has to await mid-timeline.
+   *
+   * An empty texture is a sprite nobody can see, which is the worst way for
+   * this to fail: the move plays, the timing is right, the shake lands, and
+   * the bullet simply is not there. So a miss says so rather than quietly
+   * drawing nothing.
+   */
+  const url = effectUrl(kind);
+  const texture = Assets.get<Texture>(url) ?? Texture.EMPTY;
+  if (texture === Texture.EMPTY) {
+    reportMissingAsset(url, new Error(`effect "${kind}" was not loaded`));
+  }
   const sprite = new Sprite(texture);
 
   sprite.anchor.set(options.anchorX ?? 0.5, options.anchorY ?? 0.5);

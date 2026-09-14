@@ -83,6 +83,35 @@ const art = host.inbox.filter((m) => m.type === 'art').flatMap((m) => m.art);
 const stale = art.filter((entry) => entry.character?.name === 'Sir Bonkalot');
 check('the old artwork is gone', stale.length === 0, JSON.stringify(stale.map((s) => s.character?.name)));
 
+// --- a rematch is a question, not a command --------------------------------
+//
+// The end of a game is exactly when people put their phones down. Pressing
+// Rematch used to drop the room straight into a battleground vote, so whoever
+// had wandered off came back to a fight already under way.
+{
+  host.send(JSON.stringify({ type: 'rematch' }));
+  await wait(400);
+  check('a rematch waits rather than starting',
+    state(host).phase === 'creating', state(host).phase);
+  check('and says it is waiting on everyone',
+    Array.isArray(state(host).rematchReady) && state(host).rematchReady.length === 0,
+    JSON.stringify(state(host).rematchReady));
+
+  a.send(JSON.stringify({ type: 'rejoin' }));
+  await wait(350);
+  check('one player in is not enough',
+    state(host).phase === 'creating', state(host).phase);
+  check('but is counted', state(host).rematchReady?.length === 1,
+    JSON.stringify(state(host).rematchReady));
+
+  b.send(JSON.stringify({ type: 'rejoin' }));
+  for (let i = 0; i < 20 && state(host).phase !== 'battleground'; i++) await wait(120);
+  check('everyone in starts the rematch',
+    state(host).phase === 'battleground', state(host).phase);
+  check('and the question is closed', state(host).rematchReady === null,
+    JSON.stringify(state(host).rematchReady));
+}
+
 // Closing the room reaches every device.
 const closed = [];
 for (const ws of [a, b]) {

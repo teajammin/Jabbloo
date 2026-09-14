@@ -142,8 +142,23 @@ export function findGrip(mask: Silhouette | null): Grip {
   const byWeight = (heavier - lighter) / heavier;
   const byWidth = Math.abs(nearWidest - farWidest) / Math.max(1, Math.max(nearWidest, farWidest));
 
-  // The handle is at the lighter end; the weapon points away from it.
-  const handleIsNear = nearCount <= farCount;
+  /*
+   * Which end is the handle — decided two different ways.
+   *
+   * A weapon drawn roughly flat is taken at its word. Players are told to
+   * point it at the opponent, and their drawing is then the only signal that
+   * can tell a gun from an axe: on shape alone the two are identical, a chunky
+   * blob at one end of a long shaft. The analysis below calls that blob the
+   * business end, which is right for an axe and exactly backwards for a
+   * pistol, whose blob is the grip — so a gun came out held by the barrel and
+   * aimed at its owner.
+   *
+   * A weapon drawn up, down, or steeply diagonal has said nothing about which
+   * way it faces, and most people draw a sword upright. There the shape
+   * decides, as it always did: the handle is the lighter, thinner end.
+   */
+  const drawnFlat = Math.abs(axisX) > 0.5;
+  const handleIsNear = drawnFlat ? axisX > 0 : nearCount <= farCount;
   const handleAlong = handleIsNear ? minAlong : maxAlong;
   const pointing = handleIsNear ? angle : angle + Math.PI;
 
@@ -164,11 +179,17 @@ export function findGrip(mask: Silhouette | null): Grip {
    */
   const rotation = normalise(-pointing);
 
-  // Confident when the shape is clearly long and clearly one-ended. Either
-  // signal alone is enough to be sure about: a mostly-blade sword is obvious
-  // by weight, a mallet by width.
+  /*
+   * How sure any of this is.
+   *
+   * Length is always part of it: a shape with no long axis has no direction to
+   * find. One-endedness only counts when the shape is what decided the
+   * direction — a flat drawing was taken at its word, and a symmetrical thing
+   * pointed to the right is still pointed to the right.
+   */
   const lopsided = Math.max(byWeight, byWidth);
-  const confidence = Math.min(1, (elongation - 1.35) / 1.4) * Math.min(1, lopsided * 2.2);
+  const byLength = Math.min(1, (elongation - 1.35) / 1.4);
+  const confidence = drawnFlat ? byLength : byLength * Math.min(1, lopsided * 2.2);
 
   return {
     x: gripX / mask.width,

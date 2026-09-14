@@ -106,6 +106,14 @@ These are the ONLY moves that exist. You may not invent others.
 5. Put shake_screen immediately after the moment of impact, never before.
 6. End on a settling move (recoil, idle, or a reaction on the enemy).
 7. Show consequences. A big hit should be followed by knockdown or dizzy on the enemy.
+8. Anything fired MUST cross the gap. If the weapon is a gun, rifle, pistol,
+   blaster, bow, crossbow, cannon, slingshot, wand, staff or anything else that
+   shoots — OR the player's own words say shoot, fire, blast, snipe, spray, pew
+   or aim — the move needs a projectile or a beam travelling from the attacker
+   to the enemy. Swinging it like a club is wrong: a player who wrote "shoot
+   them" and watched their gun be waved about has been handed somebody else's
+   move. Put the recoil and the impact around it, but the shot itself is not
+   optional.
 
 ## Interpreting the player
 
@@ -118,6 +126,9 @@ magic, anime moves, memes and physical impossibilities — that is the fun.
 - "call in a tsunami"            -> shockwave {kind: water, intensity: 9}
 - "sing so loud they fall over"  -> shockwave {kind: sound} then knockdown on enemy
 - "shoot them"                   -> projectile {kind: bullet, arc: 0, size: 90}
+- "shoot them with my gun"       -> aim, then projectile {kind: bullet, arc: 0},
+                                    then recoil — never a swing
+- "empty the clip into them"     -> three projectile {kind: bullet} in a row
 - "fire an arrow at their knee"  -> projectile {kind: arrow, arc: 30}
 - "fart in their direction"      -> shockwave {kind: stink, intensity: 7}
 - "kick up dust and vanish"      -> shockwave {kind: dust} then teleport

@@ -200,8 +200,6 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         fighter.setPosition(stage.offstageX(side), stage.height * engine.GROUND_Y);
       }
 
-      const newcomers = entering.filter(({ id }) => !introduced.has(id));
-
       for (const { fighter, side, name, id } of entering) {
         if (disposed) return;
         if (!introduced.has(id)) {
@@ -215,24 +213,10 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
       if (disposed) return;
 
-      // Both sides are out: the moment worth a card of its own. Only when
-      // somebody new has arrived — in a one-a-side game the pair has not
-      // changed and saying "versus" again every round is noise.
-      if (newcomers.length > 0) {
-        const names = entering.map((e) => e.name);
-        caption.textContent = `${names[0]} versus ${names[1]}`;
-        await stage.proclaim('versus', 1.1);
-        if (disposed) return;
-      }
-
-      // A rule nobody is told about is a rule nobody plays to.
-      if (isFinalRound(state!)) {
-        caption.textContent = 'Final round — every hit counts double';
-        await stage.proclaim('final round', 1.3);
-        if (disposed) return;
-      }
-
-      await stage.proclaim('fight', 0.9);
+      // The matchup and the call to fight used to be announced here, as the
+      // two of them walked on — which is before anybody has chosen a move, so
+      // "FIGHT" went up and then the room spent fifty seconds writing on their
+      // phones. Both belong to the exchange itself, and are made there.
       if (!disposed) stage.shake(7, 0.4);
     }
 
@@ -257,6 +241,30 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
       const [a, b] = turn.fighters;
       const order = turn.first === b ? [b, a] : [a, b];
+
+      /*
+       * The moment the room has been waiting through the writing for.
+       *
+       * Both names, then the call — said here rather than at the entrance,
+       * where it landed before anyone had chosen a move and left "FIGHT"
+       * hanging over a room full of people typing.
+       */
+      const matchup = turn.fighters.map(
+        (id) => artFor(id)?.character?.name || playerFor(id)?.name || '—',
+      );
+      caption.textContent = `${matchup[0]} versus ${matchup[1]}`;
+      await stage.proclaim(`${matchup[0]} versus ${matchup[1]}`, 1.2);
+      if (disposed) return;
+
+      // A rule nobody is told about is a rule nobody plays to.
+      if (isFinalRound(state!)) {
+        caption.textContent = 'Final round — every hit counts double';
+        await stage.proclaim('final round', 1.3);
+        if (disposed) return;
+      }
+
+      await stage.proclaim('fight', 0.9);
+      if (disposed) return;
 
       for (const attackerId of order) {
         if (disposed) return;

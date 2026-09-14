@@ -11,6 +11,17 @@ import { HealthBar } from './HealthBar';
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
 
+/**
+ * How far past the edges the scenery is drawn.
+ *
+ * The screen shake moves the whole world, scenery included, and a photograph
+ * cut exactly to the stage slid off its own edge and showed the blank stage
+ * underneath — a white band along one side for a fifth of a second, every
+ * time anything hit anything. The strongest shake is 30px on a 1280-wide
+ * stage, so a twentieth over on every side covers it with room to spare.
+ */
+const SCENERY_OVERSCAN = 1.06;
+
 /** How far in from each edge fighters stand, as a fraction of stage width. */
 const SPAWN_INSET = 0.24;
 
@@ -20,7 +31,7 @@ const SPAWN_INSET = 0.24;
  * Owns the Pixi application and the scene graph. Layers are separated so that
  * later primitives have somewhere sensible to act:
  *
- *   backdrop   battleground fill — never moves
+ *   backdrop   battleground fill — bled past the edges, rides the shake
  *   world      everything shakeable; shake_screen offsets THIS, not the canvas
  *    +- ground     floor line
  *    +- fighters   the combatants
@@ -94,7 +105,10 @@ export class BattleStage {
     // photograph never does.
     this.backdrop.clear();
     this.backdrop.beginFill(ground.colour);
-    this.backdrop.drawRect(0, 0, this.width, this.height);
+    // Bled past every edge for the same reason the photograph is: it rides the
+    // shake, and a fill cut to the stage slid off it and showed blank canvas.
+    const bleed = Math.max(this.width, this.height) * (SCENERY_OVERSCAN - 1);
+    this.backdrop.drawRect(-bleed, -bleed, this.width + bleed * 2, this.height + bleed * 2);
     this.backdrop.endFill();
 
     void this.loadScene(ground.image);
@@ -140,11 +154,17 @@ export class BattleStage {
     this.fitScene();
   }
 
-  /** Covers the stage with the photograph, whatever shape either of them is. */
+  /**
+   * Covers the stage with the photograph, whatever shape either of them is.
+   *
+   * Deliberately larger than the stage — see SCENERY_OVERSCAN — and centred,
+   * so the overspill is shared evenly and the shake never reaches an edge.
+   */
   private fitScene(): void {
     const { texture } = this.scene;
     if (texture === Texture.EMPTY || texture.width === 0) return;
-    const scale = Math.max(this.width / texture.width, this.height / texture.height);
+    const scale = Math.max(this.width / texture.width, this.height / texture.height)
+      * SCENERY_OVERSCAN;
     this.scene.scale.set(scale);
     this.scene.x = (this.width - texture.width * scale) / 2;
     this.scene.y = (this.height - texture.height * scale) / 2;
@@ -260,7 +280,10 @@ export class BattleStage {
     card.alpha = 0;
     this.overlay.addChild(card);
 
-    const letters = await BubbleText.create(text.toUpperCase().slice(0, 12), {
+    // Long enough for a matchup — "ANN VERSUS BO" — not only a single word.
+    // Whatever is given is shrunk to the width below, so a long pair of names
+    // gets smaller letters rather than a truncated one.
+    const letters = await BubbleText.create(text.toUpperCase().slice(0, 40), {
       height: height * 0.62,
       jitter: 3,
     });
