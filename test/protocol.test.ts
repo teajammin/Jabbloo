@@ -18,7 +18,7 @@ const check = (name: string, cond: boolean, detail = '') => {
 };
 
 const player = (name: string, role: Player['role'], isHost = false): Player => ({
-  id: name, name, role, connected: true, isHost,
+  id: name, name, role, connected: true, isHost, leftAt: 0,
   progress: { drawn: [], named: [], step: 0, endsAt: 0, done: false },
   health: 100,
   fights: 0,
@@ -217,6 +217,32 @@ check('three are not',
 check('and one is not either', !isDuel(room([host, player('Ann', 'teamA')])));
 check('the host does not count toward it',
   isDuel(room([host, player('Ann', 'teamA'), player('Bo', 'teamB')])));
+
+import { GRACE_SECONDS, graceExpired, graceRemaining } from '../src/shared/protocol';
+
+// The grace period: how long a phone may be asleep before the game gives up
+// on it. The boundary is the whole point — one second either side of it is the
+// difference between a locked screen and a forfeit.
+const away = (secondsAgo: number): Player => ({
+  ...player('Gone', 'teamA'),
+  connected: false,
+  leftAt: Date.now() - secondsAgo * 1000,
+});
+
+check('a connected player is never written off',
+  !graceExpired(player('Ann', 'teamA')));
+check('nor is one who just dropped', !graceExpired(away(1)));
+check('nor one a second short of the grace', !graceExpired(away(GRACE_SECONDS - 1)));
+check('but one past it is', graceExpired(away(GRACE_SECONDS + 1)));
+check('and exactly on it counts as past', graceExpired(away(GRACE_SECONDS)));
+check('a seat nobody has left is not counting down',
+  !graceExpired({ ...player('Ann', 'teamA'), connected: false, leftAt: 0 }));
+
+check('the countdown reads the seconds left',
+  graceRemaining(away(5)) === GRACE_SECONDS - 5, String(graceRemaining(away(5))));
+check('and stops at zero rather than going negative',
+  graceRemaining(away(GRACE_SECONDS + 10)) === 0);
+check('a connected player has no countdown', graceRemaining(player('Ann', 'teamA')) === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -6,8 +6,14 @@
  * The brief's rule: a player who drops keeps whatever they had drawn, a bot
  * fights for them, and anything they never made becomes a stand-in Sword, Axe
  * or Hammer. Reconnecting hands the fighter straight back.
+ *
+ * Nothing happens for the first twenty-five seconds, though, and that waiting
+ * is the point: a locked phone must cost nobody their game. One block here
+ * sits out a real grace period rather than faking the clock, because the thing
+ * being tested is whether the server actually waits.
  */
 import { GROUND_IDS } from './grounds.mjs';
+import { GRACE_SECONDS } from './protocol.mjs';
 let room = '';
 const freshRoom = () => { room = 'BOT' + Math.floor(Math.random() * 900000 + 100000); };
 const url = () => `ws://127.0.0.1:1999/parties/main/${room}`;
@@ -21,6 +27,8 @@ const open = (id) => new Promise((resolve, reject) => {
   ws.addEventListener('error', reject);
 });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Sits out a real grace period, with a second's margin. */
+const waitOutGrace = () => wait(GRACE_SECONDS * 1000 + 1000);
 const last = (ws, t) => [...ws.inbox].reverse().find((m) => m.type === t);
 const state = (ws) => last(ws, 'state')?.state ?? last(ws, 'welcome')?.state;
 
@@ -62,6 +70,14 @@ check('a dropped player keeps their seat',
   state(host).players.some((p) => p.id === ids[1]), JSON.stringify(state(host).players.map((p) => p.id)));
 check('and is marked as gone',
   state(host).players.find((p) => p.id === ids[1])?.connected === false);
+check('but is not written off straight away',
+  state(host).players.find((p) => p.id === ids[1])?.progress.done === false,
+  JSON.stringify(state(host).players.find((p) => p.id === ids[1])?.progress));
+
+await waitOutGrace();
+check('until the grace period runs out',
+  state(host).players.find((p) => p.id === ids[1])?.progress.done === true,
+  JSON.stringify(state(host).players.find((p) => p.id === ids[1])?.progress));
 
 // Ann finishes the rest on her own; the room must not wait on a ghost.
 for (let i = 0; i < 14; i++) {
@@ -145,23 +161,71 @@ for (const ws of [host, a, back]) ws.close();
   await wait(350);
 
   two.close();
-  await wait(500);
+  await wait(1500);
   const gone = state(screen).players.find((p) => p.id === pair[1]);
-  check('a phone that goes stops holding the room up', gone?.progress.done === true,
+  check('a phone that locks is not written off', gone?.progress.done === false,
     JSON.stringify(gone?.progress));
+  check('and its clock is still running', (gone?.progress.endsAt ?? 0) > Date.now(),
+    String(Math.round(((gone?.progress.endsAt ?? 0) - Date.now()) / 1000)) + 's');
   check('while the room keeps waiting for the one still drawing',
     state(screen).phase === 'creating', state(screen).phase);
 
   two = await open('two');
   await wait(600);
   const back = state(screen).players.find((p) => p.id === pair[1]);
-  check('coming back puts them back to work', back?.progress.done === false,
+  check('coming back inside the grace period keeps the seat',
+    back?.connected === true && back?.leftAt === 0,
+    JSON.stringify([back?.connected, back?.leftAt]));
+  check('with nothing to catch up on', back?.progress.done === false,
     JSON.stringify(back?.progress));
   check('on the step they were on', back?.progress.step === 0, String(back?.progress.step));
-  check('with a full step to do it in', (back?.progress.endsAt ?? 0) > Date.now() + 60_000,
-    String(Math.round(((back?.progress.endsAt ?? 0) - Date.now()) / 1000)) + 's');
 
   for (const ws of [screen, one, two]) ws.close();
+}
+
+// --- the host's screen blinks ----------------------------------------------
+//
+// The bug that prompted all of this: a disconnect in the lobby removed the
+// player, host included, and a room whose host had been removed answered every
+// join with "no game with that code". Players watched themselves land in the
+// lobby and get thrown out of a game that was still running on the laptop in
+// front of them.
+{
+  freshRoom();
+  let screen = await open('screen');
+  screen.send(JSON.stringify({ type: 'host', capacity: 2 }));
+  await wait(300);
+
+  const first = await open('ann');
+  first.send(JSON.stringify({ type: 'join', name: 'Ann' }));
+  await wait(300);
+  check('a player is in the lobby',
+    state(screen).players.some((p) => p.name === 'Ann'), JSON.stringify(state(screen).players));
+
+  screen.close();
+  await wait(1200);
+
+  // Somebody else joins while the big screen is away.
+  const second = await open('bo');
+  second.send(JSON.stringify({ type: 'join', name: 'Bo' }));
+  await wait(500);
+  check('a blink of the host screen does not lose the room',
+    last(second, 'error') === undefined, last(second, 'error')?.reason);
+  check('and the join lands', state(second)?.players.some((p) => p.name === 'Bo'),
+    JSON.stringify(state(second)?.players?.map((p) => p.name)));
+
+  // And the host comes back to the same room rather than a new one.
+  screen = await open('screen');
+  screen.send(JSON.stringify({ type: 'host', capacity: 2 }));
+  await wait(500);
+  check('the host screen reclaims its own room',
+    state(screen).players.filter((p) => p.isHost).length === 1,
+    JSON.stringify(state(screen).players.map((p) => [p.name, p.isHost])));
+  check('with everyone still in it',
+    ['Ann', 'Bo'].every((n) => state(screen).players.some((p) => p.name === n)),
+    JSON.stringify(state(screen).players.map((p) => p.name)));
+
+  for (const ws of [screen, first, second]) ws.close();
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

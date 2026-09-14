@@ -267,6 +267,6 @@ function playerRow(player: Player, isYou: boolean): HTMLLIElement {
     el('span', { class: 'player-name' }, player.name),
   );
   if (isYou) row.appendChild(el('span', { class: 'you' }, 'you'));
-  if (!player.connected) row.appendChild(el('span', { class: 'you' }, 'away'));
+  if (!player.connected) row.appendChild(el('span', { class: 'you' }, 'reconnecting…'));
   return row;
 }

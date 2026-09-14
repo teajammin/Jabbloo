@@ -4,7 +4,7 @@ import { drawScreen } from './drawScreen';
 import { battlegroundScreen } from './battleground';
 import type { RoomConnection } from '../net/room';
 import {
-  creators, stepFor, stepsFor, stillWorking,
+  creators, graceExpired, stepFor, stepsFor, stillWorking,
   type Player, type RoomState,
 } from '../shared/protocol';
 
@@ -159,7 +159,9 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
 
     /** What one player is up to, in the fewest words that say it. */
     function describeProgress(player: Player, state: RoomState): string {
-      if (!player.connected) return 'gone — a bot will play';
+      if (!player.connected) {
+        return graceExpired(player) ? 'gone — a bot will play' : 'reconnecting…';
+      }
       if (player.progress.done) return 'finished';
 
       const step = stepsFor(state)[player.progress.step];

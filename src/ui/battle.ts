@@ -7,7 +7,7 @@ import { report } from '../errors';
 import { play } from '../audio';
 import type { RoomConnection } from '../net/room';
 import {
-  battlegrounds, isFinalRound, judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
+  battlegrounds, graceExpired, isFinalRound, judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
 } from '../shared/protocol';
 
 /**
@@ -375,7 +375,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
             const name = artFor(id)?.character?.name || playerFor(id)?.name || '—';
             // A bot playing for someone is worth saying out loud, or the room
             // spends the round wondering why they are attacking like that.
-            return playerFor(id)?.connected === false ? `${name} (bot)` : name;
+            const fighter = playerFor(id);
+            return fighter && graceExpired(fighter) ? `${name} (bot)` : name;
           });
           caption.textContent = 'Entering the arena…';
           await setUpFighters(turn);

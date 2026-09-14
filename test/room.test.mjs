@@ -11,6 +11,7 @@
  * player's seat rather than dropping their drawings.
  */
 import { PNG } from './creation-helper.mjs';
+import { GRACE_SECONDS } from './protocol.mjs';
 // Drives the PartyKit room over raw WebSockets: host opens, two phones join,
 // host assigns teams, host starts.
 // A fresh room per run: PartyKit keeps a room alive between runs, so a fixed
@@ -124,10 +125,11 @@ for (const ws of [host, a, b]) ws.close();
 
 // --- a phone that sleeps and wakes ----------------------------------------
 //
-// In the lobby a disconnect removes the player, which is right for someone who
-// closes the tab and wrong for a phone that locked in someone's hand. The
-// client says who it is again on every reconnect; this is the server half of
-// that, and it has to work for a seat the room has already forgotten.
+// A disconnect used to remove the player on the spot, which is right for
+// someone who closes the tab for good and wrong for a phone that locked in
+// someone's hand. Now the room waits out a grace period before deciding which
+// it was. This sits through a real one rather than faking the clock, because
+// the waiting is the thing being tested.
 {
   const code = 'WAKE' + Math.floor(Math.random() * 900 + 100);
   const socket = (id) => new Promise((resolve) => {
@@ -149,9 +151,12 @@ for (const ws of [host, a, b]) ws.close();
   check('the phone is in the room', seen(screen).players.some((p) => p.name === 'Ann'));
 
   phone.close();
-  await wait(400);
-  check('sleeping in the lobby gives up the seat',
-    !seen(screen).players.some((p) => p.name === 'Ann'));
+  await wait(600);
+  check('sleeping in the lobby keeps the seat',
+    seen(screen).players.some((p) => p.name === 'Ann'),
+    JSON.stringify(seen(screen).players.map((p) => p.name)));
+  check('and shows them as away',
+    seen(screen).players.find((p) => p.name === 'Ann')?.connected === false);
 
   // Waking: the same device id, saying who it is again.
   phone = await socket('phone');
@@ -160,11 +165,23 @@ for (const ws of [host, a, b]) ws.close();
   check('waking puts them back in the room',
     seen(screen).players.some((p) => p.name === 'Ann'),
     JSON.stringify(seen(screen).players.map((p) => p.name)));
+  check('with the countdown called off',
+    seen(screen).players.find((p) => p.name === 'Ann')?.leftAt === 0);
   check('and not twice',
     seen(screen).players.filter((p) => p.name.startsWith('Ann')).length === 1,
     JSON.stringify(seen(screen).players.map((p) => p.name)));
   check('the phone can see the room too',
     seen(phone)?.players.length === 2, JSON.stringify(seen(phone)?.players.map((p) => p.name)));
+
+  // Nobody waits forever, though. Past the grace, a lobby seat is freed for
+  // somebody who is actually here.
+  phone.close();
+  await wait(GRACE_SECONDS * 1000 + 2000);
+  check('a seat left long enough is given up',
+    !seen(screen).players.some((p) => p.name === 'Ann'),
+    JSON.stringify(seen(screen).players.map((p) => p.name)));
+  check('but the room itself survives it',
+    seen(screen).players.some((p) => p.isHost));
 
   for (const ws of [screen, phone]) ws.close();
 }

@@ -22,6 +22,7 @@ import {
   canStart,
   creators,
   drawBattleground,
+  graceExpired,
   isDuel,
   stepsFor,
   voters,
@@ -210,6 +211,8 @@ export default class Room implements Party.Server {
   private stepTimer: ReturnType<typeof setTimeout> | null = null;
   /** Ticks while people are creating, watching each player's own deadline. */
   private creationClock: ReturnType<typeof setInterval> | null = null;
+  /** Ticks while anybody is away, waiting out their grace period. */
+  private graceClock: ReturnType<typeof setInterval> | null = null;
   /** Turns fought in this room, so every turn has an identity of its own. */
   private turnCount = 0;
 
@@ -219,7 +222,7 @@ export default class Room implements Party.Server {
     // bot hands their fighter straight back.
     const player = this.state.players.find((p) => p.id === connection.id);
     if (player && !player.connected) {
-      player.connected = true;
+      this.welcomeBack(player);
 
       // Back before the room moved on: they pick up where they left off, with
       // a full step's time rather than the seconds that were left when their
@@ -313,32 +316,23 @@ export default class Room implements Party.Server {
     }
   }
 
+  /**
+   * A device has gone quiet. Nobody is written off for that alone.
+   *
+   * Removing people on disconnect was wrong in every phase, and worst in the
+   * lobby, where it removed the host too: one blip on the host's connection
+   * emptied the room of its host, and the next thing any player's client said
+   * was answered with "no game with that code". A phone locking, a tab going
+   * to the background and a person leaving all look identical here. Only time
+   * tells them apart, so the room waits.
+   */
   onClose(connection: Party.Connection): void {
     const player = this.state.players.find((p) => p.id === connection.id);
     if (!player) return;
 
-    if (this.state.phase === 'lobby') {
-      // Nothing has been created yet, so drop them entirely.
-      this.state.players = this.state.players.filter((p) => p.id !== connection.id);
-    } else {
-      // Mid-game, keep the seat: the brief calls for a bot to take over, and
-      // the player's drawings must survive their phone locking.
-      player.connected = false;
-
-      /*
-       * Nobody waits on an empty chair.
-       *
-       * Each player now has their own clock, and a phone that has gone will
-       * not be pressing anything: left to run, its steps would expire one at a
-       * time and hold the whole room for six minutes. Whatever they had made
-       * is already saved, and the rest is filled in with stand-ins.
-       */
-      if (this.isCreating() && !player.progress.done) {
-        player.progress.done = true;
-        player.progress.endsAt = 0;
-        this.finishIfEveryoneIsDone();
-      }
-    }
+    player.connected = false;
+    player.leftAt = Date.now();
+    this.startGraceClock();
     this.broadcastState();
     // If they walked out mid-turn, the bot picks up their move now rather than
     // holding the fight open for a minute of nothing.
@@ -364,7 +358,7 @@ export default class Room implements Party.Server {
        */
       if (existing.id === sender.id || !existing.connected) {
         existing.id = sender.id;
-        existing.connected = true;
+        this.welcomeBack(existing);
         this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
         this.broadcastState();
         return;
@@ -384,6 +378,7 @@ export default class Room implements Party.Server {
       role: 'unassigned',
       connected: true,
       isHost: true,
+      leftAt: 0,
       progress: { drawn: [], named: [], step: 0, endsAt: 0, done: false },
       health: STARTING_HEALTH,
       fights: 0,
@@ -406,7 +401,7 @@ export default class Room implements Party.Server {
 
     const existing = this.state.players.find((p) => p.id === sender.id);
     if (existing) {
-      existing.connected = true;
+      this.welcomeBack(existing);
       this.send(sender, { type: 'welcome', playerId: existing.id, state: this.state });
       this.broadcastState();
       return;
@@ -478,6 +473,7 @@ export default class Room implements Party.Server {
       role: 'unassigned',
       connected: true,
       isHost: false,
+      leftAt: 0,
       progress: { drawn: [], named: [], step: 0, endsAt: 0, done: false },
       health: STARTING_HEALTH,
       fights: 0,
@@ -501,10 +497,19 @@ export default class Room implements Party.Server {
    * the full list of things that point at a player can be seen at once and
    * checked against the state.
    */
+  /**
+   * Somebody is back. Every return path ends here, so none of them can forget
+   * to call off the countdown that would have handed their fighter to a bot.
+   */
+  private welcomeBack(player: Player): void {
+    player.connected = true;
+    player.leftAt = 0;
+  }
+
   private reassignSeat(player: Player, newId: string): void {
     const oldId = player.id;
     if (oldId === newId) {
-      player.connected = true;
+      this.welcomeBack(player);
       return;
     }
 
@@ -549,7 +554,7 @@ export default class Room implements Party.Server {
     }
 
     player.id = newId;
-    player.connected = true;
+    this.welcomeBack(player);
   }
 
   private onSetRole(playerId: string, role: Role, sender: Party.Connection): void {
@@ -687,6 +692,57 @@ export default class Room implements Party.Server {
       }
       if (moved) this.broadcastState();
     }, 500);
+  }
+
+  /**
+   * Watches for anyone who has been gone too long.
+   *
+   * What happens then depends on where the game is: in the lobby their seat is
+   * freed for somebody else, in creation they stop being waited for, and in a
+   * fight a bot picks up their turn. All of it waits out the grace period
+   * first, so a locked phone costs nothing.
+   */
+  private startGraceClock(): void {
+    if (this.graceClock) return;
+
+    this.graceClock = setInterval(() => {
+      const away = this.state.players.filter((p) => !p.connected && p.leftAt > 0);
+      if (away.length === 0) {
+        this.stopGraceClock();
+        return;
+      }
+
+      let changed = false;
+      for (const player of away) {
+        if (!graceExpired(player)) continue;
+
+        if (this.state.phase === 'lobby' && !player.isHost) {
+          // Nothing has been made yet, so the seat can go to somebody else.
+          this.state.players = this.state.players.filter((p) => p.id !== player.id);
+          changed = true;
+          continue;
+        }
+
+        if (this.isCreating() && !player.progress.done) {
+          // Nobody waits on an empty chair: their steps would expire one at a
+          // time and hold the room for minutes. What they made is saved, and
+          // the rest is filled in with stand-ins.
+          player.progress.done = true;
+          player.progress.endsAt = 0;
+          this.finishIfEveryoneIsDone();
+          changed = true;
+        }
+      }
+
+      // A fight does not wait either, once the grace is up.
+      this.playBots();
+      if (changed) this.broadcastState();
+    }, 1000);
+  }
+
+  private stopGraceClock(): void {
+    if (this.graceClock) clearInterval(this.graceClock);
+    this.graceClock = null;
   }
 
   private stopCreationClock(): void {
@@ -871,7 +927,9 @@ export default class Room implements Party.Server {
     for (const id of turn.fighters) {
       if (turn.moves[id]) continue;
       const player = this.state.players.find((p) => p.id === id);
-      if (!player || player.connected) continue;
+      // Gone, but not yet gone long enough: a locked phone gets its grace
+      // period back before anything is written in its owner's name.
+      if (!player || !graceExpired(player)) continue;
       turn.moves[id] = botMove(player);
       wrote = true;
     }

@@ -90,6 +90,27 @@ export function byteLength(value: string): number {
     : value.length;
 }
 
+/**
+ * How long a device may be away before the game gives up on it.
+ *
+ * Phones lock, tabs get backgrounded, wifi drops for a moment. None of those
+ * should cost a player their seat — but a room cannot wait forever either, so
+ * after this the lobby lets them go and a fight hands their turn to a bot.
+ */
+export const GRACE_SECONDS = 25;
+
+/** Whether a player has been gone long enough to be given up on. */
+export function graceExpired(player: Player, now = Date.now()): boolean {
+  if (player.connected || player.leftAt === 0) return false;
+  return now - player.leftAt >= GRACE_SECONDS * 1000;
+}
+
+/** Seconds left before that happens, for a screen to count down. */
+export function graceRemaining(player: Player, now = Date.now()): number {
+  if (player.connected || player.leftAt === 0) return 0;
+  return Math.max(0, Math.ceil((player.leftAt + GRACE_SECONDS * 1000 - now) / 1000));
+}
+
 export const MAX_PLAYERS = 6;
 export const MIN_PLAYERS = 2;
 export const ROOM_CODE_LENGTH = 4;
@@ -106,6 +127,14 @@ export interface Player {
   connected: boolean;
   /** The host runs the shared screen; everyone else is on a phone. */
   isHost: boolean;
+  /**
+   * When they went, as an epoch millisecond. Zero while they are here.
+   *
+   * A disconnect is not a departure: it is a phone locking, a tab going to the
+   * background, a train entering a tunnel. This is what lets the room tell the
+   * difference between the two, by waiting.
+   */
+  leftAt: number;
   progress: CreationProgress;
   health: number;
   /** Rounds fought, so nobody fights a fourth time. */
