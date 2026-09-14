@@ -604,6 +604,36 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   });
 }
 
+// --- saying the game is busy ------------------------------------------------
+
+{
+  const badge = ui.loadingBadge();
+  document.body.appendChild(badge.root);
+
+  check('the badge says what it is doing',
+    /loading/i.test(badge.root.querySelector('[role="img"]')?.getAttribute('aria-label') ?? ''),
+    badge.root.querySelector('[role="img"]')?.getAttribute('aria-label'));
+  check('and announces itself to a screen reader',
+    badge.root.getAttribute('role') === 'status');
+
+  // In order, left to right: every letter the same hop, a beat after the one
+  // before it. Out-of-step delays would be the title's bob, not a wave.
+  const delays = [...badge.root.querySelectorAll('img')]
+    .map((img) => parseFloat(img.style.animationDelay));
+  check('every letter is delayed a little more than the last',
+    delays.length === 7 && delays.every((d, i) => i === 0 || d > delays[i - 1]),
+    JSON.stringify(delays));
+  check('by an even step', delays.length > 2
+    && Math.abs((delays[1] - delays[0]) - (delays[2] - delays[1])) < 0.001,
+    JSON.stringify(delays));
+
+  badge.done();
+  check('finishing starts it leaving', badge.root.classList.contains('is-done'));
+  badge.done();
+  check('and saying so twice is harmless', badge.root.classList.contains('is-done'));
+  badge.root.remove();
+}
+
 // --- a tab that reloads is still in the game ---------------------------------
 //
 // Tabs reload for reasons nobody chose: a renderer crash under memory

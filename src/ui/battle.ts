@@ -4,6 +4,7 @@ import { requestChoreography, requestJudgement } from '../api';
 import { judgePanel } from './judging';
 import { getSettings } from '../settings';
 import { report } from '../errors';
+import { loadingBadge } from './loading';
 import { play } from '../audio';
 import type { RoomConnection } from '../net/room';
 import {
@@ -48,6 +49,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
      * same two people again every round turns a reveal into a delay.
      */
     const introduced = new Set<string>();
+    /** Taken down on teardown, so leaving mid-load does not strand it. */
+    let loading: { done: () => void } | null = null;
     /** The final-round warning is worth one interruption, not one per round. */
     let saidFinalRound = false;
     /**
@@ -81,6 +84,17 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (ready || disposed) return Promise.resolve();
       if (building) return building;
 
+      /*
+       * The one wait in the game worth announcing.
+       *
+       * A renderer, fifty-seven effect sprites, thirty letters, a photograph
+       * and everyone's artwork, all before there is anything on the stage to
+       * look at. Everything else in this file happens between frames.
+       */
+      const badge = loadingBadge();
+      document.body.appendChild(badge.root);
+      loading = badge;
+
       building = (async () => {
         const engine = await import('../engine');
         if (disposed) return;
@@ -111,7 +125,12 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         if (disposed) { stage.destroy(); return; }
 
         ready = { stage, engine };
-      })();
+      })().finally(() => {
+        // Whatever happened — ready, or failed and falling back to the flat
+        // colour — the room is no longer waiting on it.
+        badge.done();
+        if (loading === badge) loading = null;
+      });
 
       return building;
     }
@@ -472,6 +491,10 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
     return () => {
       disposed = true;
+      // Leaving mid-load must not leave the badge behind: it is on <body>, so
+      // nothing else would ever take it down.
+      loading?.done();
+      loading = null;
       for (const fighter of onStage.values()) fighter.destroy();
       ready?.stage.clearHealthBars();
       ready?.stage.destroy();

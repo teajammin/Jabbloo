@@ -32,6 +32,15 @@ export interface BubbleTextOptions {
    * what a title is for and what a room code or a fighter's name is not.
    */
   bounce?: boolean;
+  /**
+   * A hop that runs through the letters in order, left to right.
+   *
+   * Distinct from `bounce`, which deliberately gives every letter its own
+   * unrelated timing so a title reads as a word rather than one object. Here
+   * the order is the point: it says the game is working through something, and
+   * a wave travelling along the word is the shortest way to say it.
+   */
+  wave?: boolean;
 }
 
 /**
@@ -49,11 +58,11 @@ export function titleHeight(ideal: number, min = 40): number {
 
 /** Builds an element spelling `text` in the game's letters. */
 export function bubbleText(text: string, options: BubbleTextOptions = {}): HTMLElement {
-  const { height = 90, jitter = 0, className, bounce = false } = options;
+  const { height = 90, jitter = 0, className, bounce = false, wave = false } = options;
 
   const glyphs: HTMLImageElement[] = [];
   const wrap = document.createElement('span');
-  wrap.className = ['bubble-text', className, bounce ? 'is-bouncing' : '']
+  wrap.className = ['bubble-text', className, bounce ? 'is-bouncing' : '', wave ? 'is-waving' : '']
     .filter(Boolean).join(' ');
   // The letters are decorative images; the word itself must reach a screen reader.
   wrap.setAttribute('role', 'img');
@@ -78,6 +87,14 @@ export function bubbleText(text: string, options: BubbleTextOptions = {}): HTMLE
     img.draggable = false;
     if (jitter) {
       img.style.transform = `translateY(${(Math.random() * 2 - 1) * jitter}px)`;
+    }
+
+    if (wave) {
+      // One shared duration and an even step between the starts: what makes it
+      // a wave rather than a crowd is that every letter does the same thing a
+      // beat after the one before it.
+      const index = wrap.childElementCount;
+      img.style.animationDelay = `${(index * 0.075).toFixed(3)}s`;
     }
 
     if (bounce) {

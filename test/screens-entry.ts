@@ -18,6 +18,7 @@ export { moveScreen } from '../src/ui/move';
 export { resultsScreen } from '../src/ui/results';
 export { mountOptions } from '../src/ui/options';
 export { mountConnectionBanner } from '../src/ui/connection';
+export { loadingBadge } from '../src/ui/loading';
 export { rememberRoom, forgetRoom, rememberedRoom } from '../src/ui/resume';
 export { CONNECTION_EVENT } from '../src/net/room';
 export { teamBoard, duelBoard } from '../src/ui/teams';

@@ -2086,3 +2086,61 @@ body:has(.screen-draw) .help-open { display: none !important; }
 @media (max-width: 480px) {
   .aim-guide { right: 5px; font-size: 11px; padding: 5px 7px; gap: 2px; }
 }
+
+/*
+ * A hop running through a word in order.
+ *
+ * The bob above is deliberately out of step, so a title reads as letters
+ * rather than one moving object. This is the opposite: the order is the
+ * message. Each letter does the same quick hop a beat after the one before it,
+ * so the wave travels along the word and starts again.
+ */
+.bubble-text.is-waving img {
+  animation-name: letter-hop;
+  animation-duration: 1.15s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  transform-box: fill-box;
+}
+
+@keyframes letter-hop {
+  0%, 62%, 100% { translate: 0 0; }
+  20% { translate: 0 -34%; }
+  40% { translate: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble-text.is-waving img { animation: none; }
+}
+
+[data-reduce-motion] .bubble-text.is-waving img { animation: none; }
+
+/*
+ * The loading badge: bottom right, out of the way of everything.
+ *
+ * Fixed to the window rather than the stage, because the stage is the thing
+ * that does not exist yet.
+ */
+.loading-badge {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 40;
+  /* Roomier at the top: the letters hop about a third of their height, and
+     with even padding the raised ones climbed out of the pill. */
+  padding: 17px 16px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 84%, transparent);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.loading-badge.is-done {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-badge { transition: none; }
+}
