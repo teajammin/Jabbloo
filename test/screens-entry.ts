@@ -19,7 +19,7 @@ export { resultsScreen } from '../src/ui/results';
 export { mountOptions } from '../src/ui/options';
 export { mountConnectionBanner } from '../src/ui/connection';
 export { CONNECTION_EVENT } from '../src/net/room';
-export { teamBoard } from '../src/ui/teams';
+export { teamBoard, duelBoard } from '../src/ui/teams';
 export { loadSettings } from '../src/settings';
 export { DrawCanvas } from '../src/draw/DrawCanvas';
 export { deviceId, randomId } from '../src/net/room';

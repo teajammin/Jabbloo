@@ -237,7 +237,11 @@ export function teamBoard(connection: RoomConnection, seats = 0): TeamBoard {
  * A duel has nothing to arrange: one arrangement exists and the room makes it
  * at kick-off. Offering team names and four zones for it was a puzzle with a
  * single solution standing between two people and their game — so this shows
- * the matchup instead of asking about it.
+ * who is here instead of asking about it.
+ *
+ * Nothing is drawn for a seat nobody is in. Two waiting outlines are a promise
+ * the room has not been given yet, and the first person to join should see
+ * themselves arrive in an empty space rather than fill in a slot.
  */
 export interface DuelBoard {
   root: HTMLElement;
@@ -245,12 +249,8 @@ export interface DuelBoard {
 }
 
 export function duelBoard(): DuelBoard {
-  const sides = [side('P1'), side('P2')];
-  const root = el('div', { class: 'duel-board' },
-    sides[0]!.root,
-    el('div', { class: 'duel-vs' }, 'v'),
-    sides[1]!.root,
-  );
+  const sides = [side(), side()];
+  const root = el('div', { class: 'duel-board' }, sides[0]!.root, sides[1]!.root);
 
   function update(state: RoomState): void {
     const players = state.players.filter((p) => !p.isHost);
@@ -260,29 +260,24 @@ export function duelBoard(): DuelBoard {
   return { root, update };
 }
 
-/** One corner: a floating icon, and which player it is. */
-function side(tag: string): { root: HTMLElement; show: (player?: Player) => void } {
-  const icon = el('div', { class: 'duel-icon empty' }, '?');
-  const root = el('div', { class: 'duel-side' }, icon, el('span', { class: 'duel-tag' }, tag));
+/** One half of the screen: whoever is standing in it, or nothing at all. */
+function side(): { root: HTMLElement; show: (player?: Player) => void } {
+  const icon = el('div', { class: 'duel-icon' });
+  const name = el('span', { class: 'duel-name' }, '');
+  const root = el('div', { class: 'duel-side' }, icon, name);
+  root.hidden = true;
 
   function show(player?: Player): void {
-    icon.replaceChildren();
-    icon.className = `duel-icon${player ? '' : ' empty'}`;
-    icon.style.backgroundImage = '';
+    root.hidden = !player;
+    if (!player) return;
 
-    if (!player) {
-      icon.textContent = '?';
-      return;
-    }
+    name.textContent = player.name;
 
-    // A photo fills the circle; without one, the initial does.
-    if (player.photo) {
-      icon.style.backgroundImage = `url(${JSON.stringify(player.photo)})`;
-      icon.style.backgroundSize = 'cover';
-      icon.style.backgroundPosition = 'center';
-    } else {
-      icon.textContent = player.name.slice(0, 1).toUpperCase();
-    }
+    // Their own photo if they brought one. Otherwise the plain figure, which
+    // is a person rather than a placeholder — nobody is waiting on it.
+    const hasPhoto = Boolean(player.photo);
+    icon.classList.toggle('anon', !hasPhoto);
+    icon.style.backgroundImage = hasPhoto ? `url(${JSON.stringify(player.photo)})` : '';
   }
 
   return { root, show };

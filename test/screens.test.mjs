@@ -569,7 +569,11 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
       check('a duel is not asked to name its teams',
         root.querySelector('.zone input') === null);
       check('the two of them face each other instead',
-        root.querySelectorAll('.duel-icon').length === 2);
+        root.querySelector('.duel-board') !== null);
+      // Before anyone joins there is nobody to draw, and a pair of waiting
+      // outlines is a promise the room has not been given yet.
+      check('with nobody drawn in until they arrive',
+        [...root.querySelectorAll('.duel-side')].every((s) => s.hidden));
     });
     mounts('lobby (player)', ui.lobbyScreen('ABCD', 2, false, { name: 'Ann' }));
 
@@ -733,6 +737,63 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     check('the board does not crash on interaction', true);
   } catch (error) {
     check('the team board renders the room', false, String(error?.message ?? error));
+  }
+  root.remove();
+}
+
+// --- two players, facing each other ----------------------------------------
+
+{
+  const board = ui.duelBoard();
+  const root = document.createElement('div');
+  root.appendChild(board.root);
+  document.body.appendChild(root);
+
+  const seats = () => [...root.querySelectorAll('.duel-side')];
+  const shown = () => seats().filter((s) => !s.hidden);
+
+  try {
+    check('an empty room draws nobody', shown().length === 0);
+
+    // The host is in the room from the start and is not one of the fighters.
+    board.update(roomState({ players: [player('h', 'Host', 'unassigned', { isHost: true })] }));
+    check('and the host does not count as a player', shown().length === 0);
+
+    board.update(roomState({
+      players: [
+        player('h', 'Host', 'unassigned', { isHost: true }),
+        player('a', 'Ann', 'unassigned'),
+      ],
+    }));
+    check('the first to join appears alone', shown().length === 1);
+    check('with their name under them', shown()[0]?.textContent?.includes('Ann'),
+      shown()[0]?.textContent);
+    check('and a plain figure, having brought no photo',
+      shown()[0]?.querySelector('.duel-icon')?.classList.contains('anon'));
+
+    board.update(roomState({
+      players: [
+        player('h', 'Host', 'unassigned', { isHost: true }),
+        player('a', 'Ann', 'unassigned'),
+        player('b', 'Bo', 'unassigned', { photo: 'data:image/png;base64,xx' }),
+      ],
+    }));
+    check('the second takes the other side', shown().length === 2);
+    check('the two of them are on opposite sides',
+      seats()[0]?.textContent?.includes('Ann') && seats()[1]?.textContent?.includes('Bo'));
+    check('a photo is used when there is one',
+      seats()[1]?.querySelector('.duel-icon')?.classList.contains('anon') === false);
+
+    // Somebody leaves: the space they were in is empty again, not a placeholder.
+    board.update(roomState({
+      players: [
+        player('h', 'Host', 'unassigned', { isHost: true }),
+        player('a', 'Ann', 'unassigned'),
+      ],
+    }));
+    check('and leaving empties the space again', shown().length === 1);
+  } catch (error) {
+    check('the duel board renders', false, String(error?.message ?? error));
   }
   root.remove();
 }

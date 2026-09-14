@@ -41,6 +41,14 @@
   --good: #7ed39b;
 
   /*
+   * A plain figure, for a player who brought no photo of their own.
+   *
+   * Carried as a mask rather than an image so it takes whatever colour it is
+   * used on, and inline so it cannot be the one request that fails.
+   */
+  --figure: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 3.1-9 7v1h18v-1c0-3.9-4-7-9-7Z'/%3E%3C/svg%3E");
+
+  /*
    * The pastels stay: they are what the letters, the effects and the
    * placeholder artwork are drawn in, and they belong to the game rather than
    * to the interface.
@@ -1808,11 +1816,15 @@ body:has(.screen-draw) .help-open { display: none !important; }
  * at kick-off — so the team board would be a puzzle with a single solution
  * standing between two people and their game. This says the same thing in the
  * shape of the fight itself.
+ *
+ * The space is held open whether anyone is in it or not, so the first person
+ * to join lands in it rather than pushing the Start button down the screen.
  */
 .duel-board {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
+  min-height: 168px;
   gap: 18px;
   margin: 4px 0 2px;
 }
@@ -1820,60 +1832,66 @@ body:has(.screen-draw) .help-open { display: none !important; }
 .duel-side {
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 10px;
+  /* Each wanders inside its own half and cannot stray into the other's. */
+  animation: duel-bobble 7s ease-in-out infinite;
 }
+
+/* Out of step with each other, or the two read as one moving object. */
+.duel-side:last-child { animation-duration: 8.5s; animation-delay: -3.2s; }
 
 .duel-icon {
-  width: 92px; height: 92px;
+  width: 96px; height: 96px;
   border-radius: 50%;
-  object-fit: cover;
-  display: grid;
-  place-items: center;
-  font-size: 34px;
-  font-weight: 700;
+  background-color: var(--waiting);
+  background-size: cover;
+  background-position: center;
   color: var(--on-accent);
-  background: var(--waiting);
   box-shadow: var(--shadow);
-  /* Offset so the two never bob in unison, which reads as one moving object. */
-  animation: duel-float 3.4s ease-in-out infinite;
 }
-
-.duel-side:last-child .duel-icon { animation-delay: -1.7s; }
 
 .duel-side:first-child .duel-icon { box-shadow: 0 0 0 4px var(--team-a), var(--shadow); }
 .duel-side:last-child .duel-icon { box-shadow: 0 0 0 4px var(--team-b), var(--shadow); }
 
-.duel-icon.empty {
-  background: transparent;
-  box-shadow: none;
-  border: 3px dashed color-mix(in srgb, var(--text) 28%, transparent);
-  color: color-mix(in srgb, var(--text) 45%, transparent);
-  font-size: 22px;
-  animation: none;
+/*
+ * Nobody's photo: a plain figure.
+ *
+ * Masked rather than drawn in, so it takes the colour of the text on the
+ * circle it sits in and follows the theme without a second copy of the file.
+ */
+.duel-icon.anon {
+  background-color: var(--waiting);
+  background-image: none;
 }
 
-.duel-tag {
-  font-size: 13px;
+.duel-icon.anon::after {
+  content: '';
+  display: block;
+  width: 100%; height: 100%;
+  background: currentColor;
+  opacity: 0.85;
+  -webkit-mask: var(--figure) center / 62% no-repeat;
+  mask: var(--figure) center / 62% no-repeat;
+}
+
+.duel-name {
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.7;
+  font-size: 19px;
+  max-width: 11ch;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
-.duel-vs {
-  font-size: 26px;
-  font-weight: 800;
-  opacity: 0.5;
-  font-style: italic;
-}
-
-@keyframes duel-float {
-  0%, 100% { transform: translateY(-5px); }
-  50% { transform: translateY(5px); }
+@keyframes duel-bobble {
+  0%   { transform: translate(0, -6px); }
+  25%  { transform: translate(7px, 2px) rotate(1.5deg); }
+  50%  { transform: translate(-2px, 7px); }
+  75%  { transform: translate(-7px, -1px) rotate(-1.5deg); }
+  100% { transform: translate(0, -6px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .duel-icon { animation: none; }
+  .duel-side { animation: none; }
 }
 
-[data-reduce-motion] .duel-icon { animation: none; }
+[data-reduce-motion] .duel-side { animation: none; }
