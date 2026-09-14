@@ -31,7 +31,9 @@ export const CONTROL_HELP: Record<string, ControlHelp> = {
   smaller: { icon: '－', name: 'Shrink', what: 'Makes the photo you are placing smaller.' },
   bigger: { icon: '＋', name: 'Enlarge', what: 'Makes the photo you are placing bigger.' },
 
-  zoomOut: { icon: '⤢', name: 'Fit to screen', what: 'Back to the whole canvas. Pinch with two fingers to zoom in on a detail.' },
+  zoomIn: { icon: '＋', name: 'Zoom in', what: 'Closer, for eyes and fingers and other small things. Pinching with two fingers does the same.' },
+  zoomOut: { icon: '－', name: 'Zoom out', what: 'Back out again.' },
+  zoomFit: { icon: '⤢', name: 'Fit the whole canvas', what: 'Shows all of your drawing at once.' },
 
   undo: { icon: '←', name: 'Undo', what: 'Takes back the last thing you did.', key: '⌘Z' },
   redo: { icon: '→', name: 'Redo', what: 'Puts back what you just undid.', key: '⇧⌘Z' },

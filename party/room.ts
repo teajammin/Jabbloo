@@ -14,6 +14,8 @@ import {
   MAX_SCORE,
   availableFighters,
   averageScore,
+  isFinalRound,
+  FINAL_ROUND_MULTIPLIER,
   judges,
   trimPrompt,
   battlegrounds,
@@ -397,6 +399,11 @@ export default class Room implements Party.Server {
   }
 
   private onJoin(name: string, photo: string | undefined, sender: Party.Connection): void {
+    // Tidied once, at the top, because both the rejoin path and the new-player
+    // path need it — and a `const` read from inside a closure before its own
+    // declaration is a runtime error the compiler cannot see.
+    const wanted = name.trim().slice(0, 16);
+
     const existing = this.state.players.find((p) => p.id === sender.id);
     if (existing) {
       existing.connected = true;
@@ -406,7 +413,30 @@ export default class Room implements Party.Server {
     }
 
     if (this.state.phase !== 'lobby') {
-      this.send(sender, { type: 'error', reason: 'That game has already started.' });
+      /*
+       * Coming back after closing the tab.
+       *
+       * A device that merely locked keeps its id and is recognised above. One
+       * that was closed and reopened is, as far as the wire is concerned, a
+       * stranger — so the name is the only thing left to recognise them by. It
+       * is enough: the seat is taken, its owner is not connected, and nobody
+       * else in the room is using that name.
+       */
+      const seat = this.state.players.find(
+        (p) => !p.isHost && !p.connected && p.name.toLowerCase() === wanted.toLowerCase(),
+      );
+
+      if (seat) {
+        this.reassignSeat(seat, sender.id);
+        this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
+        this.broadcastState();
+        return;
+      }
+
+      this.send(sender, {
+        type: 'error',
+        reason: 'That game has already started. To rejoin, use the name you had.',
+      });
       return;
     }
 
@@ -428,7 +458,7 @@ export default class Room implements Party.Server {
       return;
     }
 
-    const clean = name.trim().slice(0, 16) || `Player ${players.length + 1}`;
+    const clean = wanted || `Player ${players.length + 1}`;
     const taken = new Set(players.map((p) => p.name.toLowerCase()));
     let unique = clean;
     let suffix = 2;
@@ -460,6 +490,66 @@ export default class Room implements Party.Server {
 
     this.send(sender, { type: 'welcome', playerId: sender.id, state: this.state });
     this.broadcastState();
+  }
+
+  /**
+   * Moves a seat, and everything hanging off it, to a new connection.
+   *
+   * The room keys a player's artwork, votes, moves and scores on their id, and
+   * a reopened tab arrives with a different one. Rather than teach every
+   * handler about aliases, the seat itself is renamed — in one place, where
+   * the full list of things that point at a player can be seen at once and
+   * checked against the state.
+   */
+  private reassignSeat(player: Player, newId: string): void {
+    const oldId = player.id;
+    if (oldId === newId) {
+      player.connected = true;
+      return;
+    }
+
+    // Artwork and names, both keyed `${playerId}:${slot}`.
+    for (const store of [this.art, this.names]) {
+      for (const [key, value] of [...store]) {
+        const [owner, slot] = key.split(':');
+        if (owner !== oldId || !slot) continue;
+        store.delete(key);
+        store.set(`${newId}:${slot}`, value);
+      }
+    }
+
+    // Their vote for a battleground.
+    if (this.state.votes[oldId] !== undefined) {
+      this.state.votes[newId] = this.state.votes[oldId]!;
+      delete this.state.votes[oldId];
+    }
+
+    const turn = this.state.turn;
+    if (turn) {
+      turn.fighters = turn.fighters.map((id) => (id === oldId ? newId : id)) as [string, string];
+      if (turn.first === oldId) turn.first = newId;
+
+      // Their move, the damage they dealt, the note about it.
+      for (const record of [turn.moves, turn.damage, turn.notes] as Record<string, unknown>[]) {
+        if (record[oldId] === undefined) continue;
+        record[newId] = record[oldId];
+        delete record[oldId];
+      }
+
+      // Scores they gave as a judge, and scores given to them as a fighter.
+      if (turn.judged[oldId]) {
+        turn.judged[newId] = turn.judged[oldId]!;
+        delete turn.judged[oldId];
+      }
+      for (const byFighter of Object.values(turn.judged)) {
+        if (byFighter[oldId] === undefined) continue;
+        byFighter[newId] = byFighter[oldId]!;
+        delete byFighter[oldId];
+      }
+    }
+
+    player.id = newId;
+    player.connected = true;
   }
 
   private onSetRole(playerId: string, role: Role, sender: Party.Connection): void {
@@ -1004,14 +1094,21 @@ export default class Room implements Party.Server {
    *
    * A move's score is damage dealt to the OTHER fighter, which is what makes
    * "least damage taken wins" mean anything.
+   *
+   * Worked out before anyone's round count changes, because the multiplier
+   * depends on whether this turn was their last — and by the end of this
+   * function it will not be their last any more.
    */
   private closeJudging(): void {
+    const final = isFinalRound(this.state);
     if (this.stepTimer) clearTimeout(this.stepTimer);
     const turn = this.state.turn;
     if (!turn || turn.phase !== 'judging') return;
 
     for (const attackerId of turn.fighters) {
-      const dealt = averageScore(turn, attackerId);
+      // The last round counts double, so a fight is never over until it is.
+      const scored = averageScore(turn, attackerId);
+      const dealt = final ? scored * FINAL_ROUND_MULTIPLIER : scored;
       turn.damage[attackerId] = dealt;
 
       const attacker = this.state.players.find((p) => p.id === attackerId);

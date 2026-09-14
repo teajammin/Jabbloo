@@ -200,11 +200,43 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
      * place at any magnification with no arithmetic of its own.
      */
     const MAX_ZOOM = 4;
-    /** Only shown when there is something to go back from. */
-    const zoomOutButton = button('⤢', () => resetZoom(), 'tool zoom-out');
-    zoomOutButton.setAttribute('aria-label', 'Fit to screen');
-    zoomOutButton.title = 'Fit to screen';
-    zoomOutButton.hidden = true;
+
+    /*
+     * The game's own zoom, rather than the browser's.
+     *
+     * The page refuses the browser's gestures — double tap, pinch, long press
+     * — because every one of them fires while somebody is drawing with a
+     * finger and interrupts the stroke. Refusing them is only fair if the
+     * game provides what they were for, so this is a proper control: two
+     * buttons for people who would rather press something, pinch for people
+     * who would rather pinch, and a way back to the whole canvas.
+     */
+    const zoomInButton = button('＋', () => nudgeZoom(1.5), 'tool zoom-in');
+    zoomInButton.setAttribute('aria-label', 'Zoom in');
+    zoomInButton.title = 'Zoom in';
+
+    const zoomOutButton = button('－', () => nudgeZoom(1 / 1.5), 'tool zoom-out');
+    zoomOutButton.setAttribute('aria-label', 'Zoom out');
+    zoomOutButton.title = 'Zoom out';
+
+    const zoomFitButton = button('⤢', () => resetZoom(), 'tool zoom-fit');
+    zoomFitButton.setAttribute('aria-label', 'Fit the whole canvas');
+    zoomFitButton.title = 'Fit the whole canvas';
+    zoomFitButton.hidden = true;
+
+    /** A step in or out, about the middle of what is on screen. */
+    function nudgeZoom(factor: number): void {
+      const next = Math.max(1, Math.min(MAX_ZOOM, zoom * factor));
+      if (next === zoom) return;
+      // Panning scales with the zoom, so the point in the middle stays in the
+      // middle rather than the drawing sliding out from under the finger.
+      const ratio = next / zoom;
+      panX *= ratio;
+      panY *= ratio;
+      zoom = next;
+      applyZoom();
+      say(zoom === 1 ? 'Whole canvas' : `Zoomed ${Math.round(zoom * 100)}%`);
+    }
 
     const pointers = new Map<number, { x: number; y: number }>();
     let zoom = 1;
@@ -223,7 +255,9 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       stage.style.transform = zoom === 1 && panX === 0 && panY === 0
         ? ''
         : `translate(${panX}px, ${panY}px) scale(${zoom})`;
-      zoomOutButton.hidden = zoom === 1;
+      zoomFitButton.hidden = zoom === 1;
+      zoomInButton.disabled = zoom >= MAX_ZOOM - 0.001;
+      zoomOutButton.disabled = zoom <= 1.001;
     }
 
     function resetZoom(): void {
@@ -803,7 +837,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     shell.append(
       el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),
       area,
-      zoomOutButton,
+      el('div', { class: 'zoom-controls' }, zoomInButton, zoomOutButton, zoomFitButton),
         el('div', { class: 'toolbar' },
           toolRow,
           sizeRow,

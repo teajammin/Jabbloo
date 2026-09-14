@@ -10,6 +10,7 @@
  * is refused while anyone is unassigned, and a mid-game disconnect keeps the
  * player's seat rather than dropping their drawings.
  */
+import { PNG } from './creation-helper.mjs';
 // Drives the PartyKit room over raw WebSockets: host opens, two phones join,
 // host assigns teams, host starts.
 // A fresh room per run: PartyKit keeps a room alive between runs, so a fixed
@@ -206,6 +207,69 @@ for (const ws of [host, a, b]) ws.close();
     JSON.stringify(s.teamNames));
 
   for (const ws of [screen, one, two]) ws.close();
+}
+
+// --- coming back after closing the tab -------------------------------------
+//
+// A phone that locks keeps its id and is recognised by it. A tab that is
+// closed and reopened is a stranger on the wire, so the name is all there is
+// to go on — and it is enough, because the seat is taken, its owner is not
+// connected, and nobody else is using that name.
+{
+  const code = 'BACK' + Math.floor(Math.random() * 900 + 100);
+  const socket = (id) => new Promise((resolve) => {
+    const ws = new WebSocket(`ws://127.0.0.1:1999/parties/main/${code}?_pk=${id}`);
+    ws.inbox = [];
+    ws.addEventListener('message', (e) => ws.inbox.push(JSON.parse(e.data)));
+    ws.addEventListener('open', () => resolve(ws));
+  });
+  const seen = (ws) => [...ws.inbox].reverse()
+    .find((m) => m.type === 'state' || m.type === 'welcome')?.state;
+
+  const screen = await socket('screen');
+  screen.send(JSON.stringify({ type: 'host', capacity: 2 }));
+  await wait(300);
+  const one = await socket('one');
+  one.send(JSON.stringify({ type: 'join', name: 'Ann' }));
+  let two = await socket('two');
+  two.send(JSON.stringify({ type: 'join', name: 'Bo' }));
+  await wait(450);
+
+  const boId = seen(screen).players.find((p) => p.name === 'Bo').id;
+  screen.send(JSON.stringify({ type: 'start' }));
+  await wait(300);
+  two.send(JSON.stringify({
+    type: 'submitDrawing', slot: 'character', png: PNG, done: true,
+  }));
+  two.send(JSON.stringify({ type: 'submitName', slot: 'character', name: 'Sir Bo' }));
+  await wait(400);
+
+  // The tab is closed, not just locked: a new id entirely.
+  two.close();
+  await wait(500);
+  two = await socket('bo-reopened');
+  two.send(JSON.stringify({ type: 'join', name: 'Bo' }));
+  await wait(600);
+
+  const after = seen(screen);
+  const bo = after.players.find((p) => p.name === 'Bo');
+  check('a reopened tab gets its seat back', bo?.connected === true, JSON.stringify(bo?.connected));
+  check('and there is still only one of them',
+    after.players.filter((p) => p.name === 'Bo').length === 1);
+  check('their work came with them', bo?.characterName === 'Sir Bo', bo?.characterName);
+  check('the seat now answers to the new device', bo?.id !== boId, `${boId} -> ${bo?.id}`);
+  check('and they can see the room', Boolean(seen(two)?.players?.length));
+
+  // Somebody who was never here is still turned away.
+  const stranger = await socket('stranger');
+  stranger.send(JSON.stringify({ type: 'join', name: 'Cal' }));
+  await wait(400);
+  const refusal = stranger.inbox.filter((m) => m.type === 'error').map((m) => m.reason);
+  check('a stranger is still refused', refusal.length === 1, JSON.stringify(refusal));
+  check('and told how to rejoin if they were here',
+    /use the name you had/i.test(refusal[0] ?? ''), refusal[0]);
+
+  for (const ws of [screen, one, two, stranger]) ws.close();
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

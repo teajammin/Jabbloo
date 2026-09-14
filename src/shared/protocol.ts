@@ -21,6 +21,31 @@ export const MAX_PROMPT_WORDS = 50;
 export const MOVE_SECONDS = 50;
 /** Rounds each character fights. */
 export const ROUNDS_EACH = 3;
+
+/**
+ * What a hit is worth in the final round.
+ *
+ * Three rounds of scores that all count the same makes the last one a
+ * formality: whoever is ahead after two is usually ahead after three. Doubling
+ * the last round means a fight is never over until it is over, and the player
+ * who has been losing has something to swing for.
+ */
+export const FINAL_ROUND_MULTIPLIER = 2;
+
+/**
+ * Whether this turn is somebody's last.
+ *
+ * True when both fighters are on their final round, which in a one-a-side game
+ * is the third turn and in a tag team is the last turn each pair will have.
+ */
+export function isFinalRound(state: RoomState): boolean {
+  const turn = state.turn;
+  if (!turn) return false;
+  return turn.fighters.every((id) => {
+    const player = state.players.find((p) => p.id === id);
+    return player !== undefined && player.fights >= ROUNDS_EACH - 1;
+  });
+}
 /** Everyone starts here; a fighter at zero is knocked out. */
 export const STARTING_HEALTH = 100;
 /** The brief's scale: a move is worth up to this much damage. */

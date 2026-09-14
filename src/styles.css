@@ -889,7 +889,8 @@ input[type='text'] {
   .toolbar { gap: 4px; padding: 3px 0; }
   .tool-row { gap: 5px; padding: 4px 4px 5px; }
   .draw-stage { border-radius: 20px; }
-  .zoom-out { bottom: auto; top: 10px; right: 10px; }
+  .zoom-controls { bottom: auto; top: 10px; right: 10px; }
+  .zoom-controls .tool { min-width: 40px; min-height: 40px; font-size: 19px; }
 }
 
 /* Short screens (landscape phones) drop the hint too. */
@@ -905,14 +906,33 @@ input[type='text'] {
  */
 .draw-stage { transform-origin: center center; touch-action: none; }
 
-.zoom-out {
+/*
+ * The zoom controls, floating over the canvas.
+ *
+ * The page refuses the browser's own zoom so it cannot interrupt a stroke, so
+ * the game has to offer its own — and offer it where a thumb already is.
+ */
+.zoom-controls {
   position: absolute;
   right: 14px;
-  bottom: 96px;
+  bottom: 100px;
   z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zoom-controls .tool {
+  min-width: 46px;
+  min-height: 46px;
+  padding: 0;
   background: var(--waiting);
   color: var(--on-accent);
+  font-size: 22px;
+  font-weight: 700;
 }
+
+.zoom-controls .tool:disabled { opacity: 0.35; }
 
 /* --------------------------------------------------- desktop drawing layout */
 
@@ -1741,4 +1761,14 @@ body:has(.screen-draw) .help-open { display: none !important; }
   color: var(--text);
   padding: 8px 18px;
   min-height: 40px;
+}
+
+/* The one round that is worth more than the others should look it. */
+.move-stakes {
+  margin: 0;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--team-a);
+  color: var(--on-accent);
+  font-weight: 700;
 }

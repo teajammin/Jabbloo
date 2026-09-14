@@ -2,7 +2,7 @@ import { el, button, type Screen, goHome } from './screens';
 import { countdown } from './timer';
 import type { RoomConnection } from '../net/room';
 import {
-  MAX_PROMPT_WORDS, MOVE_SECONDS, wordCount, type RoomState,
+  MAX_PROMPT_WORDS, MOVE_SECONDS, isFinalRound, wordCount, type RoomState,
 } from '../shared/protocol';
 
 /**
@@ -25,6 +25,7 @@ export function moveScreen(
 
     const clock = countdown();
     const heading = el('h1', { class: 'creation-title' }, 'Your turn');
+    const stakes = el('p', { class: 'move-stakes' }, '');
     const sentence = el('p', { class: 'move-sentence' });
     const status = el('p', { class: 'lede' }, '');
 
@@ -117,7 +118,7 @@ export function moveScreen(
 
     root.append(
       el('main', { class: 'screen screen-move' },
-        heading, clock.root, weaponRow, sentence,
+        heading, stakes, clock.root, weaponRow, sentence,
         prompt,
         el('div', { class: 'tool-row' }, counter),
         send, status,
@@ -141,9 +142,17 @@ export function moveScreen(
       });
     }
 
+    /** Whether this is the round that counts double. */
+    function showStakes(state: RoomState): void {
+      const final = isFinalRound(state);
+      stakes.textContent = final ? 'Final round — this one counts double' : '';
+      stakes.hidden = !final;
+    }
+
     connection.on({
       onClosed: () => goHome(go),
       onState: (state: RoomState) => {
+        showStakes(state);
         if (left) return;
         const turn = state.turn;
         if (!turn || state.phase !== 'battle') { leave(); return; }
@@ -167,6 +176,7 @@ export function moveScreen(
 
     if (connection.state) {
       clock.setDeadline(connection.state.stepEndsAt, MOVE_SECONDS);
+      showStakes(connection.state);
     }
 
     return () => clock.stop();

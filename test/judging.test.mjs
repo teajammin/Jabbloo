@@ -155,10 +155,18 @@ for (let i = 0; i < 90; i++) {
   const ann = s.players.find((p) => p.id === ids[0]);
   const bo = s.players.find((p) => p.id === ids[1]);
 
-  check('damage given adds up', ann.damageDealt === 55, String(ann.damageDealt));
-  check('damage taken adds up', ann.damageTaken === 15, String(ann.damageTaken));
-  check('the other side mirrors it', bo.damageTaken === 55, String(bo.damageTaken));
-  check('the best hit is the hardest one', ann.best?.damage === 25, JSON.stringify(ann.best));
+  /*
+   * Scores were 20, 10 and 25, and the last round counts double: 20 + 10 + 50.
+   * The totals are what the results screen shows, so they include the
+   * multiplier rather than the raw scores — a player told they dealt 55 after
+   * seeing 50 land in one hit would rightly think the game was lying.
+   */
+  check('damage given adds up, with the last round doubled',
+    ann.damageDealt === 80, String(ann.damageDealt));
+  check('damage taken adds up the same way', ann.damageTaken === 20, String(ann.damageTaken));
+  check('the other side mirrors it', bo.damageTaken === 80, String(bo.damageTaken));
+  check('the best hit is the hardest one, as it landed',
+    ann.best?.damage === 50, JSON.stringify(ann.best));
   check('the best hit quotes what was written',
     ann.best?.prompt === 'the big one', ann.best?.prompt);
   check('health never goes below zero', s.players.every((p) => p.health >= 0),
@@ -198,8 +206,10 @@ for (let i = 0; i < 90; i++) {
     j.send(JSON.stringify({ type: 'submitScore', attackerId: ids[0], score: 10 + round }));
     j.send(JSON.stringify({ type: 'submitScore', attackerId: ids[1], score: 5 }));
     await wait(260);
+    // The third round is each fighter's last, and is worth double.
+    const expected = round === 2 ? (10 + round) * 2 : 10 + round;
     check(`round ${round + 1} accepts the judge's score`,
-      (state(host).turn?.damage?.[ids[0]] ?? 0) === 10 + round,
+      (state(host).turn?.damage?.[ids[0]] ?? 0) === expected,
       JSON.stringify(state(host).turn?.damage));
 
     host.send(JSON.stringify({ type: 'turnDone' }));
@@ -212,6 +222,41 @@ for (let i = 0; i < 90; i++) {
     JSON.stringify(rounds));
 
   for (const ws of [host, a, b, j]) ws.close();
+}
+
+// --- the last round counts double ------------------------------------------
+//
+// Three rounds that all count the same make the last one a formality: whoever
+// leads after two usually leads after three. Doubling the last one means a
+// fight is never over until it is over.
+{
+  const { host, a, b, ids } = await setup(false);
+  const damages = [];
+
+  for (let round = 0; round < 3; round++) {
+    a.send(JSON.stringify({ type: 'submitMove', weapon: 0, prompt: 'the same swing' }));
+    b.send(JSON.stringify({ type: 'submitMove', weapon: 0, prompt: 'the same swing' }));
+    await wait(220);
+    host.send(JSON.stringify({ type: 'turnPlayed' }));
+    await wait(200);
+    // The same score every round, so any difference in damage is the rule and
+    // not the judge changing its mind.
+    host.send(JSON.stringify({ type: 'submitScore', attackerId: ids[0], score: 10 }));
+    host.send(JSON.stringify({ type: 'submitScore', attackerId: ids[1], score: 10 }));
+    await wait(280);
+    damages.push(state(host).turn?.damage?.[ids[0]]);
+    host.send(JSON.stringify({ type: 'turnDone' }));
+    await wait(260);
+  }
+
+  check('the first two rounds score as given',
+    damages[0] === 10 && damages[1] === 10, JSON.stringify(damages));
+  check('the last one counts double', damages[2] === 20, JSON.stringify(damages));
+  check('and the totals include it',
+    state(host).players.find((p) => p.id === ids[0])?.damageDealt === 40,
+    String(state(host).players.find((p) => p.id === ids[0])?.damageDealt));
+
+  for (const ws of [host, a, b]) ws.close();
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

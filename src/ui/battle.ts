@@ -7,7 +7,7 @@ import { report } from '../errors';
 import { play } from '../audio';
 import type { RoomConnection } from '../net/room';
 import {
-  battlegrounds, judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
+  battlegrounds, isFinalRound, judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
 } from '../shared/protocol';
 
 /**
@@ -222,6 +222,13 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         const names = entering.map((e) => e.name);
         caption.textContent = `${names[0]} versus ${names[1]}`;
         await stage.proclaim('versus', 1.1);
+        if (disposed) return;
+      }
+
+      // A rule nobody is told about is a rule nobody plays to.
+      if (isFinalRound(state!)) {
+        caption.textContent = 'Final round — every hit counts double';
+        await stage.proclaim('final round', 1.3);
         if (disposed) return;
       }
 
