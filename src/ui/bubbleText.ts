@@ -56,6 +56,32 @@ export function titleHeight(ideal: number, min = 40): number {
   return Math.max(min, Math.min(ideal, Math.round(room * 0.62)));
 }
 
+const ALL_GLYPHS = [
+  ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)),
+  ...Object.values(ALIASES),
+];
+
+/**
+ * Pulls the whole alphabet into the browser's cache, once, at start-up.
+ *
+ * Every heading in the game is thirty-odd separate image files, and a word
+ * assembled from files that have not arrived appears a letter at a time, in
+ * whatever order the network returns them. Holding each word back until its
+ * own letters land fixes the order but not the wait — the first title on a
+ * cold load still crawls.
+ *
+ * Thirty small PNGs fetched while someone is reading the front page costs
+ * nothing and means no heading after it ever waits. Fire and forget: a failure
+ * here is not worth reporting, because the letter will simply be fetched again
+ * when something asks for it.
+ */
+export function warmGlyphs(basePath = '/letters'): void {
+  for (const name of ALL_GLYPHS) {
+    const img = new Image();
+    img.src = `${basePath}/${name}.png`;
+  }
+}
+
 /** Builds an element spelling `text` in the game's letters. */
 export function bubbleText(text: string, options: BubbleTextOptions = {}): HTMLElement {
   const { height = 90, jitter = 0, className, bounce = false, wave = false } = options;

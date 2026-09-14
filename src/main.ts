@@ -10,6 +10,7 @@ import { mount, setHome } from './ui/screens';
 import { mountOptions } from './ui/options';
 import { mountConnectionBanner } from './ui/connection';
 import { rememberedRoom } from './ui/resume';
+import { warmGlyphs } from './ui/bubbleText';
 import { mountBackdrop } from './ui/backdrop';
 import { watchForErrors } from './errors';
 import { loadSettings } from './settings';
@@ -78,6 +79,9 @@ mountOptions();
 // A dropped connection has to be visible wherever it happens, so this lives
 // on <body> alongside the options menu rather than inside any one screen.
 mountConnectionBanner();
+// The alphabet, fetched while the front page is being read, so no heading
+// after this one has to assemble itself a letter at a time.
+warmGlyphs();
 const go = mount(root);
 
 const params = new URLSearchParams(location.search);

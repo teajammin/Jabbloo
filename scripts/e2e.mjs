@@ -67,8 +67,12 @@ const evaluate = async (e) => {
 };
 
 await send('Page.enable'); await send('Runtime.enable');
+// A phone by default; `node scripts/e2e.mjs 1440 800` for a laptop, where the
+// toolbar becomes a wrapping column and the layout is a different one.
+const VW = Number(process.argv[2] ?? 390);
+const VH = Number(process.argv[3] ?? 844);
 await send('Emulation.setDeviceMetricsOverride',
-  { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  { width: VW, height: VH, deviceScaleFactor: VW < 700 ? 2 : 1, mobile: VW < 700 });
 
 // --- host opens the room, one more player joins by socket -----------------
 const host = await device('host');
@@ -119,7 +123,7 @@ const creation = await evaluate(`(() => {
 console.log('creation:', creation);
 
 const c = JSON.parse(creation);
-if (c.scrollH > c.inner + 1) note(`the creation screen scrolls: ${c.scrollH} > ${c.inner}`);
+if (c.scrollH > c.inner + 1) note(`the creation screen scrolls at ${VW}x${VH}: ${c.scrollH} > ${c.inner}`);
 else ok('the creation screen fits the phone');
 if (!c.stage) note('no canvas on the creation screen');
 else if (c.stage.w < 200) note(`the canvas is tiny: ${c.stage.w}x${c.stage.h}`);
@@ -159,6 +163,48 @@ const inked = await evaluate(`(() => {
   return on;
 })()`);
 inked > 50 ? ok(`a finger leaves a mark (${inked} pixels)`) : note(`drawing left nothing (${inked} pixels)`);
+
+// --- picking a shape must not move anything -------------------------------
+//
+// Selecting the rectangle or the ellipse reveals one extra control, and one
+// extra control is enough to change the height of the toolbar — which comes
+// out of the canvas beside it, and looks for all the world like the page
+// zooming.
+const shapeCheck = await evaluate(`(() => {
+  const read = () => {
+    const stage = document.querySelector('.draw-stage');
+    const b = stage.getBoundingClientRect();
+    const tb = document.querySelector('.toolbar').getBoundingClientRect();
+    return { w: Math.round(b.width), h: Math.round(b.height),
+      x: Math.round(b.x), y: Math.round(b.y),
+      transform: getComputedStyle(stage).transform,
+      toolbar: Math.round(tb.height), zoom: visualViewport ? visualViewport.scale : 1 };
+  };
+  const before = read();
+  const pick = (label) => {
+    const b = [...document.querySelectorAll('button')].find(
+      (x) => (x.getAttribute('aria-label') || x.title || '').toLowerCase() === label);
+    if (b) b.click();
+    return Boolean(b);
+  };
+  const found = pick('ellipse') || pick('circle');
+  const after = read();
+  return JSON.stringify({ found, before, after });
+})()`);
+const shape = JSON.parse(shapeCheck);
+if (!shape.found) note('could not find the ellipse tool to test');
+else {
+  const moved = ['w', 'h', 'x', 'y'].filter((k) => Math.abs(shape.before[k] - shape.after[k]) > 1);
+  moved.length === 0
+    ? ok('picking a shape leaves the canvas where it was')
+    : note(`picking a shape moved the canvas (${moved.map((k) => k + ' ' + shape.before[k] + '->' + shape.after[k]).join(', ')})`);
+  if (shape.before.transform !== shape.after.transform) {
+    note(`picking a shape changed the canvas transform (${shape.before.transform} -> ${shape.after.transform})`);
+  }
+  if (shape.before.toolbar !== shape.after.toolbar) {
+    note(`picking a shape changed the toolbar height (${shape.before.toolbar} -> ${shape.after.toolbar})`);
+  }
+}
 
 // A picture of the screen a player actually draws on.
 const shot = await send('Page.captureScreenshot', { format: 'png' });

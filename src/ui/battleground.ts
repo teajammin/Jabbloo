@@ -1,6 +1,7 @@
 import { el, type Screen, goHome } from './screens';
 import { countdown } from './timer';
 import { bubbleText, titleHeight } from './bubbleText';
+import { loadingBadge } from './loading';
 import { battleScreen } from './battle';
 import type { RoomConnection } from '../net/room';
 import {
@@ -148,8 +149,43 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
 
     if (connection.state) renderVotes(connection.state);
 
+    /*
+     * The four photographs, before the choice is offered.
+     *
+     * This is a picture round: asking someone to vote while the pictures are
+     * still arriving is asking them to vote on four grey rectangles, and the
+     * clock is already running. So the grid is held back until the
+     * battlegrounds can actually be told apart, with the badge in the corner
+     * saying why.
+     *
+     * A deadline on it regardless — a photograph that never arrives must not
+     * cost anyone their vote, and every card keeps its own colour underneath.
+     */
+    const badge = loadingBadge();
+    document.body.appendChild(badge.root);
+    grid.classList.add('is-loading');
+
+    let shown = false;
+    const reveal = (): void => {
+      if (shown) return;
+      shown = true;
+      grid.classList.remove('is-loading');
+      badge.done();
+    };
+
+    void Promise.all(battlegrounds.map((ground) => new Promise<void>((resolve) => {
+      const img = new Image();
+      img.addEventListener('load', () => resolve(), { once: true });
+      img.addEventListener('error', () => resolve(), { once: true });
+      img.src = ground.image;
+    }))).then(reveal);
+
+    const revealAnyway = window.setTimeout(reveal, 2500);
+
     return () => {
       clock.stop();
+      window.clearTimeout(revealAnyway);
+      reveal();
       if (shuffleTimer !== null) window.clearTimeout(shuffleTimer);
     };
   };

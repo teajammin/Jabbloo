@@ -1284,6 +1284,27 @@ input[type='text'] {
   padding: max(8px, env(safe-area-inset-top)) 10px
            max(8px, env(safe-area-inset-bottom)) 10px;
   overflow: hidden;
+  /*
+   * Pinned to the window, and it means that height.
+   *
+   * Two things were wrong with `height: 100dvh` here. A flex item will not
+   * shrink below its own content unless told it may — so the height was a
+   * suggestion the toolbar could overrule, and revealing one more control
+   * wrapped it onto a new row, grew the screen past the window, and grew the
+   * square canvas with it. Picking a shape looked like the page zooming in.
+   *
+   * And `dvh` is not reliably the height on offer; it was resolving 60px over
+   * the real viewport, which is the same thing that had the drawing tool
+   * hanging below the fold. Pinning the box removes the guess: `inset: 0` is
+   * the window, exactly, whatever the units say.
+   *
+   * Everything below this already knows how to give way, and the toolbar
+   * scrolls, which is what it is for.
+   */
+  position: fixed;
+  inset: 0;
+  height: auto;
+  min-height: 0;
 }
 
 /* The heading and the clock are chrome; the canvas is the work. */
@@ -1347,6 +1368,19 @@ input[type='text'] {
   height: auto;
   width: 100%;
   padding: 0;
+  /*
+   * And it may be smaller than the things inside it.
+   *
+   * A flex item refuses by default to shrink below its own content, so the
+   * toolbar decided the height of the whole tool: picking the rectangle or the
+   * ellipse reveals one more control, that control wrapped onto a new row, and
+   * the extra row pushed the section 63px taller. The canvas is square and
+   * follows that height, so it grew too — which on a laptop looks exactly like
+   * the page quietly zooming in every time you pick a shape.
+   *
+   * The toolbar already scrolls when it runs out of room. This lets it.
+   */
+  min-height: 0;
 }
 
 /*
@@ -2143,4 +2177,23 @@ body:has(.screen-draw) .help-open { display: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .loading-badge { transition: none; }
+}
+
+/*
+ * The choice, while its pictures are still arriving.
+ *
+ * Held rather than hidden: the cards keep their space, so nothing jumps when
+ * the photographs land and the clock beside them does not appear to move.
+ */
+.ground-grid.is-loading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ground-grid {
+  transition: opacity 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ground-grid { transition: none; }
 }
