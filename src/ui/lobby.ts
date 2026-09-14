@@ -5,7 +5,7 @@ import { creationScreen } from './creation';
 import {
   isDuel, startBlockedBecause, type Player, type RoomState,
 } from '../shared/protocol';
-import { teamBoard } from './teams';
+import { teamBoard, duelBoard } from './teams';
 import { joinRoomScreen } from './joinRoom';
 
 interface JoinDetails {
@@ -47,11 +47,18 @@ export function lobbyScreen(
      *
      * With two players there is one possible arrangement and the room makes it
      * at kick-off, so the board would be a puzzle with a single solution
-     * standing between two people and their game.
+     * standing between two people and their game. A duel gets the two of them
+     * facing each other instead — and the team-name boxes were showing right
+     * up until the second player arrived, asking the host to name two teams
+     * that were never going to exist.
+     *
+     * Decided from the capacity the host chose, which is known before the room
+     * answers, so both are laid out right the first time rather than corrected
+     * a moment later.
      */
-    // The capacity is known before the room answers, so the board can be laid
-    // out right the first time rather than corrected a moment later.
-    const board = isHost ? teamBoard(connection, capacity) : null;
+    const duel = capacity === 2;
+    const board = isHost && !duel ? teamBoard(connection, capacity) : null;
+    const versus = isHost && duel ? duelBoard() : null;
     const duelNote = el('p', { class: 'lede' }, '');
     const blocked = el('p', { class: 'help-note blocked' });
 
@@ -79,19 +86,20 @@ export function lobbyScreen(
         const target = state.capacity || capacity;
 
         // The host arranges on the board; phones just see who is here. A duel
-        // has nothing to arrange, so the board gives way to the roster and a
-        // line saying what is about to happen.
-        const duel = isDuel(state);
-        if (board) {
-          board.root.hidden = duel;
-          if (duel) renderRoster(state); else board.update(state);
+        // has nothing to arrange, so the two of them simply face each other.
+        const twoPlayers = duel || isDuel(state);
+        if (versus) {
+          versus.update(state);
+        } else if (board) {
+          board.root.hidden = twoPlayers;
+          if (twoPlayers) renderRoster(state); else board.update(state);
         } else {
           renderRoster(state);
         }
-        roster.hidden = Boolean(board) && !duel;
+        roster.hidden = Boolean(versus) || (Boolean(board) && !twoPlayers);
 
-        duelNote.textContent = duel && isHost
-          ? `${players[0]?.name ?? 'One'} against ${players[1]?.name ?? 'the other'} — no teams needed.`
+        duelNote.textContent = twoPlayers && isHost && players.length === 2
+          ? `${players[0]?.name} v ${players[1]?.name}`
           : '';
 
         status.textContent = isHost
@@ -122,7 +130,7 @@ export function lobbyScreen(
         if (/no game with that code/i.test(reason)) {
           window.setTimeout(() => {
             if (!handedOver) {
-              connection.close();
+              connection.leave();
               go(joinRoomScreen);
             }
           }, 2200);
@@ -221,13 +229,13 @@ export function lobbyScreen(
               el('div', { class: 'lobby-room' },
                 status,
                 duelNote,
-                ...(board ? [board.root, roster] : [roster]),
+                ...(versus ? [versus.root] : board ? [board.root, roster] : [roster]),
                 error,
                 el('div', { class: 'stack' },
                   blocked,
                   startButton,
                   button('Leave', () => {
-                    connection.close();
+                    connection.leave();
                     goHome(go);
                   }, 'ghost')),
               ),
@@ -242,7 +250,7 @@ export function lobbyScreen(
               // A player who mistyped the code, or arrived after the game
               // started, had no way out of this screen at all.
               button('Leave', () => {
-                connection.close();
+                connection.leave();
                 goHome(go);
               }, 'ghost'),
             ),
@@ -252,7 +260,7 @@ export function lobbyScreen(
     return () => {
       // Only closed when leaving the room outright; a handover to the next
       // screen keeps the same socket, and closing it would drop the player.
-      if (!handedOver) connection.close();
+      if (!handedOver) connection.leave();
     };
   };
 }

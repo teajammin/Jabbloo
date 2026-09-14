@@ -329,6 +329,15 @@ export type ClientMessage =
   | { type: 'join'; name: string; photo?: string }
   | { type: 'setRole'; playerId: string; role: Role }
   | { type: 'setTeamName'; team: 'teamA' | 'teamB'; name: string }
+  /**
+   * Leaving on purpose — the Leave button, or walking back out of the lobby.
+   *
+   * A closed socket cannot say whether its owner meant it, which is why the
+   * room waits [[GRACE_SECONDS]] before giving up on one. Someone who pressed
+   * Leave has already said so, and should not sit in the lobby as a ghost
+   * marked "reconnecting…" for the next twenty-five seconds.
+   */
+  | { type: 'leave' }
   | { type: 'start' }
   /**
    * A drawing for a slot, as a PNG data URL.

@@ -22,6 +22,7 @@ import {
   canStart,
   creators,
   drawBattleground,
+  GRACE_SECONDS,
   graceExpired,
   isDuel,
   stepsFor,
@@ -265,6 +266,9 @@ export default class Room implements Party.Server {
         break;
       case 'setTeamName':
         this.onSetTeamName(message.team, message.name, sender);
+        break;
+      case 'leave':
+        this.onLeave(sender);
         break;
       case 'start':
         this.beginGame(sender);
@@ -714,30 +718,67 @@ export default class Room implements Party.Server {
 
       let changed = false;
       for (const player of away) {
-        if (!graceExpired(player)) continue;
-
-        if (this.state.phase === 'lobby' && !player.isHost) {
-          // Nothing has been made yet, so the seat can go to somebody else.
-          this.state.players = this.state.players.filter((p) => p.id !== player.id);
-          changed = true;
-          continue;
-        }
-
-        if (this.isCreating() && !player.progress.done) {
-          // Nobody waits on an empty chair: their steps would expire one at a
-          // time and hold the room for minutes. What they made is saved, and
-          // the rest is filled in with stand-ins.
-          player.progress.done = true;
-          player.progress.endsAt = 0;
-          this.finishIfEveryoneIsDone();
-          changed = true;
-        }
+        if (graceExpired(player)) changed = this.giveUpOn(player) || changed;
       }
 
       // A fight does not wait either, once the grace is up.
       this.playBots();
       if (changed) this.broadcastState();
     }, 1000);
+  }
+
+  /**
+   * Stops waiting for one player, whatever the room is in the middle of.
+   *
+   * Reached two ways: the grace period running out, and the player saying
+   * outright that they are leaving. Both mean the same thing by the time they
+   * get here, so both take the same door — the difference between them is only
+   * how long it took to be sure.
+   *
+   * Answers whether anything actually changed, so a tick that did nothing does
+   * not broadcast.
+   */
+  private giveUpOn(player: Player): boolean {
+    if (this.state.phase === 'lobby') {
+      // Nothing has been made yet, so the seat can go to somebody else. The
+      // host's is the exception: it is what makes the room findable, and
+      // without it every join is answered "no game with that code".
+      if (player.isHost) return false;
+      this.state.players = this.state.players.filter((p) => p.id !== player.id);
+      return true;
+    }
+
+    if (this.isCreating() && !player.progress.done) {
+      // Nobody waits on an empty chair: their steps would expire one at a time
+      // and hold the room for minutes. What they made is saved, and the rest
+      // is filled in with stand-ins.
+      player.progress.done = true;
+      player.progress.endsAt = 0;
+      this.finishIfEveryoneIsDone();
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Someone has said they are going, rather than simply gone quiet.
+   *
+   * The grace period exists because a closed socket cannot tell the room
+   * whether its owner meant it. This one did, so there is nothing to wait for:
+   * leaving the lobby used to leave a ghost sitting in it marked
+   * "reconnecting…" for twenty-five seconds, with the room counting them
+   * towards the players it was waiting on.
+   */
+  private onLeave(sender: Party.Connection): void {
+    const player = this.state.players.find((p) => p.id === sender.id);
+    if (!player) return;
+
+    player.connected = false;
+    player.leftAt = Date.now() - GRACE_SECONDS * 1000;
+    this.giveUpOn(player);
+    this.playBots();
+    this.broadcastState();
   }
 
   private stopGraceClock(): void {

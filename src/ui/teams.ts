@@ -230,3 +230,60 @@ export function teamBoard(connection: RoomConnection, seats = 0): TeamBoard {
 
   return { root, update };
 }
+
+/**
+ * The same room, when there are only two people in it.
+ *
+ * A duel has nothing to arrange: one arrangement exists and the room makes it
+ * at kick-off. Offering team names and four zones for it was a puzzle with a
+ * single solution standing between two people and their game — so this shows
+ * the matchup instead of asking about it.
+ */
+export interface DuelBoard {
+  root: HTMLElement;
+  update: (state: RoomState) => void;
+}
+
+export function duelBoard(): DuelBoard {
+  const sides = [side('P1'), side('P2')];
+  const root = el('div', { class: 'duel-board' },
+    sides[0]!.root,
+    el('div', { class: 'duel-vs' }, 'v'),
+    sides[1]!.root,
+  );
+
+  function update(state: RoomState): void {
+    const players = state.players.filter((p) => !p.isHost);
+    sides.forEach((seat, i) => seat.show(players[i]));
+  }
+
+  return { root, update };
+}
+
+/** One corner: a floating icon, and which player it is. */
+function side(tag: string): { root: HTMLElement; show: (player?: Player) => void } {
+  const icon = el('div', { class: 'duel-icon empty' }, '?');
+  const root = el('div', { class: 'duel-side' }, icon, el('span', { class: 'duel-tag' }, tag));
+
+  function show(player?: Player): void {
+    icon.replaceChildren();
+    icon.className = `duel-icon${player ? '' : ' empty'}`;
+    icon.style.backgroundImage = '';
+
+    if (!player) {
+      icon.textContent = '?';
+      return;
+    }
+
+    // A photo fills the circle; without one, the initial does.
+    if (player.photo) {
+      icon.style.backgroundImage = `url(${JSON.stringify(player.photo)})`;
+      icon.style.backgroundSize = 'cover';
+      icon.style.backgroundPosition = 'center';
+    } else {
+      icon.textContent = player.name.slice(0, 1).toUpperCase();
+    }
+  }
+
+  return { root, show };
+}

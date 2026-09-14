@@ -565,9 +565,83 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
       check('the lobby shows the room code',
         (root.querySelector('[role="img"]')?.getAttribute('aria-label') ?? '').includes('ABCD'));
       check('and an address to join at', root.querySelector('.join-url') !== null);
+      // Two players have nothing to arrange, so nothing asks them to.
+      check('a duel is not asked to name its teams',
+        root.querySelector('.zone input') === null);
+      check('the two of them face each other instead',
+        root.querySelectorAll('.duel-icon').length === 2);
     });
     mounts('lobby (player)', ui.lobbyScreen('ABCD', 2, false, { name: 'Ann' }));
   } finally {
+    globalThis.WebSocket = realSocket;
+    window.WebSocket = realSocket;
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: realCrypto });
+  }
+}
+
+// --- leaving a room is not a connection problem ------------------------------
+//
+// Every exit from the lobby closes the socket, and a closing socket fires the
+// same event as one that drops. So leaving raised "Reconnecting…" over the
+// home screen a second later — where there is no connection, and nothing that
+// would ever clear it — and the notice sat there through the menus until the
+// next room opened a socket of its own. It read as random, because what
+// triggered it was two screens back.
+
+{
+  const realSocket = globalThis.WebSocket;
+
+  // Unlike DeadSocket above, this one reports its own closing, as a browser
+  // does. That event is the whole point: without it the bug cannot happen and
+  // the test cannot see it.
+  class TalkativeSocket {
+    static CONNECTING = 0; static OPEN = 1; static CLOSING = 2; static CLOSED = 3;
+    readyState = 0;
+    binaryType = 'blob';
+    #listeners = {};
+    constructor(url) { this.url = url; }
+    addEventListener(type, fn) { (this.#listeners[type] ??= []).push(fn); }
+    removeEventListener(type, fn) {
+      this.#listeners[type] = (this.#listeners[type] ?? []).filter((f) => f !== fn);
+    }
+    send() {}
+    close() {
+      this.readyState = 3;
+      for (const fn of this.#listeners['close'] ?? []) fn({ type: 'close', code: 1000 });
+    }
+  }
+  globalThis.WebSocket = TalkativeSocket;
+  window.WebSocket = TalkativeSocket;
+
+  const realCrypto = globalThis.crypto;
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    value: { getRandomValues: realCrypto.getRandomValues.bind(realCrypto) },
+  });
+
+  const teardownBanner = ui.mountConnectionBanner();
+  const banner = document.querySelector('.connection-banner');
+
+  // What leaving says about the connection, if anything.
+  const heard = [];
+  const listen = (e) => heard.push(e.detail?.open);
+  window.addEventListener(ui.CONNECTION_EVENT, listen);
+
+  try {
+    // Into a room and straight back out of it, the way someone flicking
+    // between the front page and the player count does.
+    mounts('lobby (left again)', ui.lobbyScreen('WXYZ', 2, true));
+
+    check('leaving says the connection is fine rather than lost',
+      heard.length > 0 && heard.every((open) => open === true),
+      JSON.stringify(heard));
+
+    await new Promise((r) => setTimeout(r, 1500));
+    check('so no reconnection notice is raised over the menus',
+      banner?.hidden === true);
+  } finally {
+    window.removeEventListener(ui.CONNECTION_EVENT, listen);
+    teardownBanner();
     globalThis.WebSocket = realSocket;
     window.WebSocket = realSocket;
     Object.defineProperty(globalThis, 'crypto', { configurable: true, value: realCrypto });

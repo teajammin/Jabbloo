@@ -173,8 +173,27 @@ for (const ws of [host, a, b]) ws.close();
   check('the phone can see the room too',
     seen(phone)?.players.length === 2, JSON.stringify(seen(phone)?.players.map((p) => p.name)));
 
-  // Nobody waits forever, though. Past the grace, a lobby seat is freed for
-  // somebody who is actually here.
+  // Pressing Leave is not the same as a socket going quiet: it says outright
+  // what a dropped connection can only be guessed at, so there is nothing to
+  // wait for. Without this the lobby held a ghost marked "reconnecting…" for
+  // twenty-five seconds and went on counting it towards the players it was
+  // waiting on.
+  phone.send(JSON.stringify({ type: 'leave' }));
+  await wait(600);
+  check('leaving on purpose frees the seat at once',
+    !seen(screen).players.some((p) => p.name === 'Ann'),
+    JSON.stringify(seen(screen).players.map((p) => p.name)));
+  phone.close();
+  await wait(300);
+
+  // And a seat that was never given up still waits out its grace.
+  phone = await socket('phone');
+  phone.send(JSON.stringify({ type: 'join', name: 'Ann' }));
+  await wait(400);
+  check('and rejoining after that is a plain join',
+    seen(screen).players.some((p) => p.name === 'Ann'),
+    JSON.stringify(seen(screen).players.map((p) => p.name)));
+
   phone.close();
   await wait(GRACE_SECONDS * 1000 + 2000);
   check('a seat left long enough is given up',

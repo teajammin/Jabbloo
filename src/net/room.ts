@@ -90,11 +90,15 @@ export interface RoomHandlers {
 }
 
 /**
- * Tells the interface whether the room is reachable.
+ * Tells the interface whether the room is reachable — or whether it matters.
  *
  * An event rather than a call into the UI: this module knows about sockets and
  * nothing about screens, and every screen in the game can hear it without
  * being handed a connection to watch.
+ *
+ * `open` is not quite "the socket is open": it is "there is nothing to worry
+ * about", which is also true when the game has closed the socket on purpose
+ * and is not expecting one.
  */
 function announce(open: boolean): void {
   window.dispatchEvent(new CustomEvent(CONNECTION_EVENT, { detail: { open } }));
@@ -106,6 +110,8 @@ export class RoomConnection {
   private readonly socket: PartySocket;
   private handlers: RoomHandlers = {};
   private readonly onWake: () => void;
+  /** Set when the game closes the socket itself, so it is not reported as a drop. */
+  private closing = false;
 
   /** Assigned by the server on welcome; identifies this client's player. */
   playerId: string | null = null;
@@ -167,6 +173,8 @@ export class RoomConnection {
     });
 
     this.socket.addEventListener('close', () => {
+      // A socket the game shut itself is not a connection problem.
+      if (this.closing) return;
       announce(false);
       this.handlers.onClose?.();
     });
@@ -221,7 +229,31 @@ export class RoomConnection {
     return true;
   }
 
+  /**
+   * Leaves the room for good, and says so.
+   *
+   * Without the message the room can only see a closed socket, which it cannot
+   * tell from a locked phone — so it holds the seat for twenty-five seconds
+   * and everyone else watches a ghost marked "reconnecting…" in a lobby that
+   * is still waiting on them.
+   */
+  leave(): void {
+    this.send({ type: 'leave' });
+    this.close();
+  }
+
+  /**
+   * Leaves the room on purpose.
+   *
+   * Said to be fine *before* the socket goes, so the banner's timer is
+   * cancelled rather than started. Leaving a lobby used to raise
+   * "Reconnecting…" over the home screen a second later — where there is no
+   * connection, and nothing that would ever clear it — so the notice sat there
+   * through the menus until the next room opened a socket of its own.
+   */
   close(): void {
+    this.closing = true;
+    announce(true);
     document.removeEventListener('visibilitychange', this.onWake);
     window.removeEventListener('pageshow', this.onWake);
     window.removeEventListener('online', this.onWake);
