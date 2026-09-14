@@ -2,6 +2,7 @@ import { el, button, goHome, type Screen } from './screens';
 import { bubbleText, titleHeight } from './bubbleText';
 import type { RoomConnection } from '../net/room';
 import { play } from '../audio';
+import { forgetRoom } from './resume';
 import {
   creators, holdingUpRematch, teamDamage, winningTeam, type Player, type RoomState,
 } from '../shared/protocol';
@@ -73,6 +74,9 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
     }
 
     const leave = () => {
+      // Going home on purpose: this device should not come back here on its
+      // next load the way a crashed tab should.
+      forgetRoom();
       connection.close();
       goHome(go);
     };

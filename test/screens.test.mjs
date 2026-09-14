@@ -604,6 +604,44 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   });
 }
 
+// --- a tab that reloads is still in the game ---------------------------------
+//
+// Tabs reload for reasons nobody chose: a renderer crash under memory
+// pressure, a phone reclaiming a page it had backgrounded. The room outlives
+// all of them on the server, and the device has to know it was in one.
+
+{
+  ui.forgetRoom();
+  check('a fresh tab remembers nothing', ui.rememberedRoom() === null);
+
+  ui.rememberRoom({ code: 'WXYZ', isHost: true, capacity: 4 });
+  const back = ui.rememberedRoom();
+  check('a host remembers its own room', back?.code === 'WXYZ' && back?.isHost === true,
+    JSON.stringify(back));
+  check('and how many it opened it for', back?.capacity === 4, String(back?.capacity));
+
+  ui.rememberRoom({ code: 'ABCD', isHost: false, capacity: 0, join: { name: 'Ann', photo: 'data:image/png;base64,' + 'x'.repeat(400_000) } });
+  const player = ui.rememberedRoom();
+  check('a player remembers the name their seat is under',
+    player?.join?.name === 'Ann', JSON.stringify(player?.join));
+  // The one field big enough to blow the storage quota, and the seat is
+  // reclaimed by name anyway.
+  check('but not their photo', player?.join?.photo === undefined);
+
+  ui.forgetRoom();
+  check('leaving on purpose is not remembered', ui.rememberedRoom() === null);
+
+  // Nothing a broken note can do should keep the game off the front page.
+  try {
+    sessionStorage.setItem('jabbloo:room', '{ not json');
+    check('a damaged note is ignored', ui.rememberedRoom() === null);
+    sessionStorage.setItem('jabbloo:room', '{"isHost":true}');
+    check('and one with no room in it', ui.rememberedRoom() === null);
+  } finally {
+    ui.forgetRoom();
+  }
+}
+
 // --- leaving a room is not a connection problem ------------------------------
 //
 // Every exit from the lobby closes the socket, and a closing socket fires the

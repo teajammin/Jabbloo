@@ -1,14 +1,16 @@
 import { bubbleText, titleHeight } from './bubbleText';
-import { el, button, goHome, type Screen } from './screens';
+import { el, button, goHome, type Navigate, type Screen } from './screens';
 import { RoomConnection } from '../net/room';
 import { creationScreen } from './creation';
+import { battlegroundScreen } from './battleground';
 import {
   isDuel, startBlockedBecause, type Player, type RoomState,
 } from '../shared/protocol';
 import { teamBoard, duelBoard } from './teams';
 import { joinRoomScreen } from './joinRoom';
+import { forgetRoom, rememberRoom } from './resume';
 
-interface JoinDetails {
+export interface JoinDetails {
   name: string;
   photo?: string | undefined;
 }
@@ -87,6 +89,9 @@ export function lobbyScreen(
     connection.on({
       onWelcome: () => {
         error.textContent = '';
+        // Noted only once the room has actually answered, so a typo'd code is
+        // never something this device tries to go back to.
+        rememberRoom({ code, isHost, capacity, ...(join ? { join } : {}) });
       },
       onState: (state) => {
         const players = state.players.filter((p) => !p.isHost);
@@ -122,15 +127,23 @@ export function lobbyScreen(
         startButton.disabled = reason !== null;
         blocked.textContent = reason ?? '';
 
-        if (state.phase === 'creating') {
-          // Hand the live connection over rather than reconnecting: a new
-          // socket would be a new player as far as the room is concerned.
-          handedOver = true;
-          go(creationScreen(connection, isHost));
-          return;
-        }
+        /*
+         * Wherever the room has got to, this device goes there.
+         *
+         * It used to hand over for creation and nothing else, which was enough
+         * while the only way in was through the lobby. It is not enough for a
+         * tab that reloaded halfway through a fight: it arrived, was told the
+         * room was in its third round, and sat on the lobby screen saying
+         * "Starting…" until somebody gave up.
+         *
+         * The live connection is handed over rather than reconnected — a new
+         * socket is a new player as far as the room is concerned.
+         */
         if (state.phase !== 'lobby') {
           status.textContent = 'Starting…';
+          handedOver = true;
+          void openPhase(state, connection, isHost, go);
+          return;
         }
       },
       onError: (reason) => {
@@ -138,6 +151,7 @@ export function lobbyScreen(
         // A code that names no game is not something to sit and wait on: the
         // player is put back where they can type it again.
         if (/no game with that code/i.test(reason)) {
+          forgetRoom();
           window.setTimeout(() => {
             if (!handedOver) {
               connection.leave();
@@ -247,6 +261,7 @@ export function lobbyScreen(
                   blocked,
                   startButton,
                   button('Leave', () => {
+                    forgetRoom();
                     connection.leave();
                     goHome(go);
                   }, 'ghost')),
@@ -262,6 +277,7 @@ export function lobbyScreen(
               // A player who mistyped the code, or arrived after the game
               // started, had no way out of this screen at all.
               button('Leave', () => {
+                forgetRoom();
                 connection.leave();
                 goHome(go);
               }, 'ghost'),
@@ -275,6 +291,39 @@ export function lobbyScreen(
       if (!handedOver) connection.leave();
     };
   };
+}
+
+/**
+ * Opens whichever screen matches the room's phase.
+ *
+ * Loaded on demand for the same reason the lobby always did: the battle screen
+ * pulls in Pixi, and a phone that only ever draws should not download a
+ * renderer to sit in a lobby.
+ */
+async function openPhase(
+  state: RoomState, connection: RoomConnection, isHost: boolean, go: Navigate,
+): Promise<void> {
+  switch (state.phase) {
+    case 'creating':
+    case 'ult':
+      go(creationScreen(connection, isHost));
+      return;
+    case 'battleground':
+      go(battlegroundScreen(connection, isHost));
+      return;
+    case 'battle': {
+      const { battleScreen } = await import('./battle');
+      go(battleScreen(connection, isHost));
+      return;
+    }
+    case 'results': {
+      const { resultsScreen } = await import('./results');
+      go(resultsScreen(connection, isHost));
+      return;
+    }
+    default:
+      return;
+  }
 }
 
 function playerRow(player: Player, isYou: boolean): HTMLLIElement {

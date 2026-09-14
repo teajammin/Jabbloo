@@ -9,6 +9,7 @@ import './styles.css';
 import { mount, setHome } from './ui/screens';
 import { mountOptions } from './ui/options';
 import { mountConnectionBanner } from './ui/connection';
+import { rememberedRoom } from './ui/resume';
 import { mountBackdrop } from './ui/backdrop';
 import { watchForErrors } from './errors';
 import { loadSettings } from './settings';
@@ -96,6 +97,30 @@ if (params.has('draw')) {
     },
   }));
 } else {
-  // A shared link (/?room=ABCD) drops straight into joining, code prefilled.
-  go(params.has('room') ? joinRoomScreen : launchScreen);
+  /*
+   * A tab that was already in a game goes back to it.
+   *
+   * Tabs reload for reasons nobody chose — a renderer crash under memory
+   * pressure, a phone reclaiming a backgrounded page — and the room outlives
+   * all of them on the server. Without this the device came back to the front
+   * page while its own game carried on without it on the big screen, which is
+   * what happened to a host whose laptop crashed mid-fight.
+   *
+   * A link with a room code in it wins: that is somebody being invited
+   * somewhere specific, and it should not be overruled by where they were.
+   */
+  const previous = params.has('room') ? null : rememberedRoom();
+
+  if (previous) {
+    const { lobbyScreen } = await import('./ui/lobby');
+    go(lobbyScreen(
+      previous.code,
+      previous.capacity,
+      previous.isHost,
+      ...(previous.join ? [previous.join] as const : []),
+    ));
+  } else {
+    // A shared link (/?room=ABCD) drops straight into joining, code prefilled.
+    go(params.has('room') ? joinRoomScreen : launchScreen);
+  }
 }
