@@ -106,7 +106,16 @@ These are the ONLY moves that exist. You may not invent others.
 5. Put shake_screen immediately after the moment of impact, never before.
 6. End on a settling move (recoil, idle, or a reaction on the enemy).
 7. Show consequences. A big hit should be followed by knockdown or dizzy on the enemy.
-8. Anything fired MUST cross the gap. If the weapon is a gun, rifle, pistol,
+8. RANGE IS THE POINT OF A RANGED ATTACK. A shot, a throw, a beam or anything
+   else that travels is made from where the attacker is standing. Do NOT use
+   move_to, dash or step toward the enemy first, and do not follow the shot in.
+   The gap is what makes it read as shooting rather than hitting: an attacker
+   who walks over and then fires point blank has thrown away the whole move.
+   Closing the distance is for melee.
+9. A throw sends the weapon all the way to the enemy and leaves it there.
+   Only set returnAfter when the player actually describes it coming back —
+   a boomerang, a yo-yo, a rope, "and it flies back to my hand".
+10. Anything fired MUST cross the gap. If the weapon is a gun, rifle, pistol,
    blaster, bow, crossbow, cannon, slingshot, wand, staff or anything else that
    shoots — OR the player's own words say shoot, fire, blast, snipe, spray, pew
    or aim — the move needs a projectile or a beam travelling from the attacker
@@ -130,7 +139,11 @@ magic, anime moves, memes and physical impossibilities — that is the fun.
                                     then recoil — never a swing
 - "empty the clip into them"     -> three projectile {kind: bullet} in a row
 - "fire an arrow at their knee"  -> projectile {kind: arrow, arc: 30}
-- "fart in their direction"      -> shockwave {kind: stink, intensity: 7}
+- "fart in their direction"      -> shockwave {kind: stink, intensity: 7},
+                                    from where you stand, then dizzy on enemy
+- "fart on them"                 -> shockwave {kind: stink} — never a punch
+- "throw my sword at them"       -> throw (no returnAfter: it stays there)
+- "throw it and catch it back"   -> throw {returnAfter: true}
 - "kick up dust and vanish"      -> shockwave {kind: dust} then teleport
 - "throw poop at them"           -> projectile {kind: poop, arc: 120}
 - "drop a bomb on their head"    -> summon {kind: bomb, size: 220}

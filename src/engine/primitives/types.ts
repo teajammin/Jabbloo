@@ -52,6 +52,14 @@ export interface SlamParams extends BaseParams {
 
 export interface ThrowParams extends BaseParams {
   target?: 'enemy';
+  /**
+   * Comes back to the hand instead of staying where it landed.
+   *
+   * Off unless asked for. A thrown thing that flew to the opponent and then
+   * drifted back on its own read as a mistake in the animation rather than a
+   * boomerang — so the default is what throwing actually looks like, and the
+   * return is for the players who say they want one.
+   */
   returnAfter?: boolean;
 }
 

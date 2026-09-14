@@ -98,10 +98,19 @@ export function slam(ctx: PrimitiveContext, params: SlamParams = {}) {
   return tl;
 }
 
-/** Hurls the weapon at the opponent, optionally boomeranging back. */
+/**
+ * Hurls the weapon at the opponent, where it stays.
+ *
+ * It used to come back by default, on the reasoning that a fighter who threw
+ * their only weapon should not be left empty-handed. What that actually looked
+ * like was every thrown thing drifting home again — a boomerang whether it was
+ * one or not — so the flight read as a mistake rather than a throw. The
+ * weapon is restored to the hand invisibly either way, ready for the next
+ * move; it simply is not dragged back through the air to get there.
+ */
 export function throw_(ctx: PrimitiveContext, params: ThrowParams = {}) {
   const seconds = duration(params.duration, 1);
-  const returnAfter = params.returnAfter !== false; // keeps the fighter armed by default
+  const returnAfter = params.returnAfter === true;
   const dir = directionToEnemy(ctx);
   const weapon = ctx.actor.weapon;
 
@@ -133,6 +142,11 @@ export function throw_(ctx: PrimitiveContext, params: ThrowParams = {}) {
       duration: seconds * 0.5,
       ease: 'power1.in',
     });
+  } else {
+    // Left where it landed, then faded out: the weapon has to be put back in
+    // the hand for the next move, and sliding it home in plain sight is the
+    // boomerang this is meant to stop being. The next reveal turns it back up.
+    tl.to(weapon, { alpha: 0, duration: Math.min(0.32, seconds * 0.3), ease: 'power2.in' });
   }
 
   tl.call(() => ctx.actor.reattachWeapon());

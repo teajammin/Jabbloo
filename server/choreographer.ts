@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, buildUserMessage, type FightContext } from './prompt';
+import { keepRangedAtRange } from './distance';
 import { clientFor, type AiConfig } from './ai';
 
 /**
@@ -85,7 +86,8 @@ async function callModel(
 
   const parsed = extractJson(textOf(message));
   if (parsed === null) throw new Error('no JSON in response');
-  return parsed;
+  // Told not to walk in before shooting, and it walks in anyway. See the file.
+  return keepRangedAtRange(parsed);
 }
 
 export async function choreograph(
