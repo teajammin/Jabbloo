@@ -16,7 +16,19 @@ import type {
  * player ideas inside a closed, safe vocabulary.
  */
 
-const PROJECTILES = ['fire', 'sun', 'star', 'ice', 'heart', 'rock'] as const;
+/*
+ * Everything that can be thrown or fired.
+ *
+ * A wide vocabulary here is what keeps an unbounded set of player ideas inside
+ * a closed set of moves: "shoot an arrow", "fling a banana", "spit fire" and
+ * "throw the sun" are one primitive with a different kind, rather than four
+ * moves nobody wrote.
+ */
+const PROJECTILES = [
+  'fire', 'sun', 'star', 'ice', 'heart', 'rock',
+  'bullet', 'arrow', 'pebble', 'splash', 'bolt', 'banana',
+  'poop', 'coin', 'snowflake', 'leaf', 'slime', 'kiss', 'tooth', 'note',
+] as const;
 type ProjectileKind = (typeof PROJECTILES)[number];
 
 /** Lobs something at the opponent. */
@@ -131,6 +143,13 @@ const SHOCKWAVES: Record<string, EffectKind> = {
   sound: 'soundwave',
   water: 'wave',
   ring: 'shockring',
+  wind: 'wind',
+  dust: 'dust',
+  smoke: 'smoke',
+  stink: 'stink',
+  rain: 'rain',
+  tornado: 'tornado',
+  confetti: 'confetti',
 };
 
 /** An expanding wave that travels outward — shouting, singing, a tsunami. */
@@ -185,7 +204,11 @@ export function shockwave(ctx: PrimitiveContext, params: ShockwaveParams = {}) {
   return tl;
 }
 
-const SUMMONS = ['drone', 'meteor', 'anvil', 'piano'] as const;
+/** Things that arrive from off screen, usually from directly above. */
+const SUMMONS = [
+  'drone', 'meteor', 'anvil', 'piano',
+  'bomb', 'safe', 'cheese', 'fish', 'fist', 'boot', 'pan', 'shield', 'clock',
+] as const;
 
 /** Drops something heavy on the opponent from off-screen. */
 export function summon(ctx: PrimitiveContext, params: SummonParams = {}) {

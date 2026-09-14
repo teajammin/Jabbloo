@@ -71,10 +71,17 @@ These are the ONLY moves that exist. You may not invent others.
 - taunt        {"style": "twerk"|"dance"|"point"|"bow", "duration": s}
 
 ### Ranged and summoned
-- projectile   {"kind": "fire"|"sun"|"star"|"ice"|"heart"|"rock", "arc": px, "size": px, "duration": s}
+- projectile   {"kind": <thrown>, "arc": px, "size": px, "duration": s}
+    <thrown>: fire | sun | star | ice | heart | rock | bullet | arrow | pebble
+              | splash | bolt | banana | poop | coin | snowflake | leaf | slime
+              | kiss | tooth | note
 - beam         {"kind": "energy"|"fire"|"ice"|"rainbow", "chargeDuration": s, "thickness": px, "duration": s}
-- shockwave    {"kind": "sound"|"water"|"ring", "intensity": 1-10, "duration": s}
-- summon       {"kind": "drone"|"meteor"|"anvil"|"piano", "size": px, "duration": s}
+- shockwave    {"kind": <spreading>, "intensity": 1-10, "duration": s}
+    <spreading>: sound | water | ring | wind | dust | smoke | stink | rain
+                 | tornado | confetti
+- summon       {"kind": <dropped>, "size": px, "duration": s}
+    <dropped>: drone | meteor | anvil | piano | bomb | safe | cheese | fish
+               | fist | boot | pan | shield | clock
 
 ### Transformations and reactions
 - inhale       {"duration": s}   (sucks the opponent in, Kirby-style, then spits them out)
@@ -90,7 +97,10 @@ These are the ONLY moves that exist. You may not invent others.
 ## Rules
 
 1. Every step needs "params" with an explicit "duration". Never omit them.
-2. Total duration across all steps MUST be 7 seconds or less. Aim for 4-6.
+2. Total duration across all steps MUST be 11 seconds or less. Aim for 7-9:
+   this is the payoff for the fifty words a player spent a minute writing, and
+   a move that is over before the room looks up wastes it. Give each step room
+   to be seen — a swing is 0.8s, not 0.3s — and use four to seven steps.
 3. Use 3 to 6 steps. Fewer reads as thin, more gets rushed.
 4. Every duration is between 0.1 and 3 seconds.
 5. Put shake_screen immediately after the moment of impact, never before.
@@ -107,6 +117,15 @@ magic, anime moves, memes and physical impossibilities — that is the fun.
 - "shoot fire"                   -> projectile {kind: fire} or beam {kind: fire}
 - "call in a tsunami"            -> shockwave {kind: water, intensity: 9}
 - "sing so loud they fall over"  -> shockwave {kind: sound} then knockdown on enemy
+- "shoot them"                   -> projectile {kind: bullet, arc: 0, size: 90}
+- "fire an arrow at their knee"  -> projectile {kind: arrow, arc: 30}
+- "fart in their direction"      -> shockwave {kind: stink, intensity: 7}
+- "kick up dust and vanish"      -> shockwave {kind: dust} then teleport
+- "throw poop at them"           -> projectile {kind: poop, arc: 120}
+- "drop a bomb on their head"    -> summon {kind: bomb, size: 220}
+- "slap them with a fish"        -> summon {kind: fish} or swing
+- "summon a tornado"             -> shockwave {kind: tornado, intensity: 9}
+- "blow them away"               -> shockwave {kind: wind, intensity: 8}
 - "call a drone strike"          -> summon {kind: drone} then shake_screen
 - "drop an anvil on them"        -> summon {kind: anvil}
 - "twerk on them"                -> taunt {style: twerk}, then a real attack

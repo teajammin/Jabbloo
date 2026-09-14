@@ -12,14 +12,19 @@ import { Assets, Container, Sprite, Texture } from 'pixi.js';
 export const EFFECT_KINDS = [
   // Projectiles
   'fire', 'sun', 'star', 'ice', 'heart', 'rock',
+  'bullet', 'arrow', 'pebble', 'splash', 'bolt', 'banana',
   // Beams
   'beam', 'charge',
-  // Shockwaves
+  // Shockwaves and weather
   'soundwave', 'shockring', 'wave',
-  // Summons
+  'wind', 'dust', 'smoke', 'stink', 'poop', 'rain', 'tornado', 'snowflake', 'leaf',
+  // Summons: things that arrive from off screen
   'drone', 'meteor', 'anvil', 'piano',
-  // Impacts and accents
+  'bomb', 'safe', 'cheese', 'fish', 'fist', 'boot', 'pan', 'shield', 'clock', 'coin',
+  // Impacts and accents: what a hit leaves behind
   'impact', 'sparkle', 'dizzy', 'whoosh',
+  'stars', 'crack', 'slash', 'bubble', 'note', 'hearts',
+  'confused', 'alert', 'sweat', 'kiss', 'slime', 'tooth', 'confetti',
 ] as const;
 
 export type EffectKind = (typeof EFFECT_KINDS)[number];

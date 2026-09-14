@@ -10,7 +10,27 @@ import type { PrimitiveContext, Step } from './primitives';
  */
 
 /** The brief's hard ceiling: no move may take longer than this. */
-export const MAX_CHOREOGRAPHY_SECONDS = 7;
+/**
+ * How long one exchange may take.
+ *
+ * Raised from seven: at seven a move landed before the room had looked up, and
+ * everything a player wrote was over in a blink. The animation is the payoff
+ * for the fifty words they spent a minute on, and it should last long enough
+ * to be watched.
+ */
+export const MAX_CHOREOGRAPHY_SECONDS = 11;
+
+/**
+ * How long an exchange should last if the choreography does not say otherwise.
+ *
+ * Models write short: asked for seven to nine seconds they return four, every
+ * time. Rather than argue with the prompt, playback stretches a short
+ * choreography toward this.
+ */
+export const TARGET_SECONDS = 7.5;
+
+/** The slowest anything is played, so a brief move does not become a dirge. */
+const SLOWEST = 0.62;
 
 /** Beyond this, a choreography is padding rather than choreography. */
 export const MAX_STEPS = 12;
@@ -139,10 +159,27 @@ export function playChoreography(
     master.add(createStep(ctx, step));
   });
 
+  /*
+   * Fit the exchange to the window it deserves.
+   *
+   * Two directions. A choreography longer than the budget is sped up to fit,
+   * because truncating it would cut the payoff off mid-swing. A very short one
+   * is slowed down toward the target, because the model reliably writes
+   * four-second moves and four seconds is over before a room has looked up —
+   * this is the reward for the fifty words a player spent a minute on.
+   *
+   * The slow-down is capped: a one-second flick stretched to eight is not
+   * dramatic, it is sluggish.
+   */
   const requestedSeconds = master.duration();
   const compressed = requestedSeconds > maxSeconds;
-  if (compressed && requestedSeconds > 0) {
-    master.timeScale(requestedSeconds / maxSeconds);
+
+  if (requestedSeconds > 0) {
+    const target = compressed
+      ? maxSeconds
+      : Math.min(maxSeconds, Math.max(requestedSeconds, TARGET_SECONDS));
+    const scale = requestedSeconds / target;
+    master.timeScale(Math.max(SLOWEST, scale));
   }
 
   let settle: () => void = () => {};
