@@ -4,7 +4,7 @@ import { RoomConnection } from '../net/room';
 import { creationScreen } from './creation';
 import { battlegroundScreen } from './battleground';
 import {
-  isDuel, startBlockedBecause, type Player, type RoomState,
+  displayName, isDuel, startBlockedBecause, type Player, type RoomState,
 } from '../shared/protocol';
 import { teamBoard, duelBoard } from './teams';
 import { joinRoomScreen } from './joinRoom';
@@ -333,7 +333,7 @@ function playerRow(player: Player, isYou: boolean): HTMLLIElement {
 
   const row = el('li', { class: `player${player.connected ? '' : ' offline'}` },
     avatar,
-    el('span', { class: 'player-name' }, player.name),
+    el('span', { class: 'player-name' }, displayName(player)),
   );
   if (isYou) row.appendChild(el('span', { class: 'you' }, 'you'));
   if (!player.connected) row.appendChild(el('span', { class: 'you' }, 'reconnecting…'));

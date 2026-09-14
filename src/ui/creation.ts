@@ -4,7 +4,7 @@ import { drawScreen } from './drawScreen';
 import { battlegroundScreen } from './battleground';
 import type { RoomConnection } from '../net/room';
 import {
-  creators, graceExpired, stepFor, stepsFor, stillWorking,
+  creators, displayName, graceExpired, stepFor, stepsFor, stillWorking,
   type Player, type RoomState,
 } from '../shared/protocol';
 
@@ -162,7 +162,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     /** What one player is up to, in the fewest words that say it. */
     function describeProgress(player: Player, state: RoomState): string {
       if (!player.connected) {
-        return graceExpired(player) ? 'gone — a bot will play' : 'reconnecting…';
+        return graceExpired(player) ? 'away' : 'reconnecting…';
       }
       if (player.progress.done) return 'finished';
 
@@ -177,7 +177,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       for (const player of creators(state)) {
         const row = el('li', { class: `player${player.progress.done ? ' is-ready' : ''}` },
           el('span', { class: 'avatar placeholder' }, player.name.slice(0, 1).toUpperCase()),
-          el('span', { class: 'player-name' }, player.name),
+          el('span', { class: 'player-name' }, displayName(player)),
           // Saying a player has gone matters more than saying they are busy:
           // it explains why a bot is about to play their turns.
           el('span', { class: 'you' }, describeProgress(player, state)),

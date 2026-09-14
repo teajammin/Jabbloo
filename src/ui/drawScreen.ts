@@ -853,10 +853,16 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       ));
     }
 
+    // Over the canvas, not the window. Pinned to the screen they ended up in
+    // the empty margin beside a square canvas on a wide monitor, a long way
+    // from the thing they zoom.
+    area.appendChild(
+      el('div', { class: 'zoom-controls' }, zoomInButton, zoomOutButton, zoomFitButton),
+    );
+
     shell.append(
       el('p', { class: 'lede draw-title' }, options.title ?? 'Draw your character'),
       area,
-      el('div', { class: 'zoom-controls' }, zoomInButton, zoomOutButton, zoomFitButton),
         el('div', { class: 'toolbar' },
           toolRow,
           sizeRow,

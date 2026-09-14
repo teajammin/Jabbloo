@@ -520,6 +520,18 @@ export function holdingUpRematch(state: RoomState): Player[] {
   );
 }
 
+/**
+ * A player's name as the room should see it.
+ *
+ * Somebody whose phone has been gone longer than the grace period is being
+ * played by a bot, and that is worth knowing at a glance — the room otherwise
+ * spends the round wondering why they are attacking like that. A tag on the
+ * name says it everywhere at once, in the same words.
+ */
+export function displayName(player: Player, now = Date.now()): string {
+  return graceExpired(player, now) ? `${player.name} (BOT)` : player.name;
+}
+
 export function isDuel(state: RoomState): boolean {
   return state.players.filter((p) => !p.isHost).length === 2;
 }

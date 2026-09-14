@@ -1,6 +1,6 @@
 import { el } from './screens';
 import type { RoomConnection } from '../net/room';
-import type { Player, Role, RoomState } from '../shared/protocol';
+import { displayName, type Player, type Role, type RoomState } from '../shared/protocol';
 
 /**
  * The host's team arrangement board.
@@ -138,7 +138,7 @@ export function teamBoard(connection: RoomConnection, seats = 0): TeamBoard {
 
     const node = el('li', { class: `card${player.connected ? '' : ' offline'}` },
       avatar,
-      el('span', { class: 'card-name' }, player.name),
+      el('span', { class: 'card-name' }, displayName(player)),
     );
 
     node.dataset['id'] = player.id;
@@ -271,7 +271,7 @@ function side(): { root: HTMLElement; show: (player?: Player) => void } {
     root.hidden = !player;
     if (!player) return;
 
-    name.textContent = player.name;
+    name.textContent = displayName(player);
 
     // Their own photo if they brought one. Otherwise the plain figure, which
     // is a person rather than a placeholder — nobody is waiting on it.

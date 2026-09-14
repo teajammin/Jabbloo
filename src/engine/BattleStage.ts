@@ -289,8 +289,19 @@ export class BattleStage {
     });
     const room = this.width * 0.84;
     if (letters.width > room) letters.scale.set(room / letters.width);
-    letters.x = this.width / 2 - letters.width / 2;
-    letters.y = this.height / 2 - letters.height / 2;
+
+    /*
+     * Centred on the band by its own measured bounds.
+     *
+     * Subtracting half the height assumes the word's box starts at its own
+     * origin, and a line of hand-cut letters does not: the tallest glyph sets
+     * the box, the shorter ones hang inside it, and the whole thing sat high
+     * of the band it was supposed to be lying on. Measuring says where the
+     * ink actually is.
+     */
+    const ink = letters.getLocalBounds();
+    letters.x = this.width / 2 - (ink.x + ink.width / 2) * letters.scale.x;
+    letters.y = this.height / 2 - (ink.y + ink.height / 2) * letters.scale.y;
     letters.alpha = 0;
     this.overlay.addChild(letters);
 

@@ -88,8 +88,23 @@ html, body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
-  touch-action: manipulation;
   overscroll-behavior: none;
+}
+
+/*
+ * Every element, not just the page.
+ *
+ * `touch-action` does not inherit. Setting it on html and body governed taps
+ * that landed on the page itself and nothing else: every button, card and
+ * panel kept the default, so a double tap on any of them still zoomed the
+ * whole interface — and once zoomed in on a canvas that takes its own
+ * gestures, there was no pinch left to get back out with.
+ *
+ * `manipulation` keeps scrolling and pinch and drops only the double-tap
+ * gesture, which is the one nobody here means to use.
+ */
+*, *::before, *::after {
+  touch-action: manipulation;
 }
 
 input, textarea, [contenteditable] {
@@ -274,6 +289,12 @@ body {
 }
 
 [data-reduce-motion] .bubble-text.is-bouncing img { animation: none; }
+
+/*
+ * A word still loading is invisible, not absent: it holds its place so nothing
+ * below it jumps when the letters arrive.
+ */
+.bubble-text.is-loading { visibility: hidden; }
 
 /* Long words must shrink rather than overflow a phone. */
 @media (max-width: 560px) {
@@ -730,7 +751,15 @@ input[type='text'] {
 
 .screen-draw {
   position: relative;
-  /* Fills the viewport so the canvas can claim whatever the toolbar leaves. */
+  /*
+   * Fills the viewport so the canvas can claim whatever the toolbar leaves.
+   *
+   * `dvh` is the honest unit here and still not always the visible height: a
+   * window with a horizontal scrollbar, or a browser that reports one viewport
+   * and lays out another, left the screen taller than the room it had and the
+   * bottom of the canvas below the fold. The non-embedded tool is pinned to
+   * the viewport instead, further down, which cannot disagree with itself.
+   */
   height: 100dvh;
   justify-content: flex-start;
   gap: 8px;
@@ -986,8 +1015,8 @@ input[type='text'] {
  */
 .zoom-controls {
   position: absolute;
-  right: 14px;
-  bottom: 100px;
+  right: 12px;
+  bottom: 12px;
   z-index: 3;
   display: flex;
   flex-direction: column;
@@ -1018,8 +1047,28 @@ input[type='text'] {
   .screen-draw {
     flex-direction: row;
     align-items: stretch;
-    gap: 20px;
-    padding: 20px;
+    /* Every pixel of padding is a pixel off a square canvas that is already
+       limited by the height of a laptop window. */
+    padding: 12px;
+    /* The toolbar and the canvas are centred as one group. Left alone, the
+       canvas centred itself in whatever the toolbar did not take, which put it
+       right of the middle of the screen with a field of empty paper beside it. */
+    justify-content: center;
+    gap: 16px;
+  }
+
+  /*
+   * The canvas is square, so on a wide window its size is decided entirely by
+   * the height. Saying so makes the drawing area exactly as wide as it is
+   * tall, which is what lets the pair of them be centred together instead of
+   * the canvas floating inside a much wider box.
+   */
+  .draw-area {
+    flex: 0 1 auto;
+    height: 100%;
+    aspect-ratio: 1;
+    width: auto;
+    max-width: 100%;
   }
 
   .draw-title {
@@ -1255,7 +1304,27 @@ input[type='text'] {
 }
 
 /* Embedded, it fills its slot rather than claiming the viewport. */
+/*
+ * The tool on its own fills the window exactly.
+ *
+ * Pinned rather than sized in viewport units, which can disagree with the
+ * space actually available and did: the screen came out taller than the window
+ * and the bottom of the canvas sat below the fold, reachable only by scrolling
+ * a screen that was not meant to scroll.
+ *
+ * Embedded in creation it is a panel inside another screen, and takes the
+ * space that screen gives it — hence the exception, and it comes second so it
+ * wins.
+ */
+.screen-draw:not(.is-embedded) {
+  position: fixed;
+  inset: 0;
+  height: auto;
+  width: auto;
+}
+
 .screen-draw.is-embedded {
+  position: relative;
   height: 100%;
   width: 100%;
   padding: 0;
@@ -1345,9 +1414,18 @@ input[type='text'] {
   flex: 0 1 auto;
   min-height: 0;
   align-content: center;
+  justify-items: stretch;
 }
 
 .ground-card {
+  /*
+   * Fills its column. A card is a <button>, and a button does not stretch to
+   * its grid cell the way a div does — `normal` resolves to `start` for it, so
+   * each card shrank to the width of its own label and the row came out as
+   * four different sizes with the photographs squeezed to match. The only
+   * thing that had been holding them open was a minimum height on the swatch.
+   */
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: stretch;

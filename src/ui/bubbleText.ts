@@ -51,6 +51,7 @@ export function titleHeight(ideal: number, min = 40): number {
 export function bubbleText(text: string, options: BubbleTextOptions = {}): HTMLElement {
   const { height = 90, jitter = 0, className, bounce = false } = options;
 
+  const glyphs: HTMLImageElement[] = [];
   const wrap = document.createElement('span');
   wrap.className = ['bubble-text', className, bounce ? 'is-bouncing' : '']
     .filter(Boolean).join(' ');
@@ -90,6 +91,34 @@ export function bubbleText(text: string, options: BubbleTextOptions = {}): HTMLE
       img.style.animationDuration = `${(2.1 + (index % 3) * 0.27).toFixed(2)}s`;
     }
     wrap.appendChild(img);
+    glyphs.push(img);
+  }
+
+  /*
+   * The word arrives whole or not at all.
+   *
+   * Each letter is its own file with no size until it has loaded, so a title
+   * assembled straight into the page grew a letter at a time, reflowing on
+   * every arrival — and because they finish in whatever order the network
+   * hands them back, the word appeared to spell itself out of sequence.
+   *
+   * Held invisible rather than absent, so it still takes its space and nothing
+   * below it jumps when the word appears. A letter that never loads must not
+   * hide the heading for good, so there is a deadline on it.
+   */
+  if (glyphs.length > 0) {
+    wrap.classList.add('is-loading');
+    const reveal = () => wrap.classList.remove('is-loading');
+    const ready = glyphs.map((img) => (img.complete
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => resolve(), { once: true });
+        })));
+
+    void Promise.all(ready).then(reveal);
+    // Whatever happens, the word is on screen inside a second.
+    setTimeout(reveal, 1000);
   }
 
   return wrap;

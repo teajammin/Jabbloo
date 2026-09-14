@@ -48,6 +48,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
      * same two people again every round turns a reveal into a delay.
      */
     const introduced = new Set<string>();
+    /** The final-round warning is worth one interruption, not one per round. */
+    let saidFinalRound = false;
     /**
      * In-flight stage build.
      *
@@ -200,7 +202,17 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         fighter.setPosition(stage.offstageX(side), stage.height * engine.GROUND_Y);
       }
 
-      for (const { fighter, side, name, id } of entering) {
+      /*
+       * The opening: one fighter, the word between them, the other, the call.
+       *
+       * Only for a pair the room has not seen before. In a one-a-side game
+       * that is round one and nothing after it — announcing the same two
+       * people against each other before every exchange turns the moment into
+       * furniture, and it was doing exactly that.
+       */
+      const opening = entering.some(({ id }) => !introduced.has(id));
+
+      for (const [index, { fighter, side, name, id }] of entering.entries()) {
         if (disposed) return;
         if (!introduced.has(id)) {
           introduced.add(id);
@@ -209,14 +221,24 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           if (disposed) return;
         }
         await stage.enterStage(fighter, side);
+        if (disposed) return;
+
+        // Between the first and the second, the word that sets them against
+        // each other.
+        if (opening && index === 0 && entering.length > 1) {
+          caption.textContent = `${name} versus…`;
+          await stage.proclaim('versus', 0.9);
+          if (disposed) return;
+        }
       }
 
       if (disposed) return;
 
-      // The matchup and the call to fight used to be announced here, as the
-      // two of them walked on — which is before anybody has chosen a move, so
-      // "FIGHT" went up and then the room spent fifty seconds writing on their
-      // phones. Both belong to the exchange itself, and are made there.
+      if (opening) {
+        caption.textContent = 'Fight!';
+        await stage.proclaim('fight', 0.9);
+        if (disposed) return;
+      }
       if (!disposed) stage.shake(7, 0.4);
     }
 
@@ -243,28 +265,16 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       const order = turn.first === b ? [b, a] : [a, b];
 
       /*
-       * The moment the room has been waiting through the writing for.
-       *
-       * Both names, then the call — said here rather than at the entrance,
-       * where it landed before anyone had chosen a move and left "FIGHT"
-       * hanging over a room full of people typing.
+       * A rule nobody is told about is a rule nobody plays to — but it only
+       * needs saying once. The fighters do not change between the rounds of a
+       * duel, so unlike the opening this cannot ride on an entrance.
        */
-      const matchup = turn.fighters.map(
-        (id) => artFor(id)?.character?.name || playerFor(id)?.name || '—',
-      );
-      caption.textContent = `${matchup[0]} versus ${matchup[1]}`;
-      await stage.proclaim(`${matchup[0]} versus ${matchup[1]}`, 1.2);
-      if (disposed) return;
-
-      // A rule nobody is told about is a rule nobody plays to.
-      if (isFinalRound(state!)) {
+      if (isFinalRound(state!) && !saidFinalRound) {
+        saidFinalRound = true;
         caption.textContent = 'Final round — every hit counts double';
         await stage.proclaim('final round', 1.3);
         if (disposed) return;
       }
-
-      await stage.proclaim('fight', 0.9);
-      if (disposed) return;
 
       for (const attackerId of order) {
         if (disposed) return;
@@ -384,7 +394,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
             // A bot playing for someone is worth saying out loud, or the room
             // spends the round wondering why they are attacking like that.
             const fighter = playerFor(id);
-            return fighter && graceExpired(fighter) ? `${name} (bot)` : name;
+            return fighter && graceExpired(fighter) ? `${name} (BOT)` : name;
           });
           caption.textContent = 'Entering the arena…';
           await setUpFighters(turn);
