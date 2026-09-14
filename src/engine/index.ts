@@ -12,6 +12,7 @@
 export { BattleStage } from './BattleStage';
 export { prepareAssets, loadTexture, reportAssetFailures } from './assets';
 export { Fighter } from './Fighter';
+export { findGrip, gripFor, DEFAULT_GRIP, type Grip } from './grip';
 export { HealthBar, type BarSide } from './HealthBar';
 export { BubbleText, preloadGlyphs, type BubbleTextOptions } from './BubbleText';
 export { Limb } from './Limb';

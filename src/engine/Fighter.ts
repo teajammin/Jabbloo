@@ -1,5 +1,6 @@
 import { Container, Sprite, Texture } from 'pixi.js';
 import { loadTexture } from './assets';
+import { gripFor, DEFAULT_GRIP, type Grip } from './grip';
 import gsap from 'gsap';
 import { Limb } from './Limb';
 import { sampleDominantColour } from './colour';
@@ -52,6 +53,8 @@ export class Fighter {
 
   /** Whether the character came with limbs of its own. */
   private drawnLimbs = { arms: false, legs: false };
+  /** How the weapon in hand is held, as measured from its own drawing. */
+  private grip: Grip = DEFAULT_GRIP;
   /** True when the caller pinned the anchor and detection must not move it. */
   private readonly anchorGiven: boolean;
 
@@ -102,6 +105,7 @@ export class Fighter {
     // Anchored near the grip end, so rotation pivots where a hand would hold it.
     this.weaponSprite.anchor.set(0.5, 0.85);
     this.weaponSprite.scale.set(this.targetWeaponHeight / weaponTexture.height);
+    this.holdProperly(weaponTexture);
     this.hand.addChild(this.weaponSprite);
 
     this.buildLimbs(characterTexture);
@@ -213,10 +217,47 @@ export class Fighter {
     if (!texture) return;
     this.weaponSprite.texture = texture;
     this.weaponSprite.scale.set(this.targetWeaponHeight / texture.height);
+    // Each weapon is held its own way, so this is worked out per swap rather
+    // than once when the fighter was built.
+    this.holdProperly(texture);
     // Facing is applied by mirroring the root, so the sprite's own sign has to
     // be reset or a swap mid-fight can leave the new weapon back to front.
     this.weaponSprite.scale.x = Math.abs(this.weaponSprite.scale.x);
     if (name !== undefined) this.heldWeaponName = name;
+  }
+
+  /**
+   * Takes hold of a weapon the way it was drawn to be held.
+   *
+   * A player draws a sword pointing up, an axe pointing left, a baguette flat.
+   * The rig used to hold all of them by the middle of the bottom edge and swing
+   * whichever way the drawing happened to face, which reads as a mis-rig in a
+   * way nobody can name but everybody sees.
+   *
+   * The measurement is only followed when it is sure. On a weapon with no
+   * obvious handle — a shield, a ball, a cloud — the drawing is left exactly as
+   * the player made it, because a confident wrong answer is worse than the
+   * plain one.
+   */
+  private holdProperly(texture: Texture): void {
+    const grip = gripFor(texture);
+    this.grip = grip;
+
+    if (grip.confidence < 0.35) {
+      this.weaponSprite.anchor.set(DEFAULT_GRIP.x, DEFAULT_GRIP.y);
+      this.weaponSprite.rotation = 0;
+      return;
+    }
+
+    // The anchor is where the hand is, so the weapon turns about its handle
+    // rather than about its middle.
+    this.weaponSprite.anchor.set(grip.x, grip.y);
+    this.weaponSprite.rotation = grip.rotation;
+  }
+
+  /** How the weapon in hand is being held, for anything that wants to know. */
+  get weaponGrip(): Grip {
+    return this.grip;
   }
 
   /**
@@ -295,7 +336,9 @@ export class Fighter {
   reattachWeapon(): void {
     this.hand.addChild(this.weaponSprite);
     this.weaponSprite.position.set(0, 0);
-    this.weaponSprite.rotation = 0;
+    // Back to how this particular weapon is held, not to zero: zero is the
+    // angle it happened to be drawn at, which is what the grip corrects.
+    this.weaponSprite.rotation = this.grip.confidence >= 0.35 ? this.grip.rotation : 0;
     this.weaponSprite.scale.x = Math.abs(this.weaponSprite.scale.x);
   }
 
