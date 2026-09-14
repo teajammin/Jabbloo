@@ -62,7 +62,13 @@ async function setup(withJudge) {
   a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
   b.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
   if (j) j.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
-  await wait(4600);
+  // Wait for the room rather than for a number of milliseconds: the draw is
+// held on screen before the battle, and a cold server holds it a moment
+// longer than a warm one.
+for (let i = 0; i < 90; i++) {
+  if (state(host).phase === 'battle') break;
+  await wait(120);
+}
   return { host, a, b, j, ids };
 }
 

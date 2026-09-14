@@ -9,6 +9,7 @@
  * pairings should not settle into the same two people every round.
  */
 import { GROUND_IDS } from './grounds.mjs';
+import { makeEverything } from './creation-helper.mjs';
 
 let room = '';
 const freshRoom = () => { room = 'TAG' + Math.floor(Math.random() * 900000 + 100000); };
@@ -55,39 +56,12 @@ async function playOut(count, { score = 4 } = {}) {
   host.send(JSON.stringify({ type: 'start' }));
   await wait(300);
 
-  /*
-   * Everyone makes everything, driven by what the room says it is waiting for
-   * rather than by a script of steps and sleeps. A fixed timetable desyncs the
-   * moment the server is cold — the step advances late, the next answer lands
-   * against the wrong slot, and the suite fails for a reason that has nothing
-   * to do with the rules it is testing.
-   */
-  const STEPS = [
-    ['character', false], ['character', true],
-    ['weapon0', false], ['weapon0', true],
-    ['weapon1', false], ['weapon1', true],
-    ['weapon2', false], ['weapon2', true],
-  ];
-
-  for (let guard = 0; guard < 60; guard++) {
-    const now = state(host);
-    if (now.phase !== 'creating') break;
-    const [slot, naming] = STEPS[now.step] ?? [];
-    if (!slot) { await wait(120); continue; }
-
-    for (const ws of players) {
-      ws.send(JSON.stringify(naming
-        ? { type: 'submitName', slot, name: `${slot} name` }
-        : { type: 'submitDrawing', slot, png: PNG, done: true }));
-    }
-
-    // Wait for the room to move on before answering the next one.
-    const from = now.step;
-    for (let i = 0; i < 25; i++) {
-      await wait(80);
-      if (state(host).step !== from || state(host).phase !== 'creating') break;
-    }
-  }
+  // Everyone makes everything, each answered on the step they are actually on:
+  // players walk their own path through creation now, so one can be naming a
+  // second weapon while another is still drawing a character.
+  const byId = Object.fromEntries(ids.map((id, i) => [id, players[i]]));
+  await makeEverything(host, byId, state, wait);
+  await wait(250);
 
   for (const ws of players) {
     ws.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
@@ -108,7 +82,6 @@ async function playOut(count, { score = 4 } = {}) {
     const [a, b] = now.turn.fighters;
     pairings.push([a, b].sort().join(' vs '));
 
-    const byId = Object.fromEntries(ids.map((id, i) => [id, players[i]]));
     byId[a]?.send(JSON.stringify({ type: 'submitMove', weapon: 0, prompt: 'a swing' }));
     byId[b]?.send(JSON.stringify({ type: 'submitMove', weapon: 0, prompt: 'a poke' }));
     await wait(220);

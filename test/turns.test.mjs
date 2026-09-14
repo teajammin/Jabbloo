@@ -9,6 +9,7 @@
  * nobody fights a fourth time.
  */
 import { GROUND_IDS } from './grounds.mjs';
+import { makeEverything } from './creation-helper.mjs';
 const ROOM = 'TRN' + Math.floor(Math.random() * 9000 + 1000);
 const URL_ = `ws://127.0.0.1:1999/parties/main/${ROOM}`;
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -44,21 +45,11 @@ await wait(200);
 host.send(JSON.stringify({ type: 'start' }));
 await wait(200);
 
-// Race through creation, naming as we go so the names reach every screen.
-const steps = [
-  ['submitDrawing', 'character'], ['submitName', 'character'],
-  ['submitDrawing', 'weapon0'], ['submitName', 'weapon0'],
-  ['submitDrawing', 'weapon1'], ['submitName', 'weapon1'],
-  ['submitDrawing', 'weapon2'], ['submitName', 'weapon2'],
-];
-for (const [type, slot] of steps) {
-  for (const [ws, who] of [[a, 'Ann'], [b, 'Bo']]) {
-    ws.send(JSON.stringify(type === 'submitDrawing'
-      ? { type, slot, png: PNG, done: true }
-      : { type, slot, name: `${who} ${slot}` }));
-  }
-  await wait(80);
-}
+// Race through creation. Each player is answered on whatever step they are
+// actually on, because they no longer move in step with each other.
+await makeEverything(host, { [ids[0]]: a, [ids[1]]: b }, state, wait, {
+  names: (slot) => `Ann ${slot}`,
+});
 await wait(250);
 
 check('names reach every screen',
@@ -68,7 +59,13 @@ check('names reach every screen',
 // Vote, then wait out the reveal into the battle.
 a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
 b.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
-await wait(4600);
+// Wait for the room rather than for a number of milliseconds: the draw is
+// held on screen before the battle, and a cold server holds it a moment
+// longer than a warm one.
+for (let i = 0; i < 90; i++) {
+  if (state(host).phase === 'battle') break;
+  await wait(120);
+}
 
 let s = state(host);
 check('the battle starts', s.phase === 'battle', s.phase);

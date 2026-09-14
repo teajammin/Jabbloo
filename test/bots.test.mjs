@@ -75,7 +75,10 @@ check('a room with one player left still reaches the vote',
   state(host).phase === 'battleground', state(host).phase);
 
 a.send(JSON.stringify({ type: 'voteBattleground', id: GROUND_IDS[0] }));
-await wait(4800);
+for (let i = 0; i < 90; i++) {
+  if (state(host).phase === 'battle') break;
+  await wait(120);
+}
 check('and the battle starts', state(host).phase === 'battle', state(host).phase);
 
 const filled = state(host).players.find((p) => p.id === ids[1]);
@@ -120,6 +123,46 @@ check('a returning player is connected again',
   JSON.stringify(state(host).players.map((p) => [p.name, p.connected])));
 
 for (const ws of [host, a, back]) ws.close();
+
+// --- a phone that comes back mid-creation ----------------------------------
+//
+// Dropping out finishes a player early so the room is not held up by an empty
+// chair. Coming back before the others have finished should undo that rather
+// than leave them sitting out the rest of their own creation.
+{
+  freshRoom();
+  const screen = await open('screen');
+  screen.send(JSON.stringify({ type: 'host', capacity: 2 }));
+  await wait(300);
+  const one = await open('one');
+  one.send(JSON.stringify({ type: 'join', name: 'Ann' }));
+  let two = await open('two');
+  two.send(JSON.stringify({ type: 'join', name: 'Bo' }));
+  await wait(450);
+
+  const pair = state(screen).players.filter((p) => !p.isHost).map((p) => p.id);
+  screen.send(JSON.stringify({ type: 'start' }));
+  await wait(350);
+
+  two.close();
+  await wait(500);
+  const gone = state(screen).players.find((p) => p.id === pair[1]);
+  check('a phone that goes stops holding the room up', gone?.progress.done === true,
+    JSON.stringify(gone?.progress));
+  check('while the room keeps waiting for the one still drawing',
+    state(screen).phase === 'creating', state(screen).phase);
+
+  two = await open('two');
+  await wait(600);
+  const back = state(screen).players.find((p) => p.id === pair[1]);
+  check('coming back puts them back to work', back?.progress.done === false,
+    JSON.stringify(back?.progress));
+  check('on the step they were on', back?.progress.step === 0, String(back?.progress.step));
+  check('with a full step to do it in', (back?.progress.endsAt ?? 0) > Date.now() + 60_000,
+    String(Math.round(((back?.progress.endsAt ?? 0) - Date.now()) / 1000)) + 's');
+
+  for (const ws of [screen, one, two]) ws.close();
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

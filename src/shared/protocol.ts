@@ -204,13 +204,37 @@ export interface Turn {
 }
 
 /** What a player has finished so far. Artwork itself stays on the server. */
+/**
+ * How far one player has got, on their own clock.
+ *
+ * Creation used to march everyone through the same step together, which meant
+ * four people waiting on a fifth to think of a name, four times over. Each
+ * player now walks their own path and waits only at the end — where waiting is
+ * unavoidable, and where at least it is visible who is being waited for.
+ */
 export interface CreationProgress {
   /** Slots with a drawing submitted. */
   drawn: string[];
   /** Slots with a name submitted. */
   named: string[];
-  /** True once they have finished the current step. */
-  ready: boolean;
+  /** Which step this player is on. Past the last one means finished. */
+  step: number;
+  /** When this player's current step runs out, as an epoch millisecond. */
+  endsAt: number;
+  /** True once they have finished everything and are waiting for the others. */
+  done: boolean;
+}
+
+/** The step a particular player is on, or null when they have finished. */
+export function stepFor(state: RoomState, playerId: string): CreationStep | null {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return null;
+  return stepsFor(state)[player.progress.step] ?? null;
+}
+
+/** Everyone still working, for a waiting screen to name. */
+export function stillWorking(state: RoomState): Player[] {
+  return creators(state).filter((p) => !p.progress.done);
 }
 
 export interface RoomState {
@@ -220,7 +244,12 @@ export interface RoomState {
   capacity: number;
   players: Player[];
   teamNames: { teamA: string; teamB: string };
-  /** Index into the current step list while creating or in an Ultimate, else -1. */
+  /**
+   * The furthest step anyone has reached, for the host's screen to caption.
+   *
+   * Each player's own step lives on their progress; this is a summary, not the
+   * thing the game runs on.
+   */
   step: number;
   /** Ultimates played so far; 0 until a tie forces one. */
   ultRound: number;

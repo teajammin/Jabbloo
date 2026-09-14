@@ -51,7 +51,7 @@ function mounts(name, screen, after) {
 
 const player = (id, name, role, extra = {}) => ({
   id, name, role, connected: true, isHost: false,
-  progress: { drawn: [], named: [], ready: false },
+  progress: { drawn: [], named: [], step: 0, endsAt: Date.now() + 60_000, done: false },
   health: 100, fights: 0,
   characterName: `${name}alot`, weaponNames: ['Butter Sword', 'Axe', 'Hammer'],
   damageDealt: 12, damageTaken: 20,
@@ -330,8 +330,13 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     check('into the slot the step asked for', drawing?.slot === 'character', drawing?.slot);
     check('and says the step is finished', drawing?.done === true, JSON.stringify(drawing?.done));
 
-    // The naming step that follows.
-    connection.push({ step: 1 });
+    // The naming step that follows. A player's own step moves, not the room's:
+    // everybody creates at their own pace now.
+    connection.push({
+      players: connection.state.players.map((p) => (p.id === 'a'
+        ? { ...p, progress: { ...p.progress, step: 1 } }
+        : p)),
+    });
     const input = root.querySelector('input.name-input');
     check('the naming step offers a name box', input !== null);
     if (!input) return;
@@ -373,7 +378,11 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     // And the step running out sends it too, without a second copy of the same
     // picture going up.
     const before = connection.sent.filter((m) => m.type === 'submitDrawing').length;
-    connection.push({ step: 1 });
+    connection.push({
+      players: connection.state.players.map((p) => (p.id === 'a'
+        ? { ...p, progress: { ...p.progress, step: 1 } }
+        : p)),
+    });
     const after = connection.sent.filter((m) => m.type === 'submitDrawing').length;
     check('an unchanged drawing is not sent twice', after === before, `${before} then ${after}`);
 

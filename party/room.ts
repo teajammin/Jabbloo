@@ -206,6 +206,8 @@ export default class Room implements Party.Server {
   private readonly names = new Map<string, string>();
   /** Timer that ends the current creation step. */
   private stepTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Ticks while people are creating, watching each player's own deadline. */
+  private creationClock: ReturnType<typeof setInterval> | null = null;
   /** Turns fought in this room, so every turn has an identity of its own. */
   private turnCount = 0;
 
@@ -216,6 +218,19 @@ export default class Room implements Party.Server {
     const player = this.state.players.find((p) => p.id === connection.id);
     if (player && !player.connected) {
       player.connected = true;
+
+      // Back before the room moved on: they pick up where they left off, with
+      // a full step's time rather than the seconds that were left when their
+      // phone died.
+      const steps = stepsFor(this.state);
+      if (this.isCreating() && player.progress.done
+        && player.progress.step < steps.length) {
+        player.progress.done = false;
+        player.progress.endsAt = Date.now()
+          + (steps[player.progress.step]?.seconds ?? 30) * 1000;
+        this.summariseDeadline();
+      }
+
       this.broadcastState();
     }
 
@@ -307,6 +322,20 @@ export default class Room implements Party.Server {
       // Mid-game, keep the seat: the brief calls for a bot to take over, and
       // the player's drawings must survive their phone locking.
       player.connected = false;
+
+      /*
+       * Nobody waits on an empty chair.
+       *
+       * Each player now has their own clock, and a phone that has gone will
+       * not be pressing anything: left to run, its steps would expire one at a
+       * time and hold the whole room for six minutes. Whatever they had made
+       * is already saved, and the rest is filled in with stand-ins.
+       */
+      if (this.isCreating() && !player.progress.done) {
+        player.progress.done = true;
+        player.progress.endsAt = 0;
+        this.finishIfEveryoneIsDone();
+      }
     }
     this.broadcastState();
     // If they walked out mid-turn, the bot picks up their move now rather than
@@ -353,7 +382,7 @@ export default class Room implements Party.Server {
       role: 'unassigned',
       connected: true,
       isHost: true,
-      progress: { drawn: [], named: [], ready: false },
+      progress: { drawn: [], named: [], step: 0, endsAt: 0, done: false },
       health: STARTING_HEALTH,
       fights: 0,
       characterName: '',
@@ -419,7 +448,7 @@ export default class Room implements Party.Server {
       role: 'unassigned',
       connected: true,
       isHost: false,
-      progress: { drawn: [], named: [], ready: false },
+      progress: { drawn: [], named: [], step: 0, endsAt: 0, done: false },
       health: STARTING_HEALTH,
       fights: 0,
       characterName: '',
@@ -477,7 +506,7 @@ export default class Room implements Party.Server {
     }
 
     this.state.phase = 'creating';
-    this.beginStep(0);
+    this.beginCreation();
   }
 
   // ------------------------------------------------------------------ creating
@@ -489,35 +518,115 @@ export default class Room implements Party.Server {
    * slept or joined late lands on the same instant as everyone else instead of
    * starting its own countdown.
    */
-  private beginStep(index: number): void {
+  /**
+   * Starts everyone on their own first step.
+   *
+   * One clock per player rather than one for the room. The old arrangement
+   * marched everybody through the same step together, so four people waited on
+   * a fifth to think of a name, four times over — and the person still drawing
+   * got no more time for it either way.
+   */
+  private beginCreation(): void {
     if (this.stepTimer) clearTimeout(this.stepTimer);
 
-    const step = stepsFor(this.state)[index];
-    if (!step) {
-      // Creation leads to the battleground vote; an Ultimate leads straight back
-      // onto the ground already chosen — the tie is what is being settled,
-      // not the venue.
-      if (this.state.phase === 'ult') this.beginSuddenDeath();
-      else this.beginVote();
+    const steps = stepsFor(this.state);
+    const first = steps[0];
+    if (!first) {
+      this.finishCreation();
       return;
     }
 
-    this.state.step = index;
-    this.state.stepEndsAt = Date.now() + step.seconds * 1000;
-    for (const player of this.state.players) player.progress.ready = false;
+    const now = Date.now();
+    for (const player of this.state.players) {
+      player.progress.step = 0;
+      player.progress.done = false;
+      player.progress.endsAt = now + first.seconds * 1000;
+    }
 
-    this.stepTimer = setTimeout(() => this.beginStep(index + 1), step.seconds * 1000);
+    this.state.step = 0;
+    this.summariseDeadline();
+    this.startCreationClock();
     this.broadcastState();
   }
 
-  /** Moves on early once every creator has finished the current step. */
-  private advanceIfAllReady(): void {
-    // Guarded on the phase because `ready` survives into the battle, and a
-    // stray `ready` message there must not walk the step counter forward.
-    if (!this.isCreating()) return;
-    const active = creators(this.state).filter((p) => p.connected);
-    if (active.length === 0 || !active.every((p) => p.progress.ready)) return;
-    this.beginStep(this.state.step + 1);
+  /**
+   * Moves one player to their next step.
+   *
+   * Called when they finish one and when their own time runs out; the two are
+   * the same event as far as the room is concerned, which is why a player who
+   * runs out of time keeps whatever the drawing tool last saved.
+   */
+  private advancePlayer(player: Player): void {
+    const steps = stepsFor(this.state);
+    player.progress.step += 1;
+
+    const next = steps[player.progress.step];
+    if (!next) {
+      player.progress.done = true;
+      player.progress.endsAt = 0;
+      this.finishIfEveryoneIsDone();
+      return;
+    }
+
+    player.progress.endsAt = Date.now() + next.seconds * 1000;
+    this.state.step = Math.max(this.state.step, player.progress.step);
+    this.summariseDeadline();
+  }
+
+  /**
+   * Watches every player's own deadline.
+   *
+   * One timer for the room rather than one per player: a handful of people
+   * checked twice a second costs nothing, and there is no set of timers to
+   * lose track of when somebody leaves.
+   */
+  private startCreationClock(): void {
+    if (this.creationClock) clearInterval(this.creationClock);
+    this.creationClock = setInterval(() => {
+      if (!this.isCreating()) {
+        this.stopCreationClock();
+        return;
+      }
+
+      const now = Date.now();
+      let moved = false;
+      for (const player of creators(this.state)) {
+        if (player.progress.done || player.progress.endsAt > now) continue;
+        this.advancePlayer(player);
+        moved = true;
+      }
+      if (moved) this.broadcastState();
+    }, 500);
+  }
+
+  private stopCreationClock(): void {
+    if (this.creationClock) clearInterval(this.creationClock);
+    this.creationClock = null;
+  }
+
+  /** The room's clock shows whoever has the longest left to go. */
+  private summariseDeadline(): void {
+    const deadlines = creators(this.state)
+      .filter((p) => !p.progress.done)
+      .map((p) => p.progress.endsAt);
+    this.state.stepEndsAt = deadlines.length > 0 ? Math.max(...deadlines) : 0;
+  }
+
+  /** Everyone finished, or nobody left to wait for. */
+  private finishIfEveryoneIsDone(): void {
+    const waiting = creators(this.state).filter((p) => !p.progress.done);
+    if (waiting.length > 0) {
+      this.summariseDeadline();
+      return;
+    }
+    this.finishCreation();
+  }
+
+  /** Creation leads to the vote; an Ultimate leads straight back into the fight. */
+  private finishCreation(): void {
+    this.stopCreationClock();
+    if (this.state.phase === 'ult') this.beginSuddenDeath();
+    else this.beginVote();
   }
 
   // -------------------------------------------------------------- battleground
@@ -721,7 +830,7 @@ export default class Room implements Party.Server {
     this.state.chosen = null;
 
     for (const player of this.state.players) {
-      player.progress = { drawn: [], named: [], ready: false };
+      player.progress = { drawn: [], named: [], step: 0, endsAt: 0, done: false };
       player.health = STARTING_HEALTH;
       player.fights = 0;
       player.characterName = '';
@@ -744,7 +853,7 @@ export default class Room implements Party.Server {
     }
 
     this.state.phase = 'creating';
-    this.beginStep(0);
+    this.beginCreation();
   }
 
   /** Shuts the room: every device goes back to its own menu. */
@@ -757,14 +866,14 @@ export default class Room implements Party.Server {
   private beginUlt(): void {
     this.state.phase = 'ult';
     this.state.ultRound += 1;
-    for (const player of this.state.players) player.progress.ready = false;
-    this.beginStep(0);
+    this.beginCreation();
   }
 
   /**
    * One more fight each, with the Ultimate in hand.
    *
-   * Health is restored so a knocked-out fighter can still swing their ULT —
+   * Health is restored so a knocked-out fighter can still swing their
+   * Ultimate —
    * the tie is being settled on total damage taken, and sitting a player out
    * of the round that decides it would be a strange way to break it.
    */
@@ -960,9 +1069,10 @@ export default class Room implements Party.Server {
 
     this.art.set(`${player.id}:${slot}`, png);
     if (!player.progress.drawn.includes(slot)) player.progress.drawn.push(slot);
-    if (done) player.progress.ready = true;
+    // Their own step, their own clock: finishing moves them on and nobody
+    // else. The room waits once, at the end.
+    if (done) this.advancePlayer(player);
     this.broadcastState();
-    if (done) this.advanceIfAllReady();
   }
 
   private onSubmitName(slot: string, name: string, sender: Party.Connection): void {
@@ -982,17 +1092,16 @@ export default class Room implements Party.Server {
     }
 
     if (!player.progress.named.includes(slot)) player.progress.named.push(slot);
-    player.progress.ready = true;
+    this.advancePlayer(player);
     this.broadcastState();
-    this.advanceIfAllReady();
   }
 
+  /** "I have finished this step" — the same event as running out of time. */
   private onReady(sender: Party.Connection): void {
     const player = this.state.players.find((p) => p.id === sender.id);
-    if (!player) return;
-    player.progress.ready = true;
+    if (!player || !this.isCreating() || player.progress.done) return;
+    this.advancePlayer(player);
     this.broadcastState();
-    this.advanceIfAllReady();
   }
 
   // --------------------------------------------------------------------- utils

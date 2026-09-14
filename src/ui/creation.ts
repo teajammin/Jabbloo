@@ -4,7 +4,8 @@ import { drawScreen } from './drawScreen';
 import { battlegroundScreen } from './battleground';
 import type { RoomConnection } from '../net/room';
 import {
-  creators, currentStep, stepsFor, type RoomState,
+  creators, stepFor, stepsFor, stillWorking,
+  type Player, type RoomState,
 } from '../shared/protocol';
 
 /**
@@ -156,56 +157,123 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
 
     const cleanups: (() => void)[] = [];
 
+    /** What one player is up to, in the fewest words that say it. */
+    function describeProgress(player: Player, state: RoomState): string {
+      if (!player.connected) return 'gone — a bot will play';
+      if (player.progress.done) return 'finished';
+
+      const step = stepsFor(state)[player.progress.step];
+      const left = Math.max(0, Math.ceil((player.progress.endsAt - Date.now()) / 1000));
+      if (!step) return 'finishing';
+      return `${step.prompt.toLowerCase()} · ${left}s`;
+    }
+
     function renderRoster(state: RoomState): void {
       roster.replaceChildren();
       for (const player of creators(state)) {
-        const row = el('li', { class: `player${player.progress.ready ? ' is-ready' : ''}` },
+        const row = el('li', { class: `player${player.progress.done ? ' is-ready' : ''}` },
           el('span', { class: 'avatar placeholder' }, player.name.slice(0, 1).toUpperCase()),
           el('span', { class: 'player-name' }, player.name),
           // Saying a player has gone matters more than saying they are busy:
           // it explains why a bot is about to play their turns.
-          el('span', { class: 'you' },
-            !player.connected ? 'gone — a bot will play'
-              : player.progress.ready ? 'done' : 'working'),
+          el('span', { class: 'you' }, describeProgress(player, state)),
         );
         roster.appendChild(row);
       }
     }
 
+    /**
+     * What the player is looking at, given where they have got to.
+     *
+     * Each player walks their own path, so this is driven by their own step
+     * and their own clock rather than by the room's.
+     */
     function render(state: RoomState): void {
       renderRoster(state);
 
-      const step = currentStep(state);
-      if (!step) return;
-
+      const me = state.players.find((p) => p.id === connection.playerId);
       const ult = state.phase === 'ult';
-      heading.textContent = step.prompt;
-      subheading.textContent = isHost
-        ? ult
-          ? 'Level on damage — both sides are drawing an Ultimate.'
-          : 'Everyone is drawing on their devices.'
-        : ult
-          ? 'The scores are level. One more weapon — your Ultimate — decides it.'
-          : `Step ${state.step + 1} of ${stepsFor(state).length}`;
-      clock.setDeadline(state.stepEndsAt, step.seconds);
 
-      // Only rebuild when the step actually changes, so typing a name or a
-      // stroke in progress survives other players' updates arriving.
-      const key = `${state.phase}:${state.ultRound}:${state.step}`;
+      // The host and the judges do not make anything; they watch.
+      if (isHost || !me || me.role === 'judge' || me.role === 'unassigned') {
+        heading.textContent = ult ? 'Drawing Ultimates' : 'Making characters';
+        subheading.textContent = isHost
+          ? ult
+            ? 'Level on damage — both sides are drawing an Ultimate.'
+            : 'Everyone is working at their own pace.'
+          : 'Relax while your friends create questionable things.';
+        clock.setDeadline(state.stepEndsAt, 0);
+
+        const key = `${state.phase}:watching`;
+        if (key === lastStep) return;
+        lastStep = key;
+        for (const fn of cleanups.splice(0)) fn();
+        if (isHost) showHost(); else showJudge();
+        return;
+      }
+
+      const step = stepFor(state, me.id);
+
+      // Finished, and waiting on the others — the only place anyone waits now.
+      if (!step || me.progress.done) {
+        heading.textContent = 'All done';
+        const others = stillWorking(state).filter((p) => p.id !== me.id);
+        subheading.textContent = others.length === 0
+          ? 'Everyone is ready.'
+          : others.length === 1
+            ? `Waiting for ${others[0]!.name}.`
+            : `Waiting for ${others.length} others.`;
+        clock.setDeadline(longestRemaining(state), 0);
+
+        const key = `${state.phase}:${state.ultRound}:waiting`;
+        if (key === lastStep) return;
+        lastStep = key;
+        flushDrawing();
+        for (const fn of cleanups.splice(0)) fn();
+        showWaitingRoom();
+        return;
+      }
+
+      heading.textContent = step.prompt;
+      subheading.textContent = ult
+        ? 'The scores are level. One more weapon — your Ultimate — decides it.'
+        : `Step ${me.progress.step + 1} of ${stepsFor(state).length}`;
+      clock.setDeadline(me.progress.endsAt, step.seconds);
+
+      // Only rebuild when this player's own step changes, so a stroke in
+      // progress survives somebody else finishing theirs.
+      const key = `${state.phase}:${state.ultRound}:${me.progress.step}`;
       if (key === lastStep) return;
       lastStep = key;
 
-      // The step is over: send whatever is on the canvas before the tool that
-      // holds it is torn down.
+      // Their step is over: send whatever is on the canvas before the tool
+      // that holds it is torn down.
       flushDrawing();
       for (const fn of cleanups.splice(0)) fn();
 
-      const me = state.players.find((p) => p.id === connection.playerId);
-      if (isHost) { showHost(); return; }
-      if (!me || me.role === 'judge' || me.role === 'unassigned') { showJudge(); return; }
-
       if (step.kind === 'draw') showDraw(step.slot, step.prompt);
       else showName(step.slot);
+    }
+
+    /** The latest anyone is still working until. */
+    function longestRemaining(state: RoomState): number {
+      const ends = stillWorking(state).map((p) => p.progress.endsAt);
+      return ends.length > 0 ? Math.max(...ends) : 0;
+    }
+
+    /**
+     * The waiting room.
+     *
+     * Not a blank screen with a spinner: it says who is still going and how
+     * long they have left, so waiting is a thing with an end rather than a
+     * thing that might be broken.
+     */
+    function showWaitingRoom(): void {
+      body.replaceChildren(
+        el('p', { class: 'lede waiting' },
+          'Your character and weapons are in. The game starts when everyone is done.'),
+        roster,
+      );
     }
 
     root.append(

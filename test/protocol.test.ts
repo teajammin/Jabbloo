@@ -19,7 +19,7 @@ const check = (name: string, cond: boolean, detail = '') => {
 
 const player = (name: string, role: Player['role'], isHost = false): Player => ({
   id: name, name, role, connected: true, isHost,
-  progress: { drawn: [], named: [], ready: false },
+  progress: { drawn: [], named: [], step: 0, endsAt: 0, done: false },
   health: 100,
   fights: 0,
   characterName: name,
