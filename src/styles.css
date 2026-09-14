@@ -241,6 +241,32 @@ body {
 
 .title { margin-bottom: 4px; }
 
+/*
+ * The title's letters bob, gently and out of step with each other.
+ *
+ * The jitter each letter already carries is a fixed offset, so the bob is
+ * applied to a wrapper transform of its own — animating `transform` here would
+ * throw that hand-placed wobble away and snap the word straight.
+ */
+.bubble-text.is-bouncing img {
+  animation-name: letter-bob;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  transform-box: fill-box;
+}
+
+@keyframes letter-bob {
+  from { translate: 0 0; }
+  to { translate: 0 -7%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble-text.is-bouncing img { animation: none; }
+}
+
+[data-reduce-motion] .bubble-text.is-bouncing img { animation: none; }
+
 /* Long words must shrink rather than overflow a phone. */
 @media (max-width: 560px) {
   .bubble-text { --bubble-height: min(var(--bubble-height, 90px), 17vw) !important; }

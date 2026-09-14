@@ -49,7 +49,9 @@ export function lobbyScreen(
      * at kick-off, so the board would be a puzzle with a single solution
      * standing between two people and their game.
      */
-    const board = isHost ? teamBoard(connection) : null;
+    // The capacity is known before the room answers, so the board can be laid
+    // out right the first time rather than corrected a moment later.
+    const board = isHost ? teamBoard(connection, capacity) : null;
     const duelNote = el('p', { class: 'lede' }, '');
     const blocked = el('p', { class: 'help-note blocked' });
 

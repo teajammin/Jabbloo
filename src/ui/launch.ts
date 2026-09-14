@@ -11,7 +11,7 @@ export const launchScreen: Screen = (root, go) => {
 
   root.append(
     el('main', { class: 'screen screen-launch' },
-      bubbleText('JABBLOO', { height: titleHeight(180), jitter: 6, className: 'title' }),
+      bubbleText('JABBLOO', { height: titleHeight(180), jitter: 6, className: 'title', bounce: true }),
       el('p', { class: 'version' }, `v${VERSION}`),
       el('div', { class: 'stack' },
         button('Create room', () => go(createRoomScreen), 'big primary'),

@@ -25,6 +25,13 @@ export interface BubbleTextOptions {
   /** Random vertical wobble in pixels, for a hand-placed look. */
   jitter?: number;
   className?: string;
+  /**
+   * Gives each letter a slow bob of its own.
+   *
+   * For the title and nothing else: a word that moves draws the eye, which is
+   * what a title is for and what a room code or a fighter's name is not.
+   */
+  bounce?: boolean;
 }
 
 /**
@@ -42,10 +49,11 @@ export function titleHeight(ideal: number, min = 40): number {
 
 /** Builds an element spelling `text` in the game's letters. */
 export function bubbleText(text: string, options: BubbleTextOptions = {}): HTMLElement {
-  const { height = 90, jitter = 0, className } = options;
+  const { height = 90, jitter = 0, className, bounce = false } = options;
 
   const wrap = document.createElement('span');
-  wrap.className = ['bubble-text', className].filter(Boolean).join(' ');
+  wrap.className = ['bubble-text', className, bounce ? 'is-bouncing' : '']
+    .filter(Boolean).join(' ');
   // The letters are decorative images; the word itself must reach a screen reader.
   wrap.setAttribute('role', 'img');
   wrap.setAttribute('aria-label', text);
@@ -69,6 +77,17 @@ export function bubbleText(text: string, options: BubbleTextOptions = {}): HTMLE
     img.draggable = false;
     if (jitter) {
       img.style.transform = `translateY(${(Math.random() * 2 - 1) * jitter}px)`;
+    }
+
+    if (bounce) {
+      /*
+       * Each letter on its own clock, and none of them a neat fraction of
+       * another: letters bobbing in step read as one object moving, which is
+       * the opposite of the intended effect.
+       */
+      const index = wrap.childElementCount;
+      img.style.animationDelay = `${(index * 0.13).toFixed(2)}s`;
+      img.style.animationDuration = `${(2.1 + (index % 3) * 0.27).toFixed(2)}s`;
     }
     wrap.appendChild(img);
   }

@@ -33,7 +33,7 @@ export interface TeamBoard {
   update: (state: RoomState) => void;
 }
 
-export function teamBoard(connection: RoomConnection): TeamBoard {
+export function teamBoard(connection: RoomConnection, seats = 0): TeamBoard {
   /** The card currently picked up by click, if any. */
   let selected: string | null = null;
 
@@ -43,6 +43,27 @@ export function teamBoard(connection: RoomConnection): TeamBoard {
     makeZone('teamB', 'Team Two', true),
     makeZone('judge', 'Judges', false),
   ];
+
+  /*
+   * Laid out correctly before anything arrives from the server.
+   *
+   * The host has already said how many are playing, so whether there is a
+   * judges' bench is known here and now. Waiting for the first state to decide
+   * meant the bench appeared and then vanished, and the board jumped as the
+   * row collapsed under it.
+   */
+  zones.find((z) => z.role === 'judge')!.root.hidden = seats > 0 && !needsJudges(seats);
+
+  /**
+   * Judges only exist at odd player counts.
+   *
+   * Two is a duel with an AI judge; four and six are tag team, where everyone
+   * fights. An empty bench in those games only invites the host to strand
+   * somebody on it.
+   */
+  function needsJudges(count: number): boolean {
+    return count % 2 === 1;
+  }
 
   function assign(playerId: string, role: Role): void {
     connection.send({ type: 'setRole', playerId, role });
@@ -175,8 +196,14 @@ export function teamBoard(connection: RoomConnection): TeamBoard {
 
   const root = el('div', { class: 'board-wrap' }, board, hint);
 
+  // Nothing is shown until the board knows what it holds.
+  root.hidden = true;
+
   function update(state: RoomState): void {
     const players = state.players.filter((p) => !p.isHost);
+    // Shown once it knows what it is: building it visible and correcting it a
+    // moment later is what made the judges' bench flash up and vanish.
+    root.hidden = false;
 
     for (const zone of zones) {
       zone.list.replaceChildren();
@@ -192,15 +219,11 @@ export function teamBoard(connection: RoomConnection): TeamBoard {
       }
     }
 
-    // Judges only exist at odd player counts. Two is 1v1 with an AI judge;
-    // four and six are tag team, where everyone fights. Showing an empty bench
-    // in those games just invites the host to strand someone on it.
-    // Kept visible anyway if someone is already on it, so nobody can vanish.
+    // Kept visible if someone is already on the bench, so nobody can vanish.
     const judgeZone = zones.find((z) => z.role === 'judge')!;
-    const seats = state.capacity || players.length;
-    const needsJudges = seats % 2 === 1;
+    const count = state.capacity || players.length;
     const hasJudges = players.some((p) => p.role === 'judge');
-    judgeZone.root.hidden = !needsJudges && !hasJudges;
+    judgeZone.root.hidden = !needsJudges(count) && !hasJudges;
 
     setSelected(selected && players.some((p) => p.id === selected) ? selected : null);
   }

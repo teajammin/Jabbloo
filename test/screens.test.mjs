@@ -105,6 +105,17 @@ mounts('launch', ui.launchScreen, (root) => {
   check('the launch screen offers exactly the two ways in',
     labels.some((l) => /create room/i.test(l)) && labels.some((l) => /join room/i.test(l)),
     JSON.stringify(labels));
+
+  // The title bobs; nothing else does. A word that moves draws the eye, which
+  // is what a title is for and what a room code is not.
+  const title = root.querySelector('.bubble-text.is-bouncing');
+  check('the title letters are set bobbing', title !== null);
+  const letters = [...(title?.querySelectorAll('img') ?? [])];
+  check('each letter on its own clock',
+    new Set(letters.map((img) => img.style.animationDelay)).size === letters.length,
+    JSON.stringify(letters.map((img) => img.style.animationDelay)));
+  check('and not all at the same speed',
+    new Set(letters.map((img) => img.style.animationDuration)).size > 1);
 });
 mounts('create room', ui.createRoomScreen);
 mounts('join room', ui.joinRoomScreen);
@@ -616,12 +627,19 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   state.players[1].role = 'unassigned';
   state.players[2].role = 'unassigned';
   const connection = fakeConnection('h', state);
-  const board = ui.teamBoard(connection);
+  // The host has already said how many are playing, so the board can be laid
+  // out right the first time: no judges' bench flashing up and vanishing.
+  const board = ui.teamBoard(connection, 4);
   const root = document.createElement('div');
   root.appendChild(board.root);
   document.body.appendChild(root);
   try {
+    check('the board shows nothing before it knows the room', board.root.hidden === true);
+    check('and an even game has no judges bench from the start',
+      board.root.querySelector('.zone-judge')?.hidden === true);
+
     board.update(state);
+    check('the board appears once it has the room', board.root.hidden === false);
     check('the team board renders the room', root.textContent.includes('Ann'), root.textContent.slice(0, 80));
     const card = root.querySelector('.card');
     check('unassigned players appear as cards', Boolean(card));
