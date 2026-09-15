@@ -44,7 +44,20 @@ export const MAX_STEPS = 12;
  * consequences belong to the other fighter. Enforced here rather than trusted
  * to the prompt, because it inverts the meaning of a move when it goes wrong.
  */
-const REACTION_MOVES = new Set(['knockdown', 'dizzy', 'recoil', 'idle']);
+/**
+ * Moves that describe something happening *to* a fighter.
+ *
+ * Only these honour `"on": "enemy"`; anything else is done by the attacker
+ * whatever the choreography claims, so an attack cannot be redirected into
+ * making the opponent swing their own weapon.
+ *
+ * It is a list that has to be kept level with the primitives, and it was not:
+ * `sicken` was added without being added here, so `"on": "enemy"` was parsed
+ * off every poisoning and the writer's own fighter turned green while their
+ * opponent stood there untouched. test/scale.test.ts now checks the two
+ * against each other.
+ */
+const REACTION_MOVES = new Set(['knockdown', 'dizzy', 'sicken', 'recoil', 'idle']);
 
 export interface Choreography {
   steps: Step[];

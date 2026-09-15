@@ -611,15 +611,20 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   document.body.appendChild(badge.root);
 
   check('the badge says what it is doing',
-    /loading/i.test(badge.root.querySelector('[role="img"]')?.getAttribute('aria-label') ?? ''),
-    badge.root.querySelector('[role="img"]')?.getAttribute('aria-label'));
+    /loading/i.test(badge.root.getAttribute('aria-label') ?? ''),
+    badge.root.getAttribute('aria-label'));
+  // Text, not the game's lettering: those are thirty image files, and a badge
+  // that cannot appear until the network is free is no use during a wait for
+  // the network.
+  check('and needs nothing fetched to appear',
+    badge.root.querySelector('img') === null);
   check('and announces itself to a screen reader',
     badge.root.getAttribute('role') === 'status');
 
   // In order, left to right: every letter the same hop, a beat after the one
   // before it. Out-of-step delays would be the title's bob, not a wave.
-  const delays = [...badge.root.querySelectorAll('img')]
-    .map((img) => parseFloat(img.style.animationDelay));
+  const delays = [...badge.root.querySelectorAll('.loading-word > span')]
+    .map((span) => parseFloat(span.style.animationDelay));
   check('every letter is delayed a little more than the last',
     delays.length === 7 && delays.every((d, i) => i === 0 || d > delays[i - 1]),
     JSON.stringify(delays));

@@ -1,6 +1,7 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import gsap from 'gsap';
 import { palette } from './theme';
+import { loadTexture } from './assets';
 
 /**
  * A fighter's health, on the stage overlay.
@@ -13,6 +14,9 @@ import { palette } from './theme';
  * 100 to 67 reads as a rendering glitch; the same change over half a second
  * reads as a hit landing.
  */
+
+/** How big a player's own photograph is, beside their bar. */
+const PORTRAIT = 62;
 
 const BAR_WIDTH = 380;
 const BAR_HEIGHT = 34;
@@ -41,17 +45,35 @@ export class HealthBar extends Container {
   /** Tweened rather than assigned, so the fill can be animated toward it. */
   private readonly value = { fraction: 1 };
   private tween: gsap.core.Tween | null = null;
+  /** Whether room was reserved for the player's own picture. */
+  private readonly hasPhoto: boolean;
+  /** Their face, on the outer end of the bar. */
+  private readonly portrait = new Container();
 
-  constructor(name: string, side: BarSide, colour: number = palette.mint) {
+  constructor(name: string, side: BarSide, colour: number = palette.mint, photo?: string) {
     super();
     this.side = side;
+    this.hasPhoto = Boolean(photo);
 
     // A soft panel behind the whole group. Ink on a pale sky is readable; the
     // same ink over a volcano is not, and the fight should not be legible only
     // on some battlegrounds.
+    /*
+     * A soft panel behind the whole group. Ink on a pale sky is readable; the
+     * same ink over a volcano is not, and the fight should not be legible only
+     * on some battlegrounds.
+     *
+     * Widened on the outer side when there is a portrait, so the face sits at
+     * the edge of the screen with the bar reading inward from it — the way a
+     * fighting game arranges them — rather than on top of the name.
+     */
+    const room = this.hasPhoto ? PORTRAIT + 14 : 0;
     const panel = new Graphics();
     panel.beginFill(palette.cream, 0.72);
-    panel.drawRoundedRect(-14, -46, BAR_WIDTH + 28, BAR_HEIGHT + 62, 24);
+    panel.drawRoundedRect(
+      -14 - (side === 'left' ? room : 0), -46,
+      BAR_WIDTH + 28 + room, BAR_HEIGHT + 62, 24,
+    );
     panel.endFill();
 
     const track = new Graphics();
@@ -110,9 +132,52 @@ export class HealthBar extends Container {
       this.fill.x = BAR_WIDTH;
     }
 
-    this.addChild(panel, track, this.fill, this.label, this.amount, this.movePlate, this.move);
+    if (this.hasPhoto) {
+      this.portrait.x = side === 'left'
+        ? -14 - room + 7
+        : BAR_WIDTH + 14 + 7 - 7;
+      this.portrait.y = -14;
+      void this.loadPortrait(photo!);
+    }
+
+    this.addChild(panel, track, this.fill, this.label, this.amount,
+      this.portrait, this.movePlate, this.move);
     this.layoutText();
     this.redraw();
+  }
+
+  /**
+   * Draws the player's own photograph in a circle at the outer end.
+   *
+   * Loaded rather than awaited in the constructor: a bar that cannot exist
+   * until a picture has decoded is a bar that is missing during the entrance,
+   * which is when it is most wanted. It arrives when it arrives, into space
+   * already reserved for it, so nothing moves when it does.
+   */
+  private async loadPortrait(url: string): Promise<void> {
+    const texture = await loadTexture(url);
+    if (!texture || this.destroyed) return;
+
+    const sprite = new Sprite(texture);
+    // Cover, not stretch: a face squashed into a circle is worse than a face
+    // cropped to one.
+    const scale = Math.max(PORTRAIT / texture.width, PORTRAIT / texture.height);
+    sprite.scale.set(scale);
+    sprite.anchor.set(0.5);
+    sprite.x = PORTRAIT / 2;
+    sprite.y = PORTRAIT / 2;
+
+    const mask = new Graphics();
+    mask.beginFill(0xffffff);
+    mask.drawCircle(PORTRAIT / 2, PORTRAIT / 2, PORTRAIT / 2);
+    mask.endFill();
+
+    const ring = new Graphics();
+    ring.lineStyle({ width: 3, color: palette.ink, alpha: 0.7 });
+    ring.drawCircle(PORTRAIT / 2, PORTRAIT / 2, PORTRAIT / 2);
+
+    sprite.mask = mask;
+    this.portrait.addChild(sprite, mask, ring);
   }
 
   /**

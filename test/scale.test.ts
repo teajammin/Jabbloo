@@ -8,6 +8,7 @@
  * property and none of them moved anything. The console said so, once, in a
  * warning nobody was reading.
  */
+import { readFileSync } from 'node:fs';
 import { Fighter } from '../src/engine/Fighter';
 
 let pass = 0, fail = 0;
@@ -45,6 +46,35 @@ check('and is not an own data property that a tween would clobber',
 teach(view);
 box.scaleX = 2;
 check('teaching an object twice is harmless', view.scale.x === 2, String(view.scale.x));
+
+/*
+ * The two lists that have to agree about who a reaction happens to.
+ *
+ * The server fills in `"on": "enemy"` for anything that describes a state
+ * somebody is put into; the engine only honours it for moves on its own list.
+ * `sicken` was added to the first and not the second, so every poisoning was
+ * parsed back onto the attacker — the bug reported twice, and invisible in
+ * both halves because each was individually correct.
+ */
+// From the working directory: these suites are bundled into a cache folder
+// before they run, so a path relative to the source file points nowhere.
+const enginePlayer = readFileSync(`${process.cwd()}/src/engine/player.ts`, 'utf8');
+const serverDistance = readFileSync(`${process.cwd()}/server/distance.ts`, 'utf8');
+
+const listed = (source: string, name: string): string[] => {
+  const found = source.match(new RegExp(`${name} = new Set\\(\\[([^\\]]*)\\]`));
+  return found ? [...found[1]!.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]!) : [];
+};
+
+const engineSide = listed(enginePlayer, 'REACTION_MOVES');
+const serverSide = listed(serverDistance, 'REACTIONS');
+
+check('both lists were found', engineSide.length > 0 && serverSide.length > 0,
+  JSON.stringify({ engineSide, serverSide }));
+check('everything the server aims at the enemy is honoured by the engine',
+  serverSide.every((move) => engineSide.includes(move)),
+  JSON.stringify(serverSide.filter((m) => !engineSide.includes(m))));
+check('poison is on both', engineSide.includes('sicken') && serverSide.includes('sicken'));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

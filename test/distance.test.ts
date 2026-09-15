@@ -6,7 +6,7 @@
  * enforcement has to get right — including the ones where an approach is
  * perfectly correct and must survive.
  */
-import { aimReactionsAtTheEnemy, keepRangedAtRange } from '../server/distance';
+import { aimReactionsAtTheEnemy, closeInForMelee, keepRangedAtRange } from '../server/distance';
 
 let pass = 0, fail = 0;
 const check = (name: string, cond: boolean, detail = '') => {
@@ -122,6 +122,48 @@ check('and one already aimed is untouched', JSON.stringify(onOf(aimReactionsAtTh
 check('nothing malformed throws', aimReactionsAtTheEnemy(null) === null
   && aimReactionsAtTheEnemy('x') === 'x'
   && JSON.stringify(aimReactionsAtTheEnemy({ steps: [1, null] })) === JSON.stringify({ steps: [1, null] }));
+
+/*
+ * And the other half: a fighter who needs to be close has to get there.
+ *
+ * They start a third of the arena apart and a punch lunges twenty-six pixels,
+ * so a jab with no approach in front of it was thrown at nothing while the
+ * impact appeared over by the opponent.
+ */
+check('a jab on its own gets walked in', JSON.stringify(moves(closeInForMelee({
+  steps: [{ move: 'punch' }, { move: 'recoil' }],
+}))) === JSON.stringify(['charge', 'punch', 'recoil']));
+
+check('so does a swing', JSON.stringify(moves(closeInForMelee({
+  steps: [{ move: 'swing' }],
+}))) === JSON.stringify(['charge', 'swing']));
+
+check('one that already walks in is left alone', JSON.stringify(moves(closeInForMelee({
+  steps: [{ move: 'move_to' }, { move: 'punch' }],
+}))) === JSON.stringify(['move_to', 'punch']));
+
+check('and a taunt before the walk still counts as before it',
+  JSON.stringify(moves(closeInForMelee({
+    steps: [{ move: 'taunt' }, { move: 'dash' }, { move: 'kick' }],
+  }))) === JSON.stringify(['taunt', 'dash', 'kick']));
+
+// A shot is supposed to be taken from where they stand.
+check('a ranged opening is not walked in', JSON.stringify(moves(closeInForMelee({
+  steps: [{ move: 'projectile' }, { move: 'recoil' }],
+}))) === JSON.stringify(['projectile', 'recoil']));
+
+check('a move with no attack in it is left alone', JSON.stringify(moves(closeInForMelee({
+  steps: [{ move: 'taunt' }, { move: 'idle' }],
+}))) === JSON.stringify(['taunt', 'idle']));
+
+// The walk goes in front of the punch, not in front of the pose before it.
+check('the walk lands just before the blow', JSON.stringify(moves(closeInForMelee({
+  steps: [{ move: 'taunt' }, { move: 'punch' }],
+}))) === JSON.stringify(['taunt', 'charge', 'punch']));
+
+check('nothing malformed throws here either', closeInForMelee(null) === null
+  && closeInForMelee('x') === 'x'
+  && JSON.stringify(closeInForMelee({ steps: [1, null] })) === JSON.stringify({ steps: [1, null] }));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

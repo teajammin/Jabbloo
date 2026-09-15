@@ -1,5 +1,3 @@
-import { bubbleText } from './bubbleText';
-
 /**
  * "Loading", in the corner, while the game is genuinely busy.
  *
@@ -8,6 +6,13 @@ import { bubbleText } from './bubbleText';
  * everyone's artwork are fetched and decoded, and until that finishes there is
  * nothing to show but an empty stage. A room watching a big screen should
  * never have to guess whether something is happening.
+ *
+ * Set in the interface font rather than the game's bubble letters, which was a
+ * mistake worth explaining: those letters are thirty-odd separate image files,
+ * so the badge announcing that the network was busy could not appear until the
+ * network had fetched seven more things. It arrived late, a letter at a time,
+ * during precisely the wait it existed to cover. Text draws in the frame it is
+ * added, which is the entire job.
  *
  * Deliberately a corner badge rather than a screen over everything: whatever
  * is behind it — the battleground painting in, the first fighter arriving — is
@@ -19,22 +24,22 @@ export function loadingBadge(): { root: HTMLElement; done: () => void } {
   const root = document.createElement('div');
   root.className = 'loading-badge';
   root.setAttribute('role', 'status');
+  root.setAttribute('aria-label', 'Loading');
 
-  /*
-   * Sized against the screen it is on, not in fixed pixels.
-   *
-   * Thirty-four pixels of lettering is a modest badge on a laptop and a
-   * cramped one on a phone, where the same word has a third of the width to
-   * sit in. Taking it from the narrower side keeps the badge the same fraction
-   * of whatever it is shown on, and the bounds stop it becoming either a
-   * postage stamp or a banner.
-   */
-  const room = typeof window === 'undefined'
-    ? 34
-    : Math.min(window.innerWidth, window.innerHeight);
-  const height = Math.max(20, Math.min(34, Math.round(room * 0.062)));
-
-  root.appendChild(bubbleText('LOADING', { height, wave: true }));
+  // One span per letter, so the hop can run through them in order. Marked
+  // hidden from a screen reader, which has the label above instead.
+  const word = document.createElement('span');
+  word.className = 'loading-word';
+  word.setAttribute('aria-hidden', 'true');
+  [...'LOADING'].forEach((letter, index) => {
+    const span = document.createElement('span');
+    span.textContent = letter;
+    // The same hop, a beat after the one before it: what makes it a wave
+    // rather than a crowd is that every letter does the same thing in turn.
+    span.style.animationDelay = `${(index * 0.075).toFixed(3)}s`;
+    word.appendChild(span);
+  });
+  root.appendChild(word);
 
   let gone = false;
   const done = (): void => {

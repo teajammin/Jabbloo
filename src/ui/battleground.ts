@@ -154,9 +154,9 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
 
     heading.replaceChildren(bubbleText('WHERE', { height: titleHeight(104), jitter: 4 }));
 
-    root.append(
-      el('main', { class: 'screen screen-ground' }, heading, note, clock.root, grid),
-    );
+    const screen = el('main', { class: 'screen screen-ground is-loading' },
+      heading, note, clock.root, grid);
+    root.append(screen);
 
     if (connection.state) renderVotes(connection.state);
 
@@ -174,23 +174,43 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
      */
     const badge = loadingBadge();
     document.body.appendChild(badge.root);
-    grid.classList.add('is-loading');
 
     let shown = false;
     const reveal = (): void => {
       if (shown) return;
       shown = true;
-      grid.classList.remove('is-loading');
+      screen.classList.remove('is-loading');
       badge.done();
     };
 
-    void Promise.all(battlegrounds.map((ground) => new Promise<void>((resolve) => {
+    /*
+     * The whole page arrives at once, or not yet.
+     *
+     * Holding back only the pictures still let the heading, the note and the
+     * clock pop in one at a time while the badge said "loading" beside them —
+     * a page assembling itself in front of somebody is exactly what a loading
+     * state is supposed to spare them. Everything waits together: the
+     * photographs, and the lettering in the heading, which is thirty image
+     * files of its own.
+     */
+    const decoded = (src: string) => new Promise<void>((resolve) => {
       const img = new Image();
       img.addEventListener('load', () => resolve(), { once: true });
       img.addEventListener('error', () => resolve(), { once: true });
-      img.src = ground.image;
-    }))).then(reveal);
+      img.src = src;
+    });
 
+    void Promise.all([
+      ...battlegrounds.map((ground) => decoded(ground.image)),
+      ...[...heading.querySelectorAll('img')].map((img) => (img.complete
+        ? Promise.resolve()
+        : decoded(img.src))),
+    ]).then(() => {
+      // One frame, so the browser has laid the page out before it is shown.
+      requestAnimationFrame(reveal);
+    });
+
+    // A photograph that never comes must not cost anybody their vote.
     const revealAnyway = window.setTimeout(reveal, 2500);
 
     return () => {

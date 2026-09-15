@@ -97,6 +97,50 @@ export function aimReactionsAtTheEnemy(choreography: unknown): unknown {
   return changed ? { ...(choreography as object), steps: fixed } : choreography;
 }
 
+/**
+ * Walks a fighter in when the move needs them close.
+ *
+ * The mirror of the rule below, and the half that was missing. Fighters start
+ * a third of the arena apart, and a punch lunges twenty-six pixels — so a jab
+ * or an uppercut with no approach in front of it was thrown at nothing, while
+ * the impact appeared over by the opponent. The choreographer supplies an
+ * approach most of the time and simply forgets it the rest, which is not a
+ * thing worth asking twice for.
+ *
+ * `charge` is what gets used, because it ends at striking range by definition
+ * rather than at a guessed coordinate.
+ */
+export function closeInForMelee(choreography: unknown): unknown {
+  if (typeof choreography !== 'object' || choreography === null) return choreography;
+
+  const steps = (choreography as { steps?: unknown }).steps;
+  if (!Array.isArray(steps)) return choreography;
+
+  const nameOf = (step: unknown): string =>
+    typeof step === 'object' && step !== null && typeof (step as Step).move === 'string'
+      ? (step as Step).move as string
+      : '';
+  const isOwn = (step: unknown): boolean =>
+    typeof step === 'object' && step !== null && (step as Step).on !== 'enemy';
+
+  const firstAttack = steps.findIndex((step) => {
+    const name = nameOf(step);
+    return isOwn(step) && (RANGED.has(name) || MELEE.has(name));
+  });
+
+  // Nothing to walk to, or the move opens at range on purpose.
+  if (firstAttack < 0 || !MELEE.has(nameOf(steps[firstAttack]))) return choreography;
+
+  // Already on their way.
+  const approaches = steps
+    .slice(0, firstAttack)
+    .some((step) => APPROACH.has(nameOf(step)) && isOwn(step));
+  if (approaches) return choreography;
+
+  const walk = { move: 'charge', params: { duration: 0.6 } };
+  return { ...(choreography as object), steps: [...steps.slice(0, firstAttack), walk, ...steps.slice(firstAttack)] };
+}
+
 export function keepRangedAtRange(choreography: unknown): unknown {
   if (typeof choreography !== 'object' || choreography === null) return choreography;
 

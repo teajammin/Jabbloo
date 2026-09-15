@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, buildUserMessage, type FightContext } from './prompt';
-import { aimReactionsAtTheEnemy, keepRangedAtRange } from './distance';
+import { aimReactionsAtTheEnemy, closeInForMelee, keepRangedAtRange } from './distance';
 import { clientFor, type AiConfig } from './ai';
 
 /**
@@ -87,7 +87,7 @@ async function callModel(
   const parsed = extractJson(textOf(message));
   if (parsed === null) throw new Error('no JSON in response');
   // Told not to walk in before shooting, and it walks in anyway. See the file.
-  return aimReactionsAtTheEnemy(keepRangedAtRange(parsed));
+  return aimReactionsAtTheEnemy(closeInForMelee(keepRangedAtRange(parsed)));
 }
 
 export async function choreograph(

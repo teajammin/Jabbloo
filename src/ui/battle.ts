@@ -234,7 +234,12 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         stage.addFighter(fighter, side);
         onStage.set(id, fighter);
 
-        const bar = new engine.HealthBar(fighter.name, side);
+        // Their own photograph, if they brought one, at the outer edge of the
+        // bar — so the room can tell at a glance whose health it is watching.
+        const bar = new engine.HealthBar(
+          fighter.name, side, undefined,
+          ...(player.photo ? [player.photo] as const : []),
+        );
         bar.setHealth(player.health, STARTING_HEALTH, false);
         stage.addHealthBar(bar, side);
         bars.set(id, bar);

@@ -2185,6 +2185,35 @@ body:has(.screen-draw) .help-open { display: none !important; }
  * Fixed to the window rather than the stage, because the stage is the thing
  * that does not exist yet.
  */
+/*
+ * The word itself, in the interface font.
+ *
+ * Each letter is its own element so the hop can travel along it; the letters
+ * are text, so the badge is on screen in the frame it is added rather than
+ * after thirty image requests it is meant to be apologising for.
+ */
+.loading-word {
+  display: inline-flex;
+  font-size: clamp(15px, 3.4vmin, 22px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.loading-word > span {
+  display: inline-block;
+  animation-name: letter-hop;
+  animation-duration: 1.15s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-word > span { animation: none; }
+}
+
+[data-reduce-motion] .loading-word > span { animation: none; }
+
 .loading-badge {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
@@ -2193,7 +2222,7 @@ body:has(.screen-draw) .help-open { display: none !important; }
   /* Roomier at the top: the letters hop about a third of their height, and
      with even padding the raised ones climbed out of the pill. */
   /* Scales with the lettering inside it, which scales with the screen. */
-  padding: clamp(11px, 3.4vmin, 17px) clamp(11px, 3vmin, 16px) clamp(6px, 1.8vmin, 9px);
+  padding: clamp(10px, 2.4vmin, 14px) clamp(14px, 3vmin, 18px);
   border-radius: 999px;
   background: color-mix(in srgb, var(--panel) 84%, transparent);
   box-shadow: var(--shadow);
@@ -2216,15 +2245,21 @@ body:has(.screen-draw) .help-open { display: none !important; }
  * Held rather than hidden: the cards keep their space, so nothing jumps when
  * the photographs land and the clock beside them does not appear to move.
  */
-.ground-grid.is-loading {
+/*
+ * The page, while it is still coming together.
+ *
+ * Hidden rather than absent, so it is laid out and measured behind the badge
+ * and appears in one piece instead of assembling itself in front of the room.
+ */
+.screen-ground.is-loading > * {
   opacity: 0;
   pointer-events: none;
 }
 
-.ground-grid {
-  transition: opacity 0.3s ease;
+.screen-ground > * {
+  transition: opacity 0.28s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ground-grid { transition: none; }
+  .screen-ground > * { transition: none; }
 }
