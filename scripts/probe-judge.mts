@@ -12,6 +12,13 @@ import { judge } from '../server/judge';
 import { readConfig } from '../server/ai';
 
 const cases = [
+  // The calibration the scale is written against.
+  ['poop on opponent', 'Poop'],
+  ['fart on opponent', 'Beans'],
+  ['fire arrow at opponent', 'Bow'],
+  ['shoot rapid fire to the chest', 'Rifle'],
+  ["swing axe on opponent's neck", 'Axe'],
+  ['uppercut, punch to gut, shoot leg with weapon, then bite', 'Gun'],
   ['shoot them right in the heart', 'Gun'],
   ['shoot them in the knee', 'Gun'],
   ['stab them through the throat', 'Dagger'],

@@ -13,7 +13,11 @@
  * being tested is whether the server actually waits.
  */
 import { GROUND_IDS } from './grounds.mjs';
-import { GRACE_SECONDS } from './protocol.mjs';
+import { GRACE_SECONDS, WEAPON_COUNT } from './protocol.mjs';
+
+/** Named from the game's own count, so this suite follows it rather than leads. */
+const WEAPON_SLOTS = Array.from({ length: WEAPON_COUNT }, (_, i) => `weapon${i}`);
+const STAND_INS = ['Sword', 'Axe', 'Hammer'].slice(0, WEAPON_COUNT);
 let room = '';
 const freshRoom = () => { room = 'BOT' + Math.floor(Math.random() * 900000 + 100000); };
 const url = () => `ws://127.0.0.1:1999/parties/main/${room}`;
@@ -80,7 +84,7 @@ check('until the grace period runs out',
   JSON.stringify(state(host).players.find((p) => p.id === ids[1])?.progress));
 
 // Ann finishes the rest on her own; the room must not wait on a ghost.
-for (let i = 0; i < 14; i++) {
+for (let i = 0; i < 4 + WEAPON_COUNT * 4; i++) {
   a.send(JSON.stringify({ type: 'submitDrawing', slot: `weapon${Math.floor(i / 2)}`, png: PNG, done: true }));
   a.send(JSON.stringify({ type: 'ready' }));
   await wait(90);
@@ -101,10 +105,10 @@ const filled = state(host).players.find((p) => p.id === ids[1]);
 check('what they drew survives', filled.progress.drawn.includes('character'));
 check('what they named survives', filled.characterName === 'Deserter', filled.characterName);
 check('the weapons they never drew are filled in',
-  ['weapon0', 'weapon1', 'weapon2'].every((s) => filled.progress.drawn.includes(s)),
+  WEAPON_SLOTS.every((s) => filled.progress.drawn.includes(s)),
   JSON.stringify(filled.progress.drawn));
-check('and named Sword, Axe and Hammer',
-  JSON.stringify(filled.weaponNames) === JSON.stringify(['Sword', 'Axe', 'Hammer']),
+check('and named after the stand-ins',
+  JSON.stringify(filled.weaponNames) === JSON.stringify(STAND_INS),
   JSON.stringify(filled.weaponNames));
 
 // The host asks for artwork: the absent player's must be complete.
@@ -113,7 +117,7 @@ await wait(300);
 const art = host.inbox.filter((m) => m.type === 'art')
   .flatMap((m) => m.art)
   .find((entry) => entry.playerId === ids[1]);
-check('their artwork is whole', art?.character !== null && art?.weapons.length === 3,
+check('their artwork is whole', art?.character !== null && art?.weapons.length === WEAPON_COUNT,
   JSON.stringify(art?.weapons?.length));
 check('the stand-in weapons point at real files',
   art?.weapons.every((w) => w.png.startsWith('/placeholder-') || w.png.startsWith('data:')),
@@ -128,7 +132,7 @@ check('and wrote something usable',
   (turn?.moves[ids[1]]?.prompt ?? '').split(' ').length > 3,
   turn?.moves[ids[1]]?.prompt);
 check('with a weapon they own',
-  turn?.moves[ids[1]]?.weapon >= 0 && turn?.moves[ids[1]]?.weapon < 3,
+  turn?.moves[ids[1]]?.weapon >= 0 && turn?.moves[ids[1]]?.weapon < WEAPON_COUNT,
   String(turn?.moves[ids[1]]?.weapon));
 
 // Coming back reclaims the seat.

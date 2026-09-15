@@ -62,6 +62,41 @@ interface Step {
  * validation proper happens downstream, and this has no business deciding
  * what a malformed choreography means.
  */
+/**
+ * Reactions belong to whoever they happen to.
+ *
+ * `sicken`, `dizzy` and `knockdown` describe a state somebody is put into, and
+ * the prompt says in capitals that they are used on the enemy. The model still
+ * leaves the `on` off, and a step with no `on` runs on the attacker — so a
+ * player who wrote "poison them" watched their own fighter turn green and
+ * stagger while their opponent stood there untouched. Exactly backwards, and
+ * the funniest possible way to lose.
+ *
+ * Only filled in when it is missing. A move that deliberately says `"on":
+ * "self"` — poisoning yourself for power is a real thing somebody will write —
+ * is left alone.
+ */
+const REACTIONS = new Set(['sicken', 'dizzy', 'knockdown']);
+
+export function aimReactionsAtTheEnemy(choreography: unknown): unknown {
+  if (typeof choreography !== 'object' || choreography === null) return choreography;
+
+  const steps = (choreography as { steps?: unknown }).steps;
+  if (!Array.isArray(steps)) return choreography;
+
+  let changed = false;
+  const fixed = steps.map((step) => {
+    if (typeof step !== 'object' || step === null) return step;
+    const named = step as { move?: unknown; on?: unknown };
+    if (typeof named.move !== 'string' || !REACTIONS.has(named.move)) return step;
+    if (named.on !== undefined) return step;
+    changed = true;
+    return { ...named, on: 'enemy' };
+  });
+
+  return changed ? { ...(choreography as object), steps: fixed } : choreography;
+}
+
 export function keepRangedAtRange(choreography: unknown): unknown {
   if (typeof choreography !== 'object' || choreography === null) return choreography;
 

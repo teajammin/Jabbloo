@@ -1,3 +1,4 @@
+import gsap from 'gsap';
 import { loadTexture, reportMissingAsset } from './assets';
 import { Assets, Container, Sprite, Texture } from 'pixi.js';
 
@@ -113,5 +114,16 @@ export function spawnEffect(
  */
 export function despawnEffect(sprite: Sprite): void {
   if (sprite.destroyed) return;
+  /*
+   * Stop animating it before taking it away.
+   *
+   * An effect is usually moved by several tweens at once — across, up, down,
+   * spinning — and it is destroyed by whichever of them finishes first. The
+   * others are still in the same frame's render list, and writing a position
+   * into a freed Pixi object throws from inside GSAP's own loop, where no
+   * caller can catch it. That surfaced as "something went wrong" over a fight
+   * that was otherwise going perfectly well.
+   */
+  gsap.killTweensOf([sprite, sprite.scale, sprite.position]);
   sprite.destroy();
 }

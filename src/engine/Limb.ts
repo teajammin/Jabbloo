@@ -1,3 +1,4 @@
+import gsap from 'gsap';
 import { Graphics, LINE_CAP } from 'pixi.js';
 import { darken } from './colour';
 
@@ -95,6 +96,8 @@ export class Limb {
   }
 
   destroy(): void {
+    // Same reason as everywhere else: a tween outlives what it animates.
+    gsap.killTweensOf([this.view, this.view.scale, this.view.position]);
     this.view.destroy();
   }
 }

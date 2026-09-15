@@ -71,6 +71,26 @@ after the move ends — plainly does more damage than the same idea delivered
 once, so score it a band higher than the writing alone would earn. It has to
 be genuinely in what they wrote; do not read poison into an ordinary stab.
 
+Worked examples, which are the scale. Score against these, not against your
+own sense of what a number ought to mean:
+
+  "poop on opponent"                                          5
+  "fart on opponent"                                          6
+  "fire arrow at opponent"                                   10
+  "shoot rapid fire to the chest"                            20
+  "swing axe on opponent's neck"                             20
+  "uppercut, punch to the gut, shoot their leg, then bite"   27
+
+Read what those are worth. A joke with no force behind it sits near the
+bottom. A plain ranged attack with no target named is about ten. A serious
+attack on somewhere that matters — rapid fire to the chest, an axe to the neck
+— is about twenty, and twenty is not a ceiling.
+
+A combination is worth more than any of its parts. Several distinct attacks
+strung together, each one landing somewhere, is the top of the scale: that is
+what 27 and upward is for, and what 33 looks like. Do not treat a long
+combination as padding — count the blows.
+
 Ask yourself: would the room cheer, laugh, or shrug? Score the answer.`;
 
 export async function judge(request: JudgeRequest, config: AiConfig): Promise<JudgeResult> {

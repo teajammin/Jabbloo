@@ -9,6 +9,7 @@
  * nobody fights a fourth time.
  */
 import { GROUND_IDS } from './grounds.mjs';
+import { WEAPON_COUNT } from './protocol.mjs';
 import { makeEverything } from './creation-helper.mjs';
 const ROOM = 'TRN' + Math.floor(Math.random() * 9000 + 1000);
 const URL_ = `ws://127.0.0.1:1999/parties/main/${ROOM}`;
@@ -53,7 +54,7 @@ await makeEverything(host, { [ids[0]]: a, [ids[1]]: b }, state, wait, {
 await wait(250);
 
 check('names reach every screen',
-  state(a).players.find((p) => p.id === ids[0])?.weaponNames.length === 3,
+  state(a).players.find((p) => p.id === ids[0])?.weaponNames.length === WEAPON_COUNT,
   JSON.stringify(state(a).players.find((p) => p.id === ids[0])?.weaponNames));
 
 // Vote, then wait out the reveal into the battle.
@@ -91,8 +92,9 @@ check('a first striker is drawn', s.turn?.fighters.includes(s.turn?.first), Stri
 check('the prompt is trimmed to 50 words',
   s.turn?.moves[ids[1]]?.prompt.split(' ').length === 50,
   String(s.turn?.moves[ids[1]]?.prompt.split(' ').length));
+// Clamped to the last weapon they actually own, whatever that number is.
 check('an out-of-range weapon is clamped',
-  s.turn?.moves[ids[1]]?.weapon === 2, String(s.turn?.moves[ids[1]]?.weapon));
+  s.turn?.moves[ids[1]]?.weapon === WEAPON_COUNT - 1, String(s.turn?.moves[ids[1]]?.weapon));
 
 // The host drives the loop on.
 host.send(JSON.stringify({ type: 'turnDone' }));

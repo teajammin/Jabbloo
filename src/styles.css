@@ -980,7 +980,7 @@ input[type='text'] {
 }
 
 /* Shorter still: a landscape phone, or a laptop with a lot of browser on it. */
-@media (max-height: 620px) {
+@media (max-height: 700px) {
   .tool { min-width: 40px; min-height: 40px; font-size: 16px; padding: 4px 6px; }
   .tool.wide { min-width: 60px; font-size: 12px; }
   .size { width: 40px; height: 40px; }
@@ -1089,8 +1089,20 @@ input[type='text'] {
     /* Left, ahead of the canvas, without reordering the markup — the canvas
        should still come first for a screen reader. */
     order: -1;
-    flex: 0 0 300px;
-    width: 300px;
+    /*
+     * Takes whatever the canvas leaves.
+     *
+     * The canvas is square, so on a laptop its size is decided entirely by the
+     * height and widening this costs it nothing — while a fixed 300px column
+     * left 175px of empty screen on either side of the pair and stacked the
+     * controls so tall that the crop bar fell off the bottom, where the only
+     * way to reach "Place it here" was to know it was there and scroll for it.
+     * Wider means fewer rows, which means everything fits.
+     */
+    flex: 1 1 260px;
+    width: auto;
+    min-width: 240px;
+    max-width: 560px;
     /* Not centred: a centred flex column that overflows its container puts
        content above the scrollable area, where it cannot be reached at all. */
     justify-content: flex-start;

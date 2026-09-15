@@ -202,8 +202,15 @@ export interface Player {
 
 export type Phase = 'lobby' | 'creating' | 'battleground' | 'battle' | 'ult' | 'results';
 
-/** How many weapons each player makes, per the brief. */
-export const WEAPON_COUNT = 3;
+/**
+ * How many weapons each player makes.
+ *
+ * Independent of [[ROUNDS_EACH]], which is how many times each fighter fights:
+ * two weapons and three rounds means somebody picks one of them twice, which
+ * is a choice rather than a shortage. Three of everything made creation long
+ * enough that people were still drawing when the room wanted to get on.
+ */
+export const WEAPON_COUNT = 2;
 
 /**
  * The creation timeline.

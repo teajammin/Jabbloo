@@ -316,6 +316,8 @@ export class BattleStage {
 
     await new Promise<void>((resolve) => {
       tl.eventCallback('onComplete', () => {
+        // Same rule as everywhere: stop animating it, then take it away.
+        gsap.killTweensOf([card, card.scale, letters, letters.scale]);
         if (!card.destroyed) card.destroy();
         if (!letters.destroyed) letters.destroy({ children: true });
         resolve();
@@ -466,6 +468,26 @@ export class BattleStage {
   destroy(): void {
     this.destroyed = true;
     this.resizeObserver.disconnect();
+
+    /*
+     * Nothing may still be animating what is about to be freed.
+     *
+     * Killing the fighters' tweens is the fighters' own job, but the stage
+     * animates plenty in its own right — the shake, the vignette, the
+     * scenery, and whatever proclamation was halfway through when the screen
+     * went. A tween that survives its target writes into a freed Pixi object
+     * from inside GSAP's render loop, where no caller can catch it, and the
+     * player is shown "something went wrong" about a game that had finished
+     * perfectly well.
+     */
+    for (const layer of [this.world, this.overlay, this.effects, this.fighters,
+      this.vignette, this.ground, this.scene, this.backdrop]) {
+      gsap.killTweensOf([layer, layer.position, layer.scale]);
+    }
+    for (const child of [...this.overlay.children]) {
+      gsap.killTweensOf([child, child.position, child.scale]);
+    }
+
     this.app.destroy(true, { children: true });
   }
 }

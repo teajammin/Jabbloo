@@ -6,7 +6,7 @@
  * enforcement has to get right — including the ones where an approach is
  * perfectly correct and must survive.
  */
-import { keepRangedAtRange } from '../server/distance';
+import { aimReactionsAtTheEnemy, keepRangedAtRange } from '../server/distance';
 
 let pass = 0, fail = 0;
 const check = (name: string, cond: boolean, detail = '') => {
@@ -86,6 +86,42 @@ check('steps that are not objects', JSON.stringify(keepRangedAtRange({ steps: [1
 check('steps with no move', JSON.stringify(moves(keepRangedAtRange({
   steps: [{ params: {} }, { move: 'projectile' }],
 }))) === JSON.stringify(['?', 'projectile']));
+
+/*
+ * Who a reaction happens to.
+ *
+ * A step with no `on` runs on the attacker, and the model keeps leaving it
+ * off — so "poison them" turned the writer's own fighter green while their
+ * opponent stood there untouched. Exactly backwards, and the funniest possible
+ * way to lose.
+ */
+const onOf = (value: unknown): (string | undefined)[] =>
+  ((value as { steps?: { on?: string }[] }).steps ?? []).map((s) => s.on);
+
+check('poison lands on the enemy by default', JSON.stringify(onOf(aimReactionsAtTheEnemy({
+  steps: [{ move: 'swing' }, { move: 'sicken' }],
+}))) === JSON.stringify([undefined, 'enemy']));
+
+check('so do dizzy and knockdown', JSON.stringify(onOf(aimReactionsAtTheEnemy({
+  steps: [{ move: 'dizzy' }, { move: 'knockdown' }],
+}))) === JSON.stringify(['enemy', 'enemy']));
+
+check('an attack is not redirected', JSON.stringify(onOf(aimReactionsAtTheEnemy({
+  steps: [{ move: 'punch' }, { move: 'projectile' }],
+}))) === JSON.stringify([undefined, undefined]));
+
+// Poisoning yourself for power is a real thing somebody will write.
+check('a deliberate self-target is left alone', JSON.stringify(onOf(aimReactionsAtTheEnemy({
+  steps: [{ move: 'sicken', on: 'self' }],
+}))) === JSON.stringify(['self']));
+
+check('and one already aimed is untouched', JSON.stringify(onOf(aimReactionsAtTheEnemy({
+  steps: [{ move: 'sicken', on: 'enemy' }],
+}))) === JSON.stringify(['enemy']));
+
+check('nothing malformed throws', aimReactionsAtTheEnemy(null) === null
+  && aimReactionsAtTheEnemy('x') === 'x'
+  && JSON.stringify(aimReactionsAtTheEnemy({ steps: [1, null] })) === JSON.stringify({ steps: [1, null] }));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -398,8 +398,11 @@ export class Fighter {
     // Tweens outlive the thing they animate: an entrance or a half-played move
     // would go on writing positions into a destroyed sprite every frame.
     gsap.killTweensOf([
-      this.root, this.body, this.hand, this.bodySprite, this.weaponSprite,
-      this.root.scale, this.body.scale, this.body.position, this.weaponSprite.scale,
+      this.root, this.body, this.hand, this.bodySprite, this.weaponSprite, this.limbs,
+      this.root.scale, this.root.position,
+      this.body.scale, this.body.position,
+      this.hand.scale, this.hand.position,
+      this.bodySprite.scale, this.weaponSprite.scale, this.weaponSprite.position,
     ]);
     this.leg.destroy();
     this.arm.destroy();

@@ -231,6 +231,13 @@ if (inBattle) {
     bo.say({ type: 'submitMove', weapon: 0, prompt: 'swing wildly at their head' });
     ok(`moves sent ("${MOVE}")`);
 
+    // One seat goes dark, which is the state the host screen has been
+    // complaining about: a player replaced by a bot mid-fight.
+    if (process.env['E2E_DROP'] === '1') {
+      bo.close();
+      console.log('  dropped Bo');
+    }
+
     // The entrance comes first — names, VERSUS, FIGHT — and takes the better
     // part of ten seconds. Watching from here would spend the whole window on
     // people walking on, which is how an earlier run concluded that nothing
@@ -294,6 +301,10 @@ if (inBattle) {
   } else {
     note(`the turn never opened for moves (${turn?.phase})`);
   }
+
+  const banner = await evaluate(
+    `document.querySelector('.breakage')?.textContent ?? 'none'`);
+  banner === 'none' ? ok('no breakage banner') : note(`breakage banner: ${banner}`);
 
   console.log('  api calls:', await evaluate(`JSON.stringify(window.__api ?? [], null, 1).slice(0, 1200)`));
 

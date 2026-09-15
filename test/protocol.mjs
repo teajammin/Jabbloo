@@ -18,3 +18,4 @@ function number(name) {
 
 export const GRACE_SECONDS = number('GRACE_SECONDS');
 export const MOVE_SECONDS = number('MOVE_SECONDS');
+export const WEAPON_COUNT = number('WEAPON_COUNT');

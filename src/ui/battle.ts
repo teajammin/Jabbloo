@@ -49,6 +49,16 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
      * same two people again every round turns a reveal into a delay.
      */
     const introduced = new Set<string>();
+    /**
+     * Whether this screen arrived after the fight had already begun.
+     *
+     * A reload puts the big screen back into a round that is already running,
+     * and the full entrance — each fighter named, then VERSUS — is a ceremony
+     * for a start that happened minutes ago. It reads as the game beginning
+     * again, which is alarming when it is not. Coming back gets the fighters
+     * in place and a single FIGHT, and then carries on.
+     */
+    let resumed: boolean | null = null;
     /** Taken down on teardown, so leaving mid-load does not strand it. */
     let loading: { done: () => void } | null = null;
     /** The final-round warning is worth one interruption, not one per round. */
@@ -253,16 +263,18 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
        * people against each other before every exchange turns the moment into
        * furniture, and it was doing exactly that.
        */
-      const opening = entering.some(({ id }) => !introduced.has(id));
+      const opening = entering.some(({ id }) => !introduced.has(id)) && resumed !== true;
 
       for (const [index, { fighter, side, name, id }] of entering.entries()) {
         if (disposed) return;
-        if (!introduced.has(id)) {
-          introduced.add(id);
+        introduced.add(id);
+
+        if (opening) {
           caption.textContent = `${name} steps up`;
           await stage.announce(name, side);
           if (disposed) return;
         }
+
         await stage.enterStage(fighter, side);
         if (disposed) return;
 
@@ -277,7 +289,9 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
       if (disposed) return;
 
-      if (opening) {
+      // The call to fight, whether this is the start or a screen catching up.
+      if (opening || resumed === true) {
+        resumed = false;
         caption.textContent = 'Fight!';
         await stage.proclaim('fight', 0.9);
         if (disposed) return;
@@ -441,6 +455,18 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (disposed || !ready) return;
 
       const turn = state.turn;
+
+      /*
+       * Decided once, from the first round this screen ever sees.
+       *
+       * Arriving at anything other than the opening moments of the first round
+       * means the fight was already under way — a reload, a host coming back,
+       * a screen opened late — and the entrance belongs to a beginning that
+       * has already happened.
+       */
+      if (resumed === null && turn) {
+        resumed = turn.index > 0 || turn.phase !== 'picking';
+      }
       if (!turn) return;
 
       const key = `${turn.fighters.join('-')}:${turn.phase}`;
