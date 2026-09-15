@@ -111,6 +111,52 @@ export function graceRemaining(player: Player, now = Date.now()): number {
   return Math.max(0, Math.ceil((player.leftAt + GRACE_SECONDS * 1000 - now) / 1000));
 }
 
+/**
+ * What the room supplies for anything nobody drew or named.
+ *
+ * Shared rather than server-only because a player deserves to see what they
+ * are about to be given: a naming step for a weapon that was never drawn used
+ * to show an empty box and the words "nothing drawn", which tells somebody
+ * their work is missing without telling them what happens next. Showing the
+ * actual stand-in answers the question instead.
+ *
+ * Paths rather than data URLs: every device loads them from its own origin,
+ * so they cost nothing to broadcast and nothing to store.
+ */
+export const FALLBACK_WEAPONS = ['Sword', 'Axe', 'Hammer'];
+
+export const FALLBACK_WEAPON_ART = [
+  '/placeholder-weapon-sword.png',
+  '/placeholder-weapon-axe.png',
+  '/placeholder-weapon-hammer.png',
+];
+
+export const FALLBACK_CHARACTER_ART = [
+  '/placeholder-character-a.png',
+  '/placeholder-character-b.png',
+];
+
+/**
+ * The stand-in for one creation slot, exactly as the room would fill it in.
+ *
+ * `index` is the player's place among the fighters, which is how the room
+ * decides which of the two stand-in characters somebody gets. Weapons go by
+ * their own slot number, so everybody's first stand-in is a Sword.
+ */
+export function standIn(slot: string, index = 0): { png: string; name: string } {
+  if (slot === 'character') {
+    return {
+      png: FALLBACK_CHARACTER_ART[index % FALLBACK_CHARACTER_ART.length]!,
+      name: 'Nameless',
+    };
+  }
+  const weapon = Number(slot.replace('weapon', '')) || 0;
+  return {
+    png: FALLBACK_WEAPON_ART[weapon % FALLBACK_WEAPON_ART.length]!,
+    name: FALLBACK_WEAPONS[weapon] ?? 'Ultimate',
+  };
+}
+
 export const MAX_PLAYERS = 6;
 export const MIN_PLAYERS = 2;
 export const ROOM_CODE_LENGTH = 4;

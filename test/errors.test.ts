@@ -7,7 +7,7 @@
  * never throws — because an error reporter that throws while reporting is the
  * worst bug a program can have.
  */
-import { buildReport, resetErrorLog, setErrorContext } from '../src/errors';
+import { describeBreakage, buildReport, resetErrorLog, setErrorContext } from '../src/errors';
 
 let pass = 0, fail = 0;
 const check = (name: string, cond: boolean, detail = '') => {
@@ -92,6 +92,39 @@ setErrorContext('ABCD');
   check('a huge message is trimmed', (report?.message.length ?? 0) <= 300, String(report?.message.length));
   check('and a huge stack too', (report?.stack?.length ?? 0) <= 1200, String(report?.stack?.length));
 }
+
+/*
+ * What a player is told when the game breaks.
+ *
+ * "Something went wrong" tells them nothing they did not already know and
+ * leaves them guessing whether to wait, reload, or go and find whoever set the
+ * game up. Each of these has a different answer, so each has to be named.
+ */
+const says = (error: unknown) => describeBreakage(error).toLowerCase();
+
+check('a dropped socket is named as one',
+  says(new Error('WebSocket connection closed')).includes('connection'),
+  says(new Error('WebSocket connection closed')));
+check('and says the room carries on without them',
+  says(new Error('socket disconnected')).includes('still in it'));
+check('an unreachable server blames the wifi',
+  says(new TypeError('Failed to fetch')).includes('wifi'));
+check('missing artwork mentions stand-ins',
+  says(new Error('texture /effects/bullet.png failed to decode')).includes('stand-ins'));
+check('a renderer that will not start says so',
+  says(new Error('Unable to auto-detect a suitable renderer')).includes('arena'));
+check('running out of memory suggests closing tabs',
+  says(new Error('quota exceeded')).includes('other tabs'));
+check('a failed choreography says the fight carries on',
+  says(new Error('choreograph failed: 503')).includes('plain swing'));
+
+// Anything unrecognised keeps the old words: a wrong explanation is worse
+// than none at all.
+check('something unfamiliar falls back',
+  says(new Error('the flux capacitor is upside down')).includes('something went wrong'));
+check('a bare string is handled', typeof describeBreakage('boom') === 'string');
+check('null is handled', typeof describeBreakage(null) === 'string');
+check('an object with no message is handled', typeof describeBreakage({}) === 'string');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

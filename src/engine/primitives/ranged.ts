@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 import { spawnEffect, despawnEffect, type EffectKind } from '../effects';
-import { clamp, burst, contactPoint, directionToEnemy, duration, handPoint } from './util';
+import { clamp, burst, contactPoint, directionToEnemy, duration, handPoint, muzzlePoint } from './util';
 import { palette } from '../theme';
 import type {
   BeamParams, PrimitiveContext, ProjectileParams, ShockwaveParams, SummonParams,
@@ -48,7 +48,8 @@ export function projectile(ctx: PrimitiveContext, params: ProjectileParams = {})
   tl.to(ctx.actor.body, { rotation: -dir * 0.14, duration: seconds * 0.25, ease: 'power2.out' });
 
   tl.call(() => {
-    const from = handPoint(ctx);
+    // Out of the business end, not out of the fighter.
+    const from = muzzlePoint(ctx);
     const to = contactPoint(ctx);
     const sprite = spawnEffect(ctx.stage.effects, kind, { ...from, height: size, alpha: 0 });
 
@@ -112,7 +113,9 @@ export function beam(ctx: PrimitiveContext, params: BeamParams = {}) {
 
   // Fire.
   tl.call(() => {
-    const from = handPoint(ctx);
+    // A beam leaves the weapon too; the charge before it gathers at the hand,
+    // which is where somebody gathering something would hold it.
+    const from = muzzlePoint(ctx);
     const to = contactPoint(ctx);
     const dx = to.x - from.x;
     const dy = to.y - from.y;

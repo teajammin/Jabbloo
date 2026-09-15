@@ -12,7 +12,7 @@ import { mountConnectionBanner } from './ui/connection';
 import { rememberedRoom } from './ui/resume';
 import { warmGlyphs } from './ui/bubbleText';
 import { mountBackdrop } from './ui/backdrop';
-import { watchForErrors } from './errors';
+import { describeBreakage, watchForErrors } from './errors';
 import { loadSettings } from './settings';
 import { launchScreen } from './ui/launch';
 import { joinRoomScreen } from './ui/joinRoom';
@@ -21,18 +21,17 @@ const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('#app missing');
 
 /**
- * Tells the player when the game has broken.
+ * Tells the player when the game has broken, and what broke.
  *
  * A screen that has stopped responding with no explanation is worse than an
  * apology: the player does not know whether to wait, reload, or tell someone.
  */
-function showBreakage(): void {
+function showBreakage(error: unknown): void {
   if (document.querySelector('.breakage')) return;
   const banner = document.createElement('div');
   banner.className = 'breakage';
   banner.setAttribute('role', 'alert');
-  banner.textContent = 'Something went wrong. Reloading usually fixes it — '
-    + 'your drawings are on the server.';
+  banner.textContent = describeBreakage(error);
 
   const reload = document.createElement('button');
   reload.type = 'button';
@@ -48,7 +47,7 @@ function showBreakage(): void {
  * being built is caught too — that is precisely the failure nobody would
  * otherwise hear about.
  */
-watchForErrors(() => showBreakage());
+watchForErrors((error) => showBreakage(error));
 
 /*
  * Safari's pinch zoom is not covered by touch-action, and it fires on the

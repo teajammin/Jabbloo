@@ -4,7 +4,7 @@ import { drawScreen } from './drawScreen';
 import { battlegroundScreen } from './battleground';
 import type { RoomConnection } from '../net/room';
 import {
-  creators, displayName, graceExpired, stepFor, stepsFor, stillWorking,
+  creators, displayName, graceExpired, standIn, stepFor, stepsFor, stillWorking,
   type Player, type RoomState,
 } from '../shared/protocol';
 
@@ -114,21 +114,33 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     function showName(slot: string): void {
       body.replaceChildren();
 
-      // This slot's drawing, and no other. Nothing drawn means nothing shown:
-      // the room fills in a stand-in for anyone who ran out of time, and
-      // showing them the last thing they drew instead is a lie about what
-      // they are naming.
+      /*
+       * This slot's drawing — or, if there isn't one, the thing they will
+       * actually be given.
+       *
+       * Nothing drawn used to say so in words over an empty box, which tells
+       * somebody their work is missing without telling them what happens next.
+       * The room fills these in from a table the client can read too, so the
+       * honest answer is simply to show it: this is your weapon, name it.
+       */
       const drawn = drawnBySlot.get(slot);
-      const preview = drawn
-        ? el('img', { class: 'creation-preview', src: drawn, alt: '' })
-        : el('div', { class: 'creation-preview empty' },
-            el('span', {}, slot === 'character'
-              ? 'Nothing drawn — a stand-in will fight for you'
-              : 'Nothing drawn — you will get a stand-in weapon'));
+      const seat = creators(connection.state ?? { players: [] } as unknown as RoomState)
+        .findIndex((p) => p.id === connection.playerId);
+      const fallback = standIn(slot, seat < 0 ? 0 : seat);
+
+      const preview = el('img', {
+        class: `creation-preview${drawn ? '' : ' is-standin'}`,
+        src: drawn ?? fallback.png,
+        alt: '',
+      });
 
       const input = el('input', {
         type: 'text', class: 'name-input', maxLength: 24,
-        placeholder: slot === 'character' ? 'Sir Bonkalot' : 'Butter Sword',
+        // A slot with no drawing is already a known thing, so the box suggests
+        // what it is rather than a joke about something else.
+        placeholder: drawn
+          ? (slot === 'character' ? 'Sir Bonkalot' : 'Butter Sword')
+          : fallback.name,
       });
       input.setAttribute('autocomplete', 'off');
 
@@ -140,7 +152,11 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       const form = el('form', { class: 'stack' }, input, button('Save', send, 'big primary'));
       form.addEventListener('submit', (event) => { event.preventDefault(); send(); });
 
-      body.append(preview, form);
+      body.append(preview, ...(drawn ? [] : [
+        el('p', { class: 'help-note' }, slot === 'character'
+          ? 'Nothing drawn, so this one is fighting for you. Give it a name.'
+          : `Nothing drawn, so you get this ${fallback.name}. Name it anyway.`),
+      ]), form);
       input.focus();
     }
 

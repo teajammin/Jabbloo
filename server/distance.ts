@@ -1,5 +1,5 @@
 /**
- * Keeping ranged attacks at range.
+ * Keeping ranged attacks at range — and only those.
  *
  * The choreographer is told, in as many words, that a shot or a throw is made
  * from where the attacker stands. It walks in anyway — near enough every time,
@@ -12,13 +12,39 @@
  * this reliably are not instructions, and this is cheap, deterministic, and
  * applies equally to the fallback model and to anything either of them
  * invents on a bad day.
+ *
+ * The narrowness matters as much as the rule. A first pass treated every
+ * effect that leaves the body as ranged — shockwaves, summons, a projectile
+ * anywhere in the move — and stopped fighters closing at all: a charge into a
+ * ground slam had its charge removed, and the slam happened across the room.
+ * Closing the distance is most of this game. Only a move that *opens* with
+ * something crossing the gap keeps its distance.
  */
 
 /** Moves that carry the fighter toward their opponent. */
 const APPROACH = new Set(['move_to', 'dash', 'charge', 'step', 'lunge']);
 
-/** Moves that put something across the gap, and so need the gap to exist. */
-const RANGED = new Set(['projectile', 'beam', 'throw', 'shockwave', 'summon']);
+/**
+ * Moves that cross the gap, and so need the gap to exist.
+ *
+ * Deliberately short. A shockwave can be a shout from across the arena or a
+ * fist into the ground at someone's feet; a summon falls out of the sky
+ * wherever its target is standing. Neither says anything about where the
+ * attacker should be, so neither belongs here.
+ */
+const RANGED = new Set(['projectile', 'beam', 'throw']);
+
+/**
+ * Moves that only make sense within arm's reach.
+ *
+ * If one of these comes first, the fighter is meant to be close, and whatever
+ * walked them over is doing its job — even if something is thrown or fired
+ * later in the same move.
+ */
+const MELEE = new Set([
+  'swing', 'slam', 'punch', 'kick', 'headbutt', 'bite', 'lick', 'grab',
+  'stomp', 'spin_weapon', 'inhale',
+]);
 
 interface Step {
   move?: unknown;
@@ -27,11 +53,10 @@ interface Step {
 }
 
 /**
- * Drops any approach the attacker makes before their first ranged move.
+ * Drops any approach the attacker makes before a move that opens at range.
  *
  * Only before it: closing in *afterwards* is a fair follow-up — fire, then
- * rush them while they are reeling — and that reads fine. It is the walk
- * before the shot that spoils it.
+ * rush them while they are reeling — and that reads fine.
  *
  * Anything that is not a recognisable list of steps is handed straight back;
  * validation proper happens downstream, and this has no business deciding
@@ -48,16 +73,21 @@ export function keepRangedAtRange(choreography: unknown): unknown {
       ? (step as Step).move as string
       : '';
 
-  // Only the attacker's own approach counts. A step aimed at the enemy that
+  // Only the attacker's own moves count. A step aimed at the enemy that
   // happens to share a name is something being done *to* them.
   const isOwn = (step: unknown): boolean =>
     typeof step === 'object' && step !== null && (step as Step).on !== 'enemy';
 
-  const firstRanged = steps.findIndex((step) => RANGED.has(nameOf(step)) && isOwn(step));
-  if (firstRanged <= 0) return choreography;
+  // The first thing that actually attacks decides how this move is fought.
+  const firstAttack = steps.findIndex((step) => {
+    const name = nameOf(step);
+    return isOwn(step) && (RANGED.has(name) || MELEE.has(name));
+  });
+  if (firstAttack <= 0) return choreography;
+  if (!RANGED.has(nameOf(steps[firstAttack]))) return choreography;
 
   const kept = steps.filter((step, index) =>
-    index >= firstRanged || !(APPROACH.has(nameOf(step)) && isOwn(step)));
+    index >= firstAttack || !(APPROACH.has(nameOf(step)) && isOwn(step)));
 
   if (kept.length === steps.length) return choreography;
   return { ...(choreography as object), steps: kept };

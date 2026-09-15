@@ -109,6 +109,37 @@ export function handPoint(ctx: PrimitiveContext): { x: number; y: number } {
   return ctx.stage.effects.toLocal(global);
 }
 
+/**
+ * Where a shot actually leaves from: the far end of the weapon.
+ *
+ * The hand is the wrong place for it. A bullet appearing at the grip looks
+ * like it came out of the fighter rather than the barrel, and on a long weapon
+ * — a rifle, a bow, a staff — it is a good fraction of the screen adrift, so
+ * the shot appears to pass through the thing that fired it.
+ *
+ * Measured from the weapon's own bounds rather than worked out from its grip
+ * and rotation, because the bounds already account for every transform that
+ * has been applied to it: the grip, the turn that aimed it, the fighter's
+ * facing, and whatever the current animation is doing to the arm. The leading
+ * edge is simply whichever side is nearer the opponent.
+ *
+ * Falls back to the hand when there is no weapon on show — a punch, a kick, a
+ * shout — where the hand is the honest answer.
+ */
+export function muzzlePoint(ctx: PrimitiveContext): { x: number; y: number } {
+  const weapon = ctx.actor.weapon;
+  if (!weapon.visible || weapon.width === 0) return handPoint(ctx);
+
+  const bounds = weapon.getBounds();
+  if (bounds.width === 0 && bounds.height === 0) return handPoint(ctx);
+
+  const dir = directionToEnemy(ctx);
+  return ctx.stage.effects.toLocal({
+    x: dir > 0 ? bounds.x + bounds.width : bounds.x,
+    y: bounds.y + bounds.height / 2,
+  } as never);
+}
+
 /** Pops a burst at a point and cleans it up. Add to a timeline at the moment of contact. */
 export function burst(
   tl: gsap.core.Timeline,

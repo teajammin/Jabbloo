@@ -23,6 +23,9 @@ import {
   creators,
   drawBattleground,
   GRACE_SECONDS,
+  FALLBACK_CHARACTER_ART,
+  FALLBACK_WEAPON_ART,
+  FALLBACK_WEAPONS,
   graceExpired,
   holdingUpRematch,
   isDuel,
@@ -47,24 +50,6 @@ import {
  * back — never their own optimistic copy — so the host screen and every phone
  * always agree on who is in the room and what phase it is in.
  */
-/** Stand-in names, per the brief's rule for anything left unnamed. */
-const FALLBACK_WEAPONS = ['Sword', 'Axe', 'Hammer'];
-
-/**
- * Artwork for anything nobody drew.
- *
- * Paths rather than data URLs: the host loads them straight from its own
- * origin, which costs nothing to broadcast and nothing to store.
- */
-const FALLBACK_WEAPON_ART = [
-  '/placeholder-weapon-sword.png',
-  '/placeholder-weapon-axe.png',
-  '/placeholder-weapon-hammer.png',
-];
-const FALLBACK_CHARACTER_ART = [
-  '/placeholder-character-a.png',
-  '/placeholder-character-b.png',
-];
 
 /**
  * What a bot writes when it is playing someone's turn for them.

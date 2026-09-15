@@ -49,6 +49,33 @@ check('a ranged move already first is untouched', JSON.stringify(moves(keepRange
   steps: [{ move: 'projectile' }, { move: 'recoil' }],
 }))) === JSON.stringify(['projectile', 'recoil']));
 
+/*
+ * Closing the distance is most of this game, and a first pass at this rule
+ * stopped it happening at all: anything that left the body counted as ranged,
+ * so a charge into a ground slam lost its charge and the slam landed from
+ * across the room.
+ */
+check('a charge into a slam keeps its charge', JSON.stringify(moves(keepRangedAtRange({
+  steps: [{ move: 'charge' }, { move: 'slam' }, { move: 'shockwave' }],
+}))) === JSON.stringify(['charge', 'slam', 'shockwave']));
+
+check('a shockwave is not a ranged attack', JSON.stringify(moves(keepRangedAtRange({
+  steps: [{ move: 'move_to' }, { move: 'shockwave' }],
+}))) === JSON.stringify(['move_to', 'shockwave']));
+
+check('nor is something dropped out of the sky', JSON.stringify(moves(keepRangedAtRange({
+  steps: [{ move: 'charge' }, { move: 'summon' }],
+}))) === JSON.stringify(['charge', 'summon']));
+
+check('a punch that sends something flying still gets to close the distance',
+  JSON.stringify(moves(keepRangedAtRange({
+    steps: [{ move: 'dash' }, { move: 'punch' }, { move: 'projectile' }],
+  }))) === JSON.stringify(['dash', 'punch', 'projectile']));
+
+check('but a shot that opens the move does not', JSON.stringify(moves(keepRangedAtRange({
+  steps: [{ move: 'dash' }, { move: 'projectile' }, { move: 'punch' }],
+}))) === JSON.stringify(['projectile', 'punch']));
+
 // Nothing malformed may throw: this runs on every choreography the model
 // returns, including the bad ones, and validation proper happens downstream.
 check('no steps at all', keepRangedAtRange({}) !== undefined);

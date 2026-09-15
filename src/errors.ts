@@ -51,7 +51,7 @@ export function setErrorContext(room: string): void {
 
 const seen = new Map<string, number>();
 let sent = 0;
-let onFirstError: (() => void) | undefined;
+let onFirstError: ((error: unknown) => void) | undefined;
 
 /** The screen a player is looking at, taken from the DOM rather than tracked. */
 function currentScreen(): string {
@@ -127,7 +127,7 @@ export function report(error: unknown): void {
     if (!shaped) return;
     console.error('[jabbloo]', shaped.message, error);
     send(shaped);
-    if (shaped.count === 1) onFirstError?.();
+    if (shaped.count === 1) onFirstError?.(error);
   } catch {
     // As above.
   }
@@ -139,7 +139,7 @@ export function report(error: unknown): void {
  * `notify` is called the first time something breaks, so a screen can tell the
  * player rather than leaving them staring at a game that has stopped.
  */
-export function watchForErrors(notify?: () => void): () => void {
+export function watchForErrors(notify?: (error: unknown) => void): () => void {
   onFirstError = notify;
 
   const onError = (event: ErrorEvent) => report(event.error ?? event.message);
@@ -153,6 +153,53 @@ export function watchForErrors(notify?: () => void): () => void {
     window.removeEventListener('unhandledrejection', onRejection);
     onFirstError = undefined;
   };
+}
+
+/**
+ * Says what broke, in the fewest words that are actually true.
+ *
+ * "Something went wrong" tells a player nothing they did not already know, and
+ * leaves them guessing whether to wait, reload, or go and find whoever set the
+ * game up. Most failures here fall into a handful of kinds that each have a
+ * different answer, and naming the kind is usually enough to pick one.
+ *
+ * Matched on the message rather than on types, because by the time an error
+ * reaches the window it may be a string, a DOM event, or something a library
+ * threw. The generic line is still there for anything that does not match: a
+ * wrong explanation would be worse than none.
+ */
+export function describeBreakage(error: unknown): string {
+  const text = String(
+    (typeof error === 'object' && error !== null && 'message' in error
+      ? (error as { message?: unknown }).message
+      : error) ?? '',
+  ).toLowerCase();
+
+  if (/websocket|socket|connection|disconnect|network|offline|econn/.test(text)) {
+    return 'Lost the connection to the room. Everyone else is still in it, '
+      + 'and your drawings are on the server.';
+  }
+  if (/fetch|failed to fetch|load failed|timeout|abort/.test(text)) {
+    return 'Could not reach the server. Check the wifi — nothing is lost.';
+  }
+  if (/texture|asset|image|decode|\.png|\.jpg/.test(text)) {
+    return 'Some of the artwork did not load. The fight will use stand-ins '
+      + 'for anything missing.';
+  }
+  if (/webgl|context|renderer|gpu/.test(text)) {
+    return 'This browser could not start the arena. Reloading usually fixes '
+      + 'it; another tab using a lot of memory is the usual cause.';
+  }
+  if (/quota|storage|memory/.test(text)) {
+    return 'This device ran out of room. Closing other tabs and reloading '
+      + 'usually fixes it.';
+  }
+  if (/choreograph|judge|api|429|503/.test(text)) {
+    return 'The move could not be choreographed, so the fight fell back to a '
+      + 'plain swing. Nothing else is affected.';
+  }
+  return 'Something went wrong. Reloading usually fixes it — your drawings '
+    + 'are on the server.';
 }
 
 /** For tests: forgets what has been seen and sent. */
