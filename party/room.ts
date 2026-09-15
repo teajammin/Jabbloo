@@ -137,14 +137,33 @@ export default class Room implements Party.Server {
     const vouch = async (roomId: string, device: string): Promise<boolean> => {
       try {
         const party = lobby.parties['main']?.get(roomId.toUpperCase());
-        if (!party) return false;
+        if (!party) {
+          console.warn(`[vouch] no party for ${roomId}; known: ${Object.keys(lobby.parties).join(',') || 'none'}`);
+          return false;
+        }
+        /*
+         * A path, not a URL.
+         *
+         * A party stub's `fetch` takes the path it is being asked for and
+         * throws "Path must start with /" on anything else — so this threw on
+         * every single call, the vouch swallowed it, and the answer was always
+         * no. Every choreography and every judgement in production was refused
+         * with "not in a fight", and the fight fell back to the stock swing:
+         * no bullet from a gun, no cloud from a fart, no effect of any kind
+         * from anything anyone wrote, for as long as the guard has existed.
+         */
         const answer = await party.fetch(
-          `https://party/?device=${encodeURIComponent(device)}`,
+          `/?device=${encodeURIComponent(device)}`,
         );
-        if (!answer.ok) return false;
+        if (!answer.ok) {
+          console.warn(`[vouch] room answered ${answer.status} for ${roomId}`);
+          return false;
+        }
         const { ok } = await answer.json() as { ok?: boolean };
+        if (!ok) console.warn(`[vouch] room says no for ${roomId} / ${device.slice(0, 8)}`);
         return ok === true;
-      } catch {
+      } catch (error) {
+        console.warn(`[vouch] threw for ${roomId}: ${String(error).slice(0, 200)}`);
         return false;
       }
     };

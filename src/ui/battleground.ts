@@ -33,9 +33,20 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
 
     for (const ground of battlegrounds) {
       const swatch = el('div', { class: 'ground-swatch' });
-      // The colour is what shows until the photograph loads, and if it never
-      // does, the card is still recognisably that battleground.
-      swatch.style.background = toCss(ground.colour);
+      /*
+       * The colour is what shows until the photograph loads, and if it never
+       * does, the card is still recognisably that battleground.
+       *
+       * `backgroundColor`, not the `background` shorthand: the shorthand
+       * resets every other background property to its initial value, and as an
+       * inline style it beat the stylesheet — so `background-size: cover` and
+       * `background-position: center` were quietly replaced with `auto` and
+       * `0% 0%`. Every card was showing the top-left corner of a 1600x900
+       * photograph at full size, which for a cliff-top is a square of sky and
+       * for a volcano is a square of dark rock. Four battlegrounds nobody
+       * could tell apart, from one word.
+       */
+      swatch.style.backgroundColor = toCss(ground.colour);
       swatch.style.backgroundImage = `url('${ground.image}')`;
       const votersRow = el('div', { class: 'ground-voters' });
 

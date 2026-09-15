@@ -125,6 +125,30 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         if (disposed) { stage.destroy(); return; }
 
         ready = { stage, engine };
+
+        /*
+         * A door onto the arena, for a driving script — and only when asked.
+         *
+         * Every report of a move that "did not animate" is about this stage,
+         * and there is no way to check one from outside: the effects are
+         * sprites in a WebGL scene, not elements anything can query. A harness
+         * that can ask the running stage what is on it is the difference
+         * between fixing that class of bug and guessing at it.
+         *
+         * Behind ?debug, so an ordinary game never exposes anything.
+         */
+        if (new URLSearchParams(location.search).has('debug')) {
+          const w = window as unknown as { __stage: unknown; __battle: unknown };
+          w.__stage = stage;
+          // Enough to tell "the renderer is broken" from "the move was never
+          // played", which look identical from outside and are not the same
+          // bug at all.
+          w.__battle = {
+            onStage: () => [...onStage.keys()],
+            art: () => (art ?? []).map((a) => `${a.playerId}:${a.weapons.length}w`),
+            turn: () => state?.turn,
+          };
+        }
       })().finally(() => {
         // Whatever happened — ready, or failed and falling back to the flat
         // colour — the room is no longer waiting on it.
@@ -279,6 +303,23 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
     async function playTurn(turn: Turn): Promise<void> {
       if (!ready || disposed) return;
       const { stage, engine } = ready;
+
+      /*
+       * Nobody fights from off stage.
+       *
+       * The fighters are put out during the picking phase, which assumes the
+       * screen was watching when it happened. A host whose arena was still
+       * loading when both moves landed never sees that phase — and neither
+       * does one that reloaded mid-round, or one in a game where bots answered
+       * instantly — so the stage stayed empty and every move was skipped by
+       * the guard below: no choreography even requested, no effect, no sound,
+       * nothing to see. The round simply passed.
+       *
+       * This is free when they are already out there: setting up the same pair
+       * again resets their pose and returns.
+       */
+      await setUpFighters(turn);
+      if (disposed) return;
 
       const [a, b] = turn.fighters;
       const order = turn.first === b ? [b, a] : [a, b];

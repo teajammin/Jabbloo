@@ -32,6 +32,11 @@ const WEAPON_HEIGHT_RATIO = 0.55;
 export class Fighter {
   readonly root = new Container();
   readonly limbs = new Container();
+  /**
+   * Everything that squashes and stretches.
+   *
+   * Given `scaleX` and `scaleY` of its own below — see `understandScale`.
+   */
   readonly body = new Container();
   readonly hand = new Container();
 
@@ -105,6 +110,9 @@ export class Fighter {
     // Anchored near the grip end, so rotation pivots where a hand would hold it.
     this.weaponSprite.anchor.set(0.5, 0.85);
     this.weaponSprite.scale.set(this.targetWeaponHeight / weaponTexture.height);
+    // Before anything animates it.
+    Fighter.understandScale(this.body);
+
     this.holdProperly(weaponTexture);
     this.hand.addChild(this.weaponSprite);
 
@@ -253,6 +261,36 @@ export class Fighter {
     // rather than about its middle.
     this.weaponSprite.anchor.set(grip.x, grip.y);
     this.weaponSprite.rotation = grip.rotation;
+  }
+
+  /**
+   * Teaches a display object to understand `scaleX` and `scaleY`.
+   *
+   * Pixi has `scale.x` and `scale.y`; `scaleX` is GSAP's Pixi plugin's
+   * invention, and that plugin is not registered here. So every squash and
+   * stretch written as `{ scaleX, scaleY }` — the anticipation before a swing,
+   * the recoil after it, the wind-up on a shout — was quietly rejected by GSAP
+   * as an unknown property and did nothing at all. Thirty-nine of them, across
+   * the whole engine, animating nothing.
+   *
+   * Two accessors are a smaller and safer change than rewriting every one of
+   * those call sites into a second tween on a different target, and they mean
+   * the obvious spelling keeps working the next time somebody reaches for it.
+   */
+  private static understandScale(view: Container): void {
+    if ('scaleX' in view) return;
+    Object.defineProperties(view, {
+      scaleX: {
+        configurable: true,
+        get(this: Container) { return this.scale.x; },
+        set(this: Container, value: number) { this.scale.x = value; },
+      },
+      scaleY: {
+        configurable: true,
+        get(this: Container) { return this.scale.y; },
+        set(this: Container, value: number) { this.scale.y = value; },
+      },
+    });
   }
 
   /** How the weapon in hand is being held, for anything that wants to know. */

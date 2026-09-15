@@ -84,6 +84,11 @@ bo.say({ type: 'join', name: 'Bo' });
 await wait(400);
 
 // --- the browser joins as a phone -----------------------------------------
+// A tab that was in a game goes back to it, which is the point of the resume
+// but not what a fresh run wants. Cleared first, then loaded for real.
+await send('Page.navigate', { url: SITE });
+await wait(900);
+await evaluate('try { sessionStorage.clear(); } catch {} "cleared"');
 await send('Page.navigate', { url: `${SITE}/?room=${ROOM}` });
 await wait(2500);
 
@@ -203,6 +208,242 @@ else {
   }
   if (shape.before.toolbar !== shape.after.toolbar) {
     note(`picking a shape changed the toolbar height (${shape.before.toolbar} -> ${shape.after.toolbar})`);
+  }
+}
+
+// --- through creation, to the vote, to the fight ---------------------------
+//
+// The screens after this one are where the game actually happens, and they
+// were the half of the flow nothing could see. Everything here drives the real
+// interface: the browser presses Done and types names the way a player does,
+// while the other seat answers over its socket.
+
+/** Scribbles on whatever canvas is on screen, with input the browser makes itself. */
+const scribble = async () => {
+  const box = await evaluate(`(() => {
+    const s = document.querySelector('.draw-stage');
+    if (!s) return 'null';
+    const b = s.getBoundingClientRect();
+    return JSON.stringify({ x: b.x, y: b.y, w: b.width, h: b.height });
+  })()`);
+  if (!box || box === 'null') return false;
+  const at = JSON.parse(box);
+  const touch = (type, x, y) => send('Input.dispatchTouchEvent', {
+    type, touchPoints: type === 'touchEnd' ? [] : [{ x: at.x + x, y: at.y + y, id: 1 }],
+  });
+  await touch('touchStart', at.w * 0.25, at.h * 0.3);
+  for (let i = 1; i <= 6; i++) {
+    await touch('touchMove', at.w * (0.25 + i * 0.07), at.h * (0.3 + i * 0.06));
+  }
+  await touch('touchEnd', 0, 0);
+  await wait(120);
+  return true;
+};
+
+/** Answers whatever step the browser is currently showing. */
+const answerStep = async () => await evaluate(`(() => {
+  const name = document.querySelector('.name-input');
+  if (name) {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    set.call(name, 'Thing ' + Math.floor(Math.random() * 99));
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    const save = [...(name.closest('form')?.querySelectorAll('button') ?? [])]
+    .find((b) => /save/i.test(b.textContent));
+    if (save) { save.click(); return 'named'; }
+    return 'name box with no save';
+  }
+  // Scoped to the drawing tool: the options sheet has a Done of its own, and
+  // an unscoped search found that one and clicked it happily for ever.
+  const tool = document.querySelector('.screen-draw');
+  const done = tool && [...tool.querySelectorAll('button')]
+    .find((b) => /^done$/i.test(b.textContent.trim()));
+  // Done is deliberately refused on an empty canvas, so an empty one has to be
+  // drawn on before it will go anywhere.
+  if (done && done.disabled) return 'blank';
+  if (done) { done.click(); return 'drew'; }
+  return 'waiting';
+})()`);
+
+/** The other seat, which has no browser and simply says yes to everything. */
+const SLOTS = ['character', 'weapon0', 'weapon1', 'weapon2'];
+const answerBo = (state) => {
+  const me = state?.players.find((p) => p.id === boId);
+  if (!me || me.progress.done) return;
+  const slot = SLOTS[Math.floor(me.progress.step / 2)];
+  if (!slot) return;
+  bo.say(me.progress.step % 2 === 0
+    ? { type: 'submitDrawing', slot, png: PNG, done: true }
+    : { type: 'submitName', slot, name: `Bo ${slot}` });
+};
+
+const boId = bo.state()?.players.find((p) => p.name === 'Bo')?.id
+  ?? host.state()?.players.find((p) => p.name === 'Bo')?.id;
+
+for (let i = 0; i < 90; i++) {
+  const phase = host.state()?.phase;
+  if (phase !== 'creating') break;
+  let did = await answerStep();
+  if (did === 'blank' && await scribble()) did = await answerStep();
+  answerBo(host.state());
+  if (process.env['E2E_TRACE'] && i === 1) {
+    // Record everything the page sends from here on.
+    await evaluate(`(() => {
+      if (window.__sent) return 'already';
+      window.__sent = [];
+      const real = WebSocket.prototype.send;
+      WebSocket.prototype.send = function (data) {
+        try { window.__sent.push(String(data).slice(0, 120)); } catch {}
+        return real.call(this, data);
+      };
+      return 'hooked';
+    })()`);
+  }
+  if (process.env['E2E_TRACE'] && i === 3) {
+    console.log('  click probe:', await evaluate(`(() => {
+      const tool = document.querySelector('.screen-draw');
+      const b = [...tool.querySelectorAll('button')].find((x) => /^done$/i.test(x.textContent.trim()));
+      if (!b) return 'no done button in the tool';
+      const info = { text: b.textContent.trim(), disabled: b.disabled,
+        cls: b.className, visible: b.offsetParent !== null };
+      try { b.click(); info.click = 'ok'; }
+      catch (e) { info.click = 'THREW ' + e.message; }
+      info.after = document.querySelector('.draw-canvas') ? 'still drawing' : 'moved on';
+      return JSON.stringify(info);
+    })()`));
+  }
+  if (process.env['E2E_TRACE'] && i === 6) {
+    console.log('  sent:', await evaluate(`JSON.stringify((window.__sent || []).slice(-8))`));
+    console.log('  all buttons:', await evaluate(`JSON.stringify(
+      [...document.querySelectorAll('button')].map((b, i) => i + ':' + (b.textContent.trim() || '?')
+        + (b.offsetParent === null ? '(hidden)' : '') + '[' + b.className + ']').slice(0, 40))`));
+    console.log('  stuck page:', await evaluate(`JSON.stringify({
+      title: document.querySelector('.draw-title')?.textContent,
+      hint: document.querySelector('.draw-hint')?.textContent,
+      body: (document.querySelector('.creation-body')?.innerText || '').slice(0, 160),
+      buttons: [...document.querySelectorAll('button')].map((b) => b.textContent.trim()).slice(0, 14),
+      canvas: Boolean(document.querySelector('.draw-canvas')),
+    })`));
+  }
+  if (process.env['E2E_TRACE']) {
+    const me = host.state()?.players.find((p) => p.name === 'Ann');
+    const them = host.state()?.players.find((p) => p.name === 'Bo');
+    console.log(`  [${i}] browser:${did} ann:${me?.progress.step}${me?.progress.done ? '/done' : ''}`
+      + ` bo:${them?.progress.step}${them?.progress.done ? '/done' : ''}`);
+  }
+  await wait(220);
+}
+
+const reachedVote = host.state()?.phase === 'battleground';
+reachedVote ? ok('creation finishes and the vote opens') : note(`stuck in ${host.state()?.phase}`);
+
+if (reachedVote) {
+  // The vote is a picture round, so the pictures are the thing to check.
+  await wait(1200);
+  const vote = await evaluate(`(() => {
+    const cards = [...document.querySelectorAll('.ground-card')];
+    const grid = document.querySelector('.ground-grid');
+    return JSON.stringify({
+      cards: cards.length,
+      hidden: grid ? grid.classList.contains('is-loading') : 'no grid',
+      sizes: cards.map((c) => {
+        const b = c.getBoundingClientRect();
+        const sw = c.querySelector('.ground-swatch');
+        const s = sw.getBoundingClientRect();
+        const bg = getComputedStyle(sw).backgroundImage;
+        return Math.round(b.width) + 'x' + Math.round(b.height)
+          + ' img ' + Math.round(s.width) + 'x' + Math.round(s.height)
+          + (bg && bg !== 'none' ? ' pic' : ' NO PIC');
+      }),
+      badge: (() => { const el = document.querySelector('.loading-badge');
+        if (!el) return 'gone';
+        const b = el.getBoundingClientRect();
+        return Math.round(b.width) + 'x' + Math.round(b.height); })(),
+      scrollH: document.documentElement.scrollHeight, inner: innerHeight,
+    });
+  })()`);
+  console.log('  vote:', vote);
+  const v = JSON.parse(vote);
+  if (v.cards !== 4) note(`the vote shows ${v.cards} battlegrounds`);
+  else if (v.sizes.some((x) => x.includes('NO PIC'))) note('a battleground has no picture');
+  else ok(`battleground cards ${v.sizes[0]}`);
+  if (v.hidden === true) note('the grid is still hidden after the photographs loaded');
+  if (v.scrollH > v.inner + 1) note(`the vote screen scrolls: ${v.scrollH} > ${v.inner}`);
+
+  const shot2 = await send('Page.captureScreenshot', { format: 'png' });
+  if (shot2.result?.data) {
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync('vote.png', Buffer.from(shot2.result.data, 'base64'));
+    console.log('  saved vote.png');
+  }
+}
+
+// --- into the fight -------------------------------------------------------
+//
+// The arena is where the loading badge shows, where the effects have to
+// appear, and where every "it did not animate" report has come from. Nothing
+// could see it until now.
+
+if (host.state()?.phase === 'battleground') {
+  // Both seats vote, so the draw resolves without waiting out the clock.
+  const grounds = host.state()?.players ? ['cliffs', 'forest'] : [];
+  await evaluate(`(() => {
+    const card = document.querySelector('.ground-card');
+    if (card) card.click();
+    return 'voted';
+  })()`);
+  bo.say({ type: 'voteBattleground', id: grounds[1] ?? 'forest' });
+
+  for (let i = 0; i < 60 && host.state()?.phase !== 'battle'; i++) await wait(400);
+  const inBattle = host.state()?.phase === 'battle';
+  inBattle ? ok('the vote closes and the fight opens') : note(`never reached the fight (${host.state()?.phase})`);
+
+  if (inBattle) {
+    // The badge, while the arena is still loading.
+    const badge = await evaluate(`(() => {
+      const el = document.querySelector('.loading-badge');
+      if (!el) return 'gone already';
+      const b = el.getBoundingClientRect();
+      const letters = [...el.querySelectorAll('img')];
+      const first = letters[0]?.getBoundingClientRect();
+      return JSON.stringify({
+        badge: Math.round(b.width) + 'x' + Math.round(b.height),
+        right: Math.round(innerWidth - b.right), bottom: Math.round(innerHeight - b.bottom),
+        letters: letters.length,
+        letter: first ? Math.round(first.width) + 'x' + Math.round(first.height) : 'none',
+        shareOfWidth: Math.round((b.width / innerWidth) * 100) + '%',
+      });
+    })()`);
+    console.log('  badge:', badge);
+    if (badge !== 'gone already') {
+      const b = JSON.parse(badge);
+      const share = Number(b.shareOfWidth.replace('%', ''));
+      if (share > 60) note(`the loading badge takes ${b.shareOfWidth} of the screen`);
+      else ok(`loading badge ${b.badge} (${b.shareOfWidth} of the width)`);
+    }
+
+    // Wait for the arena, then look at what is actually on the stage.
+    for (let i = 0; i < 40; i++) {
+      const ready = await evaluate(`Boolean(document.querySelector('.battle-stage canvas'))`);
+      if (ready === true) break;
+      await wait(500);
+    }
+    const stage = await evaluate(`(() => {
+      const c = document.querySelector('.battle-stage canvas');
+      if (!c) return 'no canvas';
+      const b = c.getBoundingClientRect();
+      return JSON.stringify({ canvas: Math.round(b.width) + 'x' + Math.round(b.height),
+        scrollH: document.documentElement.scrollHeight, inner: innerHeight });
+    })()`);
+    console.log('  arena:', stage);
+    if (stage === 'no canvas') note('the arena never rendered a canvas');
+    else ok('the arena renders');
+
+    const shot3 = await send('Page.captureScreenshot', { format: 'png' });
+    if (shot3.result?.data) {
+      const { writeFileSync } = await import('node:fs');
+      writeFileSync('battle.png', Buffer.from(shot3.result.data, 'base64'));
+      console.log('  saved battle.png');
+    }
   }
 }
 

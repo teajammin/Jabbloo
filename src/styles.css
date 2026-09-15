@@ -1504,7 +1504,15 @@ input[type='text'] {
  */
 .ground-swatch {
   width: 100%;
-  aspect-ratio: 16 / 10;
+  /*
+   * The photograph's own shape, so almost nothing is cropped.
+   *
+   * These are 16:9 landscapes, and a squarer frame filled by `cover` keeps the
+   * middle and throws both sides away — which for a cliff-top or a shoreline
+   * is the sky, and the sky looks the same everywhere. Four cards of pale grey
+   * is not a choice anybody can make.
+   */
+  aspect-ratio: 16 / 9;
   min-height: 0;
   border-radius: 18px;
   background-size: cover;
@@ -1562,7 +1570,6 @@ input[type='text'] {
  */
 @media (min-width: 900px) and (max-height: 820px) {
   .screen-ground { gap: 10px; padding: 10px 14px 14px; }
-  .ground-swatch { aspect-ratio: 16 / 9; }
   .ground-card { padding: 8px; gap: 5px; }
   .ground-voters { min-height: 22px; }
 }
@@ -1573,7 +1580,7 @@ input[type='text'] {
   .screen-ground { gap: 10px; padding: 10px; }
   .ground-grid { gap: 10px; }
   .ground-card { padding: 7px; gap: 6px; }
-  .ground-swatch { aspect-ratio: 4 / 3; }
+  .ground-voters { min-height: 20px; }
   .ground-card .ground-name { font-size: 15px; }
 }
 
