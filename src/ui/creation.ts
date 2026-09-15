@@ -22,7 +22,15 @@ import {
 export function creationScreen(connection: RoomConnection, isHost: boolean): Screen {
   return (root, go) => {
     let lastStep = '';
-    let drawnPng: string | null = null;
+    /*
+     * What was drawn, kept per slot.
+     *
+     * One variable for "the drawing" was wrong the moment a player skipped a
+     * step: it still held the last thing they *had* drawn, so the naming step
+     * for a weapon they never got to showed them their character, or the
+     * weapon before it, and asked them to name that.
+     */
+    const drawnBySlot = new Map<string, string>();
 
     /**
      * Autosave for the drawing in progress.
@@ -42,7 +50,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       const png = readDrawing();
       if (!png || png === lastSaved) return;
       lastSaved = png;
-      drawnPng = png;
+      drawnBySlot.set(pendingSlot, png);
       // Work in progress, not a finished step: `done` is what ends the step.
       connection.send({ type: 'submitDrawing', slot: pendingSlot, png });
     }
@@ -61,7 +69,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
 
     /** Submits whatever the current step produced, then waits for the others. */
     const submitDrawing = (png: string, slot: string) => {
-      drawnPng = png;
+      drawnBySlot.set(slot, png);
       lastSaved = png;
       connection.send({ type: 'submitDrawing', slot, png, done: true });
     };
@@ -106,9 +114,17 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     function showName(slot: string): void {
       body.replaceChildren();
 
-      const preview = drawnPng
-        ? el('img', { class: 'creation-preview', src: drawnPng, alt: '' })
-        : el('div', { class: 'creation-preview empty' });
+      // This slot's drawing, and no other. Nothing drawn means nothing shown:
+      // the room fills in a stand-in for anyone who ran out of time, and
+      // showing them the last thing they drew instead is a lie about what
+      // they are naming.
+      const drawn = drawnBySlot.get(slot);
+      const preview = drawn
+        ? el('img', { class: 'creation-preview', src: drawn, alt: '' })
+        : el('div', { class: 'creation-preview empty' },
+            el('span', {}, slot === 'character'
+              ? 'Nothing drawn — a stand-in will fight for you'
+              : 'Nothing drawn — you will get a stand-in weapon'));
 
       const input = el('input', {
         type: 'text', class: 'name-input', maxLength: 24,

@@ -930,6 +930,21 @@ export class DrawCanvas {
     this.paintStroke(this.floating);
     this.floating = null;
     this.floatingImage = null;
+    /*
+     * A crop frame outlives nothing.
+     *
+     * The frame belongs to the photo that was floating; once that photo is
+     * part of the drawing there is nothing left to crop. Leaving it up wedged
+     * the whole tool — every pointer press went to a crop handle that no
+     * longer framed anything, so no tool the player picked did anything at
+     * all, with no way back except reloading.
+     *
+     * Keeping the trim is the screen's job, and it settles the crop before
+     * calling this. This is only here so that forgetting costs a crop rather
+     * than the drawing.
+     */
+    this.cropRect = null;
+    this.activeHandle = null;
     this.drawOverlay();
     this.onChange?.();
   }

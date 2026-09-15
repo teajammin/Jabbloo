@@ -8,6 +8,7 @@
  */
 
 import gsap from 'gsap';
+import { Assets } from 'pixi.js';
 import {
   BattleStage,
   BubbleText,
@@ -15,6 +16,7 @@ import {
   EFFECT_KINDS,
   preloadEffects,
   spawnEffect,
+  effectUrl,
   battlegrounds,
   parseChoreography,
   playChoreography,
@@ -55,6 +57,23 @@ const [left, right] = await Promise.all([
     weapon: '/placeholder-weapon-hammer.png',
   }),
 ]);
+
+/*
+ * The workbench's own innards, reachable from a console or a driving script.
+ *
+ * This page is a development tool and never ships as part of the game, so
+ * putting the stage where a script can poke it costs nothing and is the only
+ * way to ask the running engine a direct question — "is this texture actually
+ * loaded?" — rather than inferring the answer from whether something looked
+ * right on screen.
+ */
+(window as unknown as { sandbox: unknown }).sandbox = {
+  stage,
+  spawnEffect,
+  EFFECT_KINDS,
+  effectUrl,
+  Assets,
+};
 
 stage.addFighter(left, 'left');
 stage.addFighter(right, 'right');

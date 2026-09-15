@@ -482,9 +482,34 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       shapeFill.hidden = !(next === 'rect' || next === 'ellipse');
     };
 
+    /**
+     * Settles a crop frame that is still up.
+     *
+     * A crop in progress is a decision the player has not finished making, and
+     * everything else on this screen assumed they had. Reaching for the eraser
+     * committed the photo *uncropped* — the trim they had just dragged out
+     * thrown away — and left the frame behind, so every pointer press after
+     * that went to a crop handle instead of the tool they had picked and
+     * nothing worked at all.
+     *
+     * Moving on is the player saying they meant it, so the crop is kept. The
+     * one place that cancels it is the ✕ that exists to.
+     */
+    const settleCrop = async (): Promise<void> => {
+      if (!canvas.isCropping) return;
+      await canvas.applyCrop(cropImage);
+      updateCropBar();
+    };
+
+    /** Every way of choosing a tool, so none of them can skip the above. */
+    const pickTool = async (next: ToolName): Promise<void> => {
+      await settleCrop();
+      selectTool(next);
+    };
+
     const toolRow = el('div', { class: 'tool-row' });
     for (const name of ['select', 'pen', 'eraser', 'fill', 'line', 'rect', 'ellipse'] as const) {
-      const node = control(name, () => selectTool(name));
+      const node = control(name, () => { void pickTool(name); });
       node.setAttribute('aria-pressed', String(name === tool));
       toolButtons.set(name, node);
       toolRow.appendChild(node);
@@ -599,6 +624,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     // the photo rather than in the toolbar: hold it, or right-click it.
 
     const shape = (key: MaskShape) => async () => {
+      await settleCrop();
       const layer = canvas.floatingLayer;
       if (!layer) return;
       say('Cutting the shape…');
@@ -616,7 +642,10 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         // Placing the photo first is the whole point: once it is part of the
         // drawing the eraser cuts into it like anything else, and the player
         // decides what counts as background.
-        icon: '🧽', label: 'Rub bits out', onPick: () => {
+        icon: '🧽', label: 'Rub bits out', onPick: async () => {
+          // Keeps the trim they just made, rather than committing the photo
+          // they had before it.
+          await settleCrop();
           canvas.commitFloating();
           selectTool('eraser');
           updateCropBar();
@@ -835,7 +864,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       };
       if (!mod && shortcuts[key]) {
         event.preventDefault();
-        selectTool(shortcuts[key]!);
+        void pickTool(shortcuts[key]!);
       }
     };
     window.addEventListener('keydown', onKey);
