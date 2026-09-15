@@ -536,6 +536,26 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       // nothing else would ever take it down.
       loading?.done();
       loading = null;
+
+      /*
+       * The debug hooks go with the stage they describe.
+       *
+       * They hang off `window`, so nothing else would ever drop them — and
+       * what they hold is not small: a destroyed Pixi stage with its textures,
+       * every fighter, and every player's artwork as base64. Left in place
+       * they would pin all of it for the life of the tab, through every
+       * rematch and new game, on the one screen in this game that has actually
+       * run a browser out of memory.
+       */
+      const w = window as unknown as { __stage?: unknown; __battle?: unknown };
+      // Only if they still describe this screen. The battle screen can be
+      // rebuilt while a fight is running, and an outgoing instance clearing
+      // the incoming one's hooks would leave the harness blind to the very
+      // thing it was watching.
+      if (ready && w.__stage === ready.stage) {
+        delete w.__stage;
+        delete w.__battle;
+      }
       for (const fighter of onStage.values()) fighter.destroy();
       ready?.stage.clearHealthBars();
       ready?.stage.destroy();
