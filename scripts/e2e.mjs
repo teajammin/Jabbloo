@@ -421,22 +421,35 @@ if (host.state()?.phase === 'battleground') {
       else ok(`loading badge ${b.badge} (${b.shareOfWidth} of the width)`);
     }
 
-    // Wait for the arena, then look at what is actually on the stage.
+    /*
+     * A phone does not get an arena.
+     *
+     * The stage belongs to the big screen; a player gets somewhere to write
+     * their move and a note telling them where to look. Asserting a canvas
+     * here was this harness expecting the host's screen on a phone — see
+     * scripts/e2e-host.mjs for the screen that does have one.
+     */
     for (let i = 0; i < 40; i++) {
-      const ready = await evaluate(`Boolean(document.querySelector('.battle-stage canvas'))`);
-      if (ready === true) break;
+      const up = await evaluate(`Boolean(document.querySelector('.screen-move, .move-input, textarea'))`);
+      if (up === true) break;
       await wait(500);
     }
-    const stage = await evaluate(`(() => {
-      const c = document.querySelector('.battle-stage canvas');
-      if (!c) return 'no canvas';
-      const b = c.getBoundingClientRect();
-      return JSON.stringify({ canvas: Math.round(b.width) + 'x' + Math.round(b.height),
-        scrollH: document.documentElement.scrollHeight, inner: innerHeight });
+    const phone = await evaluate(`(() => {
+      const box = document.querySelector('textarea, .move-input');
+      const b = box && box.getBoundingClientRect();
+      return JSON.stringify({
+        writeBox: b ? Math.round(b.width) + 'x' + Math.round(b.height) : 'none',
+        arena: Boolean(document.querySelector('.battle-stage canvas')),
+        text: (document.body.innerText || '').replace(/\\s+/g, ' ').slice(0, 70),
+        scrollH: document.documentElement.scrollHeight, inner: innerHeight,
+      });
     })()`);
-    console.log('  arena:', stage);
-    if (stage === 'no canvas') note('the arena never rendered a canvas');
-    else ok('the arena renders');
+    console.log('  phone in the fight:', phone);
+    const f = JSON.parse(phone);
+    if (f.arena) note('a phone is rendering an arena it does not need');
+    else if (f.writeBox === 'none') note('a player has nowhere to write their move');
+    else ok(`the move box is ${f.writeBox}`);
+    if (f.scrollH > f.inner + 1) note(`the fight screen scrolls on a phone: ${f.scrollH} > ${f.inner}`);
 
     const shot3 = await send('Page.captureScreenshot', { format: 'png' });
     if (shot3.result?.data) {
