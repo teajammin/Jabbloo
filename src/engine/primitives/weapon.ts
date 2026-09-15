@@ -1,5 +1,5 @@
 import gsap from 'gsap';
-import { clamp, degrees, directionToEnemy, duration } from './util';
+import { burst, clamp, contactPoint, degrees, directionToEnemy, duration } from './util';
 import type {
   PrimitiveContext,
   SlamParams,
@@ -63,6 +63,14 @@ export function swing(ctx: PrimitiveContext, params: SwingParams = {}) {
     ease: 'power4.in',
   });
   tl.to(ctx.actor.body, { rotation: dir * 0.12, duration: seconds * 0.25 }, '<');
+  /*
+   * Something at the point of contact.
+   *
+   * A bare punch drew an impact and a swung weapon drew nothing, so the
+   * commonest attack in the game — hit them with the thing you drew — was the
+   * one that landed in silence, the blade passing through as if it had missed.
+   */
+  burst(tl, ctx, 'impact', contactPoint(ctx), 190);
   // Recover to neutral so the next step starts from a known pose.
   tl.to(ctx.actor.hand, { rotation: 0, duration: seconds * 0.35, ease: 'power2.out' });
   tl.to(ctx.actor.body, { rotation: 0, duration: seconds * 0.35 }, '<');
@@ -92,6 +100,9 @@ export function slam(ctx: PrimitiveContext, params: SlamParams = {}) {
   if (forward) {
     tl.to(ctx.actor.root, { x: `+=${dir * 30}`, duration: seconds * 0.18 }, '<');
   }
+  // A heavier blow than a swing, and it throws up the ground it lands on.
+  burst(tl, ctx, 'impact', contactPoint(ctx), 230);
+  burst(tl, ctx, 'dust', { x: contactPoint(ctx).x, y: ctx.enemy.root.y }, 200, '<');
   // Bounce off the impact, then settle.
   tl.to(ctx.actor.body, { y: 0, duration: seconds * 0.42, ease: 'elastic.out(1, 0.5)' });
   tl.to(ctx.actor.hand, { rotation: 0, duration: seconds * 0.42, ease: 'power2.out' }, '<');
