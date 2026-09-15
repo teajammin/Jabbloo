@@ -19,7 +19,22 @@ export function loadingBadge(): { root: HTMLElement; done: () => void } {
   const root = document.createElement('div');
   root.className = 'loading-badge';
   root.setAttribute('role', 'status');
-  root.appendChild(bubbleText('LOADING', { height: 34, wave: true }));
+
+  /*
+   * Sized against the screen it is on, not in fixed pixels.
+   *
+   * Thirty-four pixels of lettering is a modest badge on a laptop and a
+   * cramped one on a phone, where the same word has a third of the width to
+   * sit in. Taking it from the narrower side keeps the badge the same fraction
+   * of whatever it is shown on, and the bounds stop it becoming either a
+   * postage stamp or a banner.
+   */
+  const room = typeof window === 'undefined'
+    ? 34
+    : Math.min(window.innerWidth, window.innerHeight);
+  const height = Math.max(20, Math.min(34, Math.round(room * 0.062)));
+
+  root.appendChild(bubbleText('LOADING', { height, wave: true }));
 
   let gone = false;
   const done = (): void => {

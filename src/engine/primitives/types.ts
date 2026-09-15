@@ -149,6 +149,13 @@ export interface ShrinkParams extends BaseParams {
 export type KnockdownParams = BaseParams;
 export type DizzyParams = BaseParams;
 
+export interface SickenParams extends BaseParams {
+  /** What kind of lingering harm, which decides the colour it turns them. */
+  kind?: 'poison' | 'burn' | 'curse';
+  /** How badly, 1-10: more marks, rising higher. */
+  intensity?: number;
+}
+
 /** The complete set of moves a choreographer may call. */
 export interface PrimitiveParams {
   move_to: MoveToParams;
@@ -185,6 +192,7 @@ export interface PrimitiveParams {
   shrink: ShrinkParams;
   knockdown: KnockdownParams;
   dizzy: DizzyParams;
+  sicken: SickenParams;
 }
 
 /**

@@ -358,7 +358,21 @@ export class Fighter {
    * Choreographies are played back-to-back, so every move must begin from a
    * known state or errors accumulate across a round.
    */
+  /**
+   * Colours the fighter, for a state that outlasts the blow that caused it.
+   *
+   * On the sprite rather than the container it sits in: a Pixi container has
+   * no tint of its own in this version, so tinting "the body" means tinting
+   * what the body is made of. White is the absence of a tint, which is why
+   * clearing uses it.
+   */
+  setTint(colour: number): void {
+    this.bodySprite.tint = colour;
+  }
+
   resetPose(): void {
+    // Whatever was done to them, it ends with the exchange.
+    this.setTint(0xffffff);
     this.reattachWeapon();
     this.leg.hide();
     this.arm.hide();

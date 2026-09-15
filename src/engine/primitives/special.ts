@@ -3,6 +3,7 @@ import { spawnEffect, despawnEffect } from '../effects';
 import { clamp, directionToEnemy, duration } from './util';
 import type {
   DizzyParams, GrowParams, InhaleParams, KnockdownParams, PrimitiveContext, ShrinkParams,
+  SickenParams,
 } from './types';
 
 /**
@@ -132,5 +133,72 @@ export function dizzy(ctx: PrimitiveContext, params: DizzyParams = {}) {
     tl.to(ctx.actor.body, { rotation: side * 0.16, duration: each, ease: 'sine.inOut' });
     tl.to(ctx.actor.body, { rotation: 0, duration: each, ease: 'sine.inOut' });
   }
+  return tl;
+}
+
+/**
+ * Poisons, sickens, infects — whatever the player called it.
+ *
+ * Applied to the fighter it happens to, like dizzy and knockdown: the move
+ * that causes it says `"on": "enemy"`.
+ *
+ * Lingering harm was the one kind of attack with nothing to show for itself. A
+ * player who wrote "poison them" got a swing and a number, and the room had no
+ * way to tell that the next round's damage was their doing. This puts it on
+ * the body: the colour drains toward something sickly, and it keeps bubbling
+ * long enough to be read as a state rather than a hit.
+ *
+ * The tint is left behind on purpose. It is cleared when a fighter resets, so
+ * it lasts the exchange and does not follow them into the next one.
+ */
+export function sicken(ctx: PrimitiveContext, params: SickenParams = {}) {
+  const seconds = duration(params.duration, 1.2);
+  const strength = clamp(params.intensity, 1, 10, 6);
+  const tint = params.kind === 'burn' ? 0xff8a5c
+    : params.kind === 'curse' ? 0xb07bff
+      : 0x8fd48a;
+
+  const tl = gsap.timeline();
+
+  // The colour goes first, because it is what says "something is wrong with
+  // them" before any of the rest of it has had time to read.
+  tl.call(() => { ctx.actor.setTint(tint); });
+  tl.fromTo(ctx.actor.body.scale, { y: 1 }, {
+    y: 0.94, duration: seconds * 0.18, ease: 'power2.out',
+  });
+
+  // Marks rising off them, staggered so it reads as something ongoing rather
+  // than one puff.
+  const marks = Math.min(6, 2 + Math.round(strength / 2));
+  for (let i = 0; i < marks; i++) {
+    tl.call(() => {
+      const mark = spawnEffect(ctx.stage.effects, 'bubble', {
+        x: ctx.actor.root.x + (Math.random() - 0.5) * ctx.actor.width * 0.7,
+        y: ctx.actor.root.y - ctx.actor.height * (0.45 + Math.random() * 0.4),
+        height: 40 + strength * 5,
+        alpha: 0.9,
+      });
+      mark.tint = tint;
+      gsap.to(mark, {
+        y: mark.y - 90 - strength * 8,
+        x: mark.x + (Math.random() - 0.5) * 40,
+        alpha: 0,
+        duration: 0.9,
+        ease: 'power1.out',
+        onComplete: () => despawnEffect(mark),
+      });
+    }, undefined, seconds * 0.15 + i * (seconds * 0.6 / marks));
+  }
+
+  // A queasy sway underneath it all.
+  const sways = 3;
+  const each = (seconds * 0.7) / (sways * 2);
+  for (let i = 0; i < sways; i++) {
+    const side = i % 2 === 0 ? 1 : -1;
+    tl.to(ctx.actor.body, { rotation: side * 0.09, duration: each, ease: 'sine.inOut' });
+    tl.to(ctx.actor.body, { rotation: 0, duration: each, ease: 'sine.inOut' });
+  }
+  tl.to(ctx.actor.body.scale, { y: 1, duration: seconds * 0.2, ease: 'power2.out' });
+
   return tl;
 }

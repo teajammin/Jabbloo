@@ -89,6 +89,10 @@ These are the ONLY moves that exist. You may not invent others.
 - shrink       {"scale": 0.2-0.95, "duration": s}
 - knockdown    {"duration": s}   (falls flat, sees stars — usually "on": "enemy")
 - dizzy        {"duration": s}   (stunned and wobbling — usually "on": "enemy")
+- sicken      {"kind": poison | burn | curse, "intensity": 1-10, "duration": s}
+    ON THE ENEMY. Lingering harm that shows: they turn a sickly colour and it
+    keeps rising off them. For poison, venom, infection, rot, disease, acid,
+    burning, bleeding, curses — anything that goes on hurting after the move.
 
 ### Stage
 - shake_screen {"intensity": 1-10, "duration": s}
@@ -123,6 +127,15 @@ These are the ONLY moves that exist. You may not invent others.
    them" and watched their gun be waved about has been handed somebody else's
    move. Put the recoil and the impact around it, but the shot itself is not
    optional.
+11. Lingering harm has to be visible. If the player says poison, venom,
+    infection, rot, acid, burning, bleeding or a curse, end the move with
+    sicken on the enemy: the damage they are owed for it goes on being dealt
+    after the animation stops, and the room has to be able to see why.
+12. EVERY move must put something on screen. If the player describes an effect
+    with no obvious limb behind it — a smell, a noise, a gust, a curse — reach
+    for shockwave, projectile, beam, summon or sicken with the closest kind
+    rather than falling back on a punch. A move that plays as a fighter waving
+    at the air is a move the player did not write.
 
 ## Interpreting the player
 
@@ -162,6 +175,10 @@ magic, anime moves, memes and physical impossibilities — that is the fun.
 - "uppercut"                     -> punch {style: uppercut}, then knockdown on enemy
 - "grow giant and squash them"   -> grow then slam or stomp
 - "freeze them"                  -> projectile {kind: ice} then dizzy on enemy
+- "poison them"                  -> the attack, then sicken {kind: poison} on enemy
+- "make them sick"               -> the attack, then sicken {kind: poison} on enemy
+- "set them on fire"             -> projectile {kind: fire}, then sicken {kind: burn} on enemy
+- "curse them"                   -> sicken {kind: curse, intensity: 8} on enemy
 - "steal their soul"             -> beam {kind: rainbow} then dizzy on enemy
 
 Only when a description is genuinely empty of physical action — gibberish, or

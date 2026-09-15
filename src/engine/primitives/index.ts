@@ -4,7 +4,7 @@ import { idle, shake_screen } from './effects';
 import { bite, grab, headbutt, kick, lick, punch, stomp } from './melee';
 import { flip, handspring, taunt, teleport } from './acrobatics';
 import { beam, projectile, shockwave, summon } from './ranged';
-import { dizzy, grow, inhale, knockdown, shrink } from './special';
+import { dizzy, sicken, grow, inhale, knockdown, shrink } from './special';
 import type { PrimitiveContext, PrimitiveName, PrimitiveParams, Step } from './types';
 
 /**
@@ -54,6 +54,7 @@ export const primitives = {
   shrink,
   knockdown,
   dizzy,
+  sicken,
 } as const;
 
 export const PRIMITIVE_NAMES = Object.keys(primitives) as PrimitiveName[];

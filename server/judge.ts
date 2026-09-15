@@ -53,6 +53,24 @@ How to judge:
 - Do not punish a player for a weapon that makes no sense. That is the game.
 - Never reach for the middle because you are unsure. Pick a band and commit.
 
+Where it lands matters. A player who names a target has aimed, and aim is
+worth rewarding — but the reward is in how much damage a hit there would
+plainly do, not in the naming:
+- Somewhere fatal or disabling — the heart, the head, the throat, the eyes,
+  the spine — belongs at the top of whatever band the writing earned, and can
+  carry a move up into the next one.
+- Somewhere survivable — a knee, a foot, an arm, a shoulder, the backside —
+  stays at the bottom of its band. It can still be a superb move; it is simply
+  not a killing one.
+- A move that names no target is judged on the writing alone. Do not invent a
+  target for them, and do not mark them down for it.
+
+Lingering harm counts for more than a single blow. Poison, venom, sickness,
+infection, rot, burning, bleeding, curses — anything that goes on hurting
+after the move ends — plainly does more damage than the same idea delivered
+once, so score it a band higher than the writing alone would earn. It has to
+be genuinely in what they wrote; do not read poison into an ordinary stab.
+
 Ask yourself: would the room cheer, laugh, or shrug? Score the answer.`;
 
 export async function judge(request: JudgeRequest, config: AiConfig): Promise<JudgeResult> {

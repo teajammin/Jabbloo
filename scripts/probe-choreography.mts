@@ -19,6 +19,9 @@ const cases = [
   { prompt: 'throw it at their head as hard as i can', weaponName: 'Axe' },
   { prompt: 'fart in their general direction', weaponName: 'Beans' },
   { prompt: 'swing it at their head', weaponName: 'Butter Sword' },
+  { prompt: 'poison them with the blade so they rot', weaponName: 'Dagger' },
+  { prompt: 'shoot them right in the heart', weaponName: 'Gun' },
+  { prompt: 'shoot them in the knee', weaponName: 'Gun' },
 ];
 
 /** Moves that close the distance — wrong in front of a ranged attack. */

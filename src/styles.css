@@ -2169,7 +2169,8 @@ body:has(.screen-draw) .help-open { display: none !important; }
   z-index: 40;
   /* Roomier at the top: the letters hop about a third of their height, and
      with even padding the raised ones climbed out of the pill. */
-  padding: 17px 16px 9px;
+  /* Scales with the lettering inside it, which scales with the screen. */
+  padding: clamp(11px, 3.4vmin, 17px) clamp(11px, 3vmin, 16px) clamp(6px, 1.8vmin, 9px);
   border-radius: 999px;
   background: color-mix(in srgb, var(--panel) 84%, transparent);
   box-shadow: var(--shadow);
