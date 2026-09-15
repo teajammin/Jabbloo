@@ -370,6 +370,12 @@ export class Fighter {
     this.bodySprite.tint = colour;
   }
 
+  /** What colour they currently are. White means nothing is wrong with them. */
+  get tint(): number {
+    // Pixi widens this to a ColorSource on read; everything here sets a number.
+    return Number(this.bodySprite.tint);
+  }
+
   resetPose(): void {
     // Whatever was done to them, it ends with the exchange.
     this.setTint(0xffffff);

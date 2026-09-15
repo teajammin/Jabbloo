@@ -155,6 +155,12 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           // bug at all.
           w.__battle = {
             onStage: () => [...onStage.keys()],
+            // Who is currently poisoned, burnt or cursed — the one question
+            // that cannot be answered from outside a WebGL scene, and the one
+            // a move aimed at the wrong fighter gets wrong.
+            tints: () => Object.fromEntries(
+              [...onStage.entries()].map(([id, f]) => [id, f.tint]),
+            ),
             art: () => (art ?? []).map((a) => `${a.playerId}:${a.weapons.length}w`),
             turn: () => state?.turn,
           };

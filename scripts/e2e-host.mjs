@@ -229,6 +229,7 @@ if (inBattle) {
   if (turn?.phase === 'picking') {
     ann.say({ type: 'submitMove', weapon: 0, prompt: MOVE });
     bo.say({ type: 'submitMove', weapon: 0, prompt: 'swing wildly at their head' });
+    console.log(`  Ann is ${ids['Ann']}, Bo is ${ids['Bo']}`);
     ok(`moves sent ("${MOVE}")`);
 
     // One seat goes dark, which is the state the host screen has been
@@ -293,6 +294,35 @@ if (inBattle) {
       return JSON.stringify({ frames, effects: [...found] });
     })()`);
     console.log('  effects seen:', seen);
+
+    /*
+     * Who the lingering harm actually happened to.
+     *
+     * Only Ann's move can poison anybody — Bo swings — so if this works, Bo is
+     * the one who changes colour and Ann never does. It was the other way
+     * round twice, which is why it is worth watching rather than reasoning
+     * about: the tint lives in a WebGL scene where nothing outside can see it.
+     */
+    if (/poison|rot|venom|sick|burn|curse/i.test(MOVE)) {
+      const tinted = await evaluate(`(async () => {
+        const seenTints = {};
+        for (let i = 0; i < 60; i++) {
+          await new Promise((r) => setTimeout(r, 250));
+          const b = window.__battle;
+          if (!b || !b.tints) continue;
+          for (const [id, tint] of Object.entries(b.tints())) {
+            if (tint !== 0xffffff) seenTints[id] = '0x' + Number(tint).toString(16);
+          }
+        }
+        return JSON.stringify(seenTints);
+      })()`);
+      console.log('  who changed colour:', tinted);
+      const who = typeof tinted === 'string' && tinted.startsWith('{') ? JSON.parse(tinted) : null;
+      if (!who) note('could not watch the fighters for lingering harm');
+      else if (who[ids['Ann']]) note('the poison landed on the fighter who cast it');
+      else if (who[ids['Bo']]) ok('the poison landed on the opponent');
+      else note('nobody was poisoned by a move that said poison');
+    }
     const e = typeof seen === 'string' && seen.startsWith('{') ? JSON.parse(seen) : null;
     if (!e) note('could not watch the effects layer');
     else if (e.frames === 0) note('the stage was never reachable to watch');
