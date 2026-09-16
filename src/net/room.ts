@@ -2,6 +2,7 @@ import PartySocket from 'partysocket';
 import { setErrorContext } from '../errors';
 import {
   MAX_MESSAGE_BYTES,
+  mergeArt,
   type ClientMessage, type PlayerArt, type RoomState, type ServerMessage,
 } from '../shared/protocol';
 
@@ -160,7 +161,14 @@ export class RoomConnection {
           // Sent one player at a time — six characters and eighteen weapons in
           // a single message would be past the platform's limit — so entries
           // accumulate here and every screen still sees one whole list.
-          for (const entry of message.art) this.artByPlayer.set(entry.playerId, entry);
+          // Merged, not replaced: artwork arrives a piece at a time so that no
+          // single message can be big enough to close the socket carrying it.
+          for (const entry of message.art) {
+            this.artByPlayer.set(
+              entry.playerId,
+              mergeArt(this.artByPlayer.get(entry.playerId), entry),
+            );
+          }
           this.handlers.onArt?.([...this.artByPlayer.values()]);
           break;
         case 'error':

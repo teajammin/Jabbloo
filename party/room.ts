@@ -26,6 +26,7 @@ import {
   FALLBACK_CHARACTER_ART,
   FALLBACK_WEAPON_ART,
   FALLBACK_WEAPONS,
+  MAX_MESSAGE_BYTES,
   graceExpired,
   holdingUpRematch,
   isDuel,
@@ -1368,8 +1369,22 @@ export default class Room implements Party.Server {
     return this.state.players.some((p) => p.id === connection.id && p.isHost);
   }
 
+  /**
+   * Sends one message, unless it would cost the connection.
+   *
+   * The platform closes a socket that carries an oversized message rather than
+   * rejecting the message — so an unchecked send does not fail, it disconnects
+   * whoever it was sent to, and everything they had not received yet is gone.
+   * Dropping one picture is a bad outcome; dropping the host's screen in the
+   * middle of a fight is a much worse one.
+   */
   private send(connection: Party.Connection, message: ServerMessage): void {
-    connection.send(JSON.stringify(message));
+    const encoded = JSON.stringify(message);
+    if (encoded.length > MAX_MESSAGE_BYTES * 0.95) {
+      console.warn(`[room] refusing to send ${message.type}: ${encoded.length} bytes`);
+      return;
+    }
+    connection.send(encoded);
   }
 
   /**
@@ -1390,16 +1405,44 @@ export default class Room implements Party.Server {
   private onRequestArt(sender: Party.Connection): void {
     if (!this.isHost(sender)) {
       const player = this.state.players.find((p) => p.id === sender.id && !p.isHost);
-      if (player) this.send(sender, { type: 'art', art: [this.artFor(player.id)] });
+      if (player) this.sendArtOf(player.id, sender);
       return;
     }
 
-    // One message per player. Six characters and eighteen weapons together run
-    // to several megabytes, and the platform closes a socket that carries a
-    // message over a megabyte — which would take the host's screen down at the
-    // exact moment the battle starts.
     for (const player of creators(this.state)) {
-      this.send(sender, { type: 'art', art: [this.artFor(player.id)] });
+      this.sendArtOf(player.id, sender);
+    }
+  }
+
+  /**
+   * Sends one player's work, one piece per message.
+   *
+   * Per player was not small enough. A character and two weapons, each capped
+   * at MAX_ARTWORK_BYTES, come to more than a megabyte between them — and the
+   * platform does not reject a message that size, it closes the socket
+   * carrying it. So a single player who imported photographs took the host's
+   * screen down as the battle opened, and everyone whose artwork had not
+   * arrived yet fought as a stand-in. Exactly the bug that was reported, and
+   * only ever by people playing with somebody who had used the camera.
+   *
+   * One piece is capped well under the limit by the export budget on the way
+   * in, so this cannot be the thing that closes a socket.
+   */
+  private sendArtOf(playerId: string, to: Party.Connection): void {
+    const whole = this.artFor(playerId);
+
+    if (whole.character) {
+      this.send(to, {
+        type: 'art',
+        art: [{ playerId, character: whole.character, weapons: [] }],
+      });
+    }
+
+    for (const [index, weapon] of whole.weapons.entries()) {
+      this.send(to, {
+        type: 'art',
+        art: [{ playerId, character: null, weapons: [{ ...weapon, index }] }],
+      });
     }
   }
 

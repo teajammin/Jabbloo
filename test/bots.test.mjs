@@ -111,12 +111,36 @@ check('and named after the stand-ins',
   JSON.stringify(filled.weaponNames) === JSON.stringify(STAND_INS),
   JSON.stringify(filled.weaponNames));
 
-// The host asks for artwork: the absent player's must be complete.
+/*
+ * The host asks for artwork: the absent player's must be complete.
+ *
+ * It arrives a piece at a time — one message per picture — because a whole
+ * portfolio in one message is over the platform's limit for somebody who
+ * imported photographs, and the platform closes the socket rather than
+ * rejecting the message. So this puts the pieces back together the way the
+ * real client does.
+ */
 host.send(JSON.stringify({ type: 'requestArt' }));
-await wait(300);
+await wait(400);
 const art = host.inbox.filter((m) => m.type === 'art')
   .flatMap((m) => m.art)
-  .find((entry) => entry.playerId === ids[1]);
+  .filter((entry) => entry.playerId === ids[1])
+  .reduce((into, piece) => {
+    if (!into) return { ...piece, weapons: placed([], piece.weapons) };
+    return {
+      playerId: piece.playerId,
+      character: piece.character ?? into.character,
+      weapons: placed(into.weapons, piece.weapons),
+    };
+  }, null);
+
+function placed(existing, incoming) {
+  const weapons = [...existing];
+  for (const [offset, weapon] of incoming.entries()) {
+    weapons[weapon.index ?? weapons.length + offset] = weapon;
+  }
+  return weapons;
+}
 check('their artwork is whole', art?.character !== null && art?.weapons.length === WEAPON_COUNT,
   JSON.stringify(art?.weapons?.length));
 check('the stand-in weapons point at real files',

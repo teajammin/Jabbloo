@@ -245,5 +245,60 @@ check('and stops at zero rather than going negative',
   graceRemaining(away(GRACE_SECONDS + 10)) === 0);
 check('a connected player has no countdown', graceRemaining(player('Ann', 'teamA')) === 0);
 
+/*
+ * Artwork arriving in pieces.
+ *
+ * A player who imported photographs has more than a megabyte of PNG between
+ * their character and their weapons, and the platform closes a socket that
+ * carries a message that size rather than rejecting it — so the whole lot in
+ * one message took the host's screen down as the battle opened and everyone
+ * whose art had not arrived fought as a stand-in.
+ */
+import { mergeArt, type PlayerArt } from '../src/shared/protocol';
+
+const piece = (over: Partial<PlayerArt>): PlayerArt => ({
+  playerId: 'ann', character: null, weapons: [], ...over,
+});
+
+const face = { png: 'face.png', name: 'Ann' };
+const sword = { png: 'sword.png', name: 'Sword', index: 0 };
+const axe = { png: 'axe.png', name: 'Axe', index: 1 };
+
+check('the first piece stands on its own',
+  mergeArt(undefined, piece({ character: face })).character?.png === 'face.png');
+
+let built = mergeArt(undefined, piece({ character: face }));
+built = mergeArt(built, piece({ weapons: [sword] }));
+built = mergeArt(built, piece({ weapons: [axe] }));
+check('a character and two weapons come back whole',
+  built.character?.png === 'face.png' && built.weapons.length === 2,
+  JSON.stringify(built.weapons.length));
+check('and in the order they were drawn',
+  built.weapons[0]?.name === 'Sword' && built.weapons[1]?.name === 'Axe',
+  JSON.stringify(built.weapons.map((w) => w.name)));
+
+// Messages are not promised in order, and a weapon knows its own slot.
+let reversed = mergeArt(undefined, piece({ weapons: [axe] }));
+reversed = mergeArt(reversed, piece({ weapons: [sword] }));
+reversed = mergeArt(reversed, piece({ character: face }));
+check('arriving out of order does not scramble them',
+  reversed.weapons[0]?.name === 'Sword' && reversed.weapons[1]?.name === 'Axe',
+  JSON.stringify(reversed.weapons.map((w) => w.name)));
+check('and the character still lands', reversed.character?.png === 'face.png');
+
+// A redraw replaces what it replaces.
+const redrawn = mergeArt(built, piece({ weapons: [{ png: 'new.png', name: 'Better', index: 0 }] }));
+check('a later piece wins', redrawn.weapons[0]?.name === 'Better',
+  JSON.stringify(redrawn.weapons.map((w) => w.name)));
+check('without disturbing the others', redrawn.weapons[1]?.name === 'Axe');
+
+// A weapon knows its own slot, and keeps it even when it is the only thing
+// that has turned up: the fight asks for a weapon by the slot it was drawn
+// in, so slot one must not answer to slot zero just because it arrived first.
+const gappy = mergeArt(undefined, piece({ weapons: [axe] }));
+check('a lone second weapon stays in its own slot',
+  gappy.weapons[1]?.name === 'Axe' && gappy.weapons[0] === undefined,
+  JSON.stringify(gappy.weapons));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

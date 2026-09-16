@@ -435,10 +435,59 @@ export type ClientMessage =
 // --------------------------------------------------------------- server -> client
 
 /** One player's finished work, sent only when the battle needs it. */
+/**
+ * One player's finished work, or a piece of it.
+ *
+ * Deliberately partial-friendly. A player who imported photographs can have
+ * two megabytes of PNG between their character and their weapons, and the
+ * platform does not reject a message over one megabyte — it closes the socket
+ * carrying it. Sending somebody's whole portfolio in one message therefore
+ * took the host's screen down at the exact moment the battle started, and
+ * everyone whose art had not arrived fought as a stand-in.
+ *
+ * So it arrives a piece at a time and the client puts it back together:
+ * `character` may be null in a message that carries only a weapon, and
+ * `weapons` carries the slot each one came from so the order survives being
+ * split up and arriving out of sequence.
+ */
 export interface PlayerArt {
   playerId: string;
   character: { png: string; name: string } | null;
-  weapons: { png: string; name: string }[];
+  weapons: { png: string; name: string; index?: number }[];
+}
+
+/**
+ * Puts the pieces of one player's artwork back together.
+ *
+ * Later pieces win, so a redraw replaces what it replaces, and a weapon with
+ * no index falls in after the ones that have them — which is what a message
+ * from an older client would look like.
+ */
+export function mergeArt(into: PlayerArt | undefined, piece: PlayerArt): PlayerArt {
+  // Even the first piece has to be filed by its slot: a second weapon that
+  // arrives before the first would otherwise sit at slot zero and be
+  // overwritten the moment the first turned up.
+  const weapons = into ? [...into.weapons] : [];
+  for (const [offset, weapon] of piece.weapons.entries()) {
+    const at = weapon.index ?? weapons.length + offset;
+    weapons[at] = weapon;
+  }
+
+  return {
+    playerId: piece.playerId,
+    character: piece.character ?? into?.character ?? null,
+    /*
+     * Holes are kept, not squeezed out.
+     *
+     * Pieces are not promised in order, and closing a gap the moment it
+     * appears renumbers everything after it: a second weapon arriving before
+     * the first put itself at slot zero, and the first then overwrote it.
+     * The fight asks for a weapon by the slot it was drawn in, so the slots
+     * have to survive the journey — an empty one reads the same as one that
+     * has not arrived yet, which is exactly what it is.
+     */
+    weapons,
+  };
 }
 
 export type ServerMessage =
