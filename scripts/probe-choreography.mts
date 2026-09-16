@@ -22,6 +22,9 @@ const cases = [
   { prompt: 'poison them with the blade so they rot', weaponName: 'Dagger' },
   { prompt: 'shoot them right in the heart', weaponName: 'Gun' },
   { prompt: 'shoot them in the knee', weaponName: 'Gun' },
+  // Does every action in a sentence get its own beat, in order?
+  { prompt: 'uppercut, then shoot their leg, then bite their ear', weaponName: 'Gun' },
+  { prompt: 'hypnotise them into punching their own face', weaponName: 'Pocket Watch' },
 ];
 
 /** Moves that close the distance — wrong in front of a ranged attack. */
@@ -45,18 +48,26 @@ for (const one of cases) {
   const names = steps.map((s) => s.move ?? '?');
   const summary = steps.map((s) => {
     const kind = s.params?.['kind'];
-    return (s.move ?? '?') + (kind ? `:${String(kind)}` : '') + (s.on === 'enemy' ? '(enemy)' : '');
+    return (s.move ?? '?') + (kind ? `:${String(kind)}` : '') + (s.on ? `(${s.on})` : '');
   }).join(' → ');
 
-  // An approach before a ranged move is the thing that makes shooting look
-  // like hitting.
-  const firstRanged = names.findIndex((n) => RANGED.has(n));
-  const closedIn = firstRanged >= 0 && names.slice(0, firstRanged).some((n) => APPROACH.has(n));
+  /*
+   * Walking in before a *ranged opening* is the thing that makes shooting look
+   * like hitting. Walking in before a punch is how punching works, even when
+   * something is fired later in the same move — so this asks the same question
+   * the server does rather than a cruder version of it.
+   */
+  const MELEE = new Set(['swing', 'slam', 'punch', 'kick', 'headbutt', 'bite',
+    'grab', 'stomp', 'spin_weapon', 'inhale']);
+  const firstAttack = names.findIndex((n) => RANGED.has(n) || MELEE.has(n));
+  const closedIn = firstAttack > 0
+    && RANGED.has(names[firstAttack] ?? '')
+    && names.slice(0, firstAttack).some((n) => APPROACH.has(n));
 
   console.log(`${one.weaponName.padEnd(14)} "${one.prompt}"`);
   console.log(`  ${summary}`);
   if (closedIn) console.log('  !! walked in before a ranged attack');
-  if (firstRanged < 0 && /shoot|fire|throw|fart|blast/i.test(one.prompt)) {
+  if (!names.some((n) => RANGED.has(n)) && /shoot|fire|throw|fart|blast/i.test(one.prompt)) {
     console.log('  !! nothing crossed the gap');
   }
   console.log();

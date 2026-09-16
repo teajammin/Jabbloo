@@ -212,7 +212,20 @@ export interface PrimitiveParams {
  * choreography shows the opponent reacting — knocked flat, staggered, sucked
  * in — rather than only ever animating the attacker.
  */
-export type Performer = 'self' | 'enemy';
+/**
+ * Who does a move, and to whom.
+ *
+ * `self` is the attacker doing it to their opponent, which is nearly
+ * everything. `enemy` is something happening *to* the opponent — a knockdown,
+ * a poisoning — done by swapping the two fighters over, so every primitive
+ * works on either of them with no per-move targeting.
+ *
+ * `themselves` is the opponent doing it to themselves, which needs both to be
+ * the same fighter. It exists for one situation and it is worth the third
+ * case: somebody hypnotised into punching their own face is the best thing
+ * that can happen in this game, and there was no way to express it.
+ */
+export type Performer = 'self' | 'enemy' | 'themselves';
 
 export type PrimitiveName = keyof PrimitiveParams;
 

@@ -76,5 +76,27 @@ check('everything the server aims at the enemy is honoured by the engine',
   JSON.stringify(serverSide.filter((m) => !engineSide.includes(m))));
 check('poison is on both', engineSide.includes('sicken') && serverSide.includes('sicken'));
 
+/*
+ * Who a step is aimed at, as the parser reads it.
+ *
+ * `enemy` is honoured only for moves that describe something happening to
+ * somebody, so an attack cannot be redirected into making the opponent swing
+ * their own weapon at the attacker. `themselves` is honoured for anything,
+ * because that is precisely what it is for — somebody hypnotised into hitting
+ * their own face, which is the best thing that can happen in this game.
+ */
+const enginePlayerSource = readFileSync(`${process.cwd()}/src/engine/player.ts`, 'utf8');
+const indexSource = readFileSync(`${process.cwd()}/src/engine/primitives/index.ts`, 'utf8');
+
+check('the parser knows about aiming a move at its own performer',
+  enginePlayerSource.includes("on === 'themselves'"),
+  'src/engine/player.ts');
+check('and it is not gated behind the reactions list',
+  /selfInflicted[\s\S]{0,200}performedByEnemy/.test(enginePlayerSource)
+  || enginePlayerSource.includes("const selfInflicted = on === 'themselves';"));
+check('the step builder points both fighters at the same one',
+  indexSource.includes("actor: ctx.enemy, enemy: ctx.enemy"),
+  'src/engine/primitives/index.ts');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

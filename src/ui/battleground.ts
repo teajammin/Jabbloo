@@ -29,6 +29,8 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
     const cards = new Map<string, { card: HTMLElement; voters: HTMLElement }>();
     let myVote: string | null = null;
     let revealing = false;
+    /** Set once this screen has handed over, so it cannot hand over twice. */
+    let leaving = false;
     let shuffleTimer: number | null = null;
 
     for (const ground of battlegrounds) {
@@ -137,6 +139,10 @@ export function battlegroundScreen(connection: RoomConnection, isHost: boolean):
       onClosed: () => goHome(go),
       onState: (state) => {
         if (state.phase === 'battle') {
+          // Once. State arrives faster than a screen swaps, and two battle
+          // screens means two entrances.
+          if (leaving) return;
+          leaving = true;
           clock.stop();
           go(battleScreen(connection, isHost));
           return;

@@ -22,6 +22,8 @@ import {
 export function creationScreen(connection: RoomConnection, isHost: boolean): Screen {
   return (root, go) => {
     let lastStep = '';
+    /** Set once this screen has handed over, so it cannot hand over twice. */
+    let leaving = false;
     /*
      * What was drawn, kept per slot.
      *
@@ -345,8 +347,17 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
           go(battlegroundScreen(connection, isHost));
           return;
         }
-        // An ULT runs straight into the fight on the ground already chosen.
+        /*
+         * An ULT runs straight into the fight on the ground already chosen.
+         *
+         * Guarded, because the handover waits on a dynamic import: state keeps
+         * arriving while that is in flight, and without this a second battle
+         * screen was mounted on top of the first — which is why the fighters
+         * walked on, vanished, and walked on again.
+         */
         if (state.phase === 'battle') {
+          if (leaving) return;
+          leaving = true;
           clock.stop();
           void import('./battle').then(({ battleScreen }) => {
             go(battleScreen(connection, isHost));

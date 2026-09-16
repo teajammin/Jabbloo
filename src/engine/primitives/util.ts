@@ -25,6 +25,14 @@ export function duration(value: unknown, fallback: number): number {
 
 /** +1 if the enemy is to the actor's right, -1 if to the left. */
 export function directionToEnemy(ctx: PrimitiveContext): 1 | -1 {
+  /*
+   * A fighter attacking themselves is standing exactly where their target is,
+   * so there is no direction between them — and a swing with no direction
+   * plays as a fighter standing still. They swing the way they are facing,
+   * which for somebody who has been hypnotised into hitting themselves is
+   * both correct and funnier than the alternative.
+   */
+  if (ctx.enemy === ctx.actor) return ctx.actor.facing === 'left' ? -1 : 1;
   return ctx.enemy.root.x >= ctx.actor.root.x ? 1 : -1;
 }
 

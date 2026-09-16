@@ -76,10 +76,18 @@ export function createStep(ctx: PrimitiveContext, step: Step): gsap.core.Timelin
     params: PrimitiveParams[typeof name],
   ) => gsap.core.Timeline;
 
-  // `on: "enemy"` simply swaps the two fighters. Every primitive then works on
-  // either of them for free, with no per-move targeting logic.
+  /*
+   * Targeting, by handing the primitive a different pair of fighters.
+   *
+   * `enemy` swaps them, so a knockdown written against the attacker happens to
+   * the opponent. `themselves` points both at the opponent, so the move is
+   * performed by them and lands on them — which is the only way to animate
+   * somebody hypnotised into hitting their own face.
+   */
   const scoped: PrimitiveContext =
-    step.on === 'enemy' ? { actor: ctx.enemy, enemy: ctx.actor, stage: ctx.stage } : ctx;
+    step.on === 'enemy' ? { actor: ctx.enemy, enemy: ctx.actor, stage: ctx.stage }
+      : step.on === 'themselves' ? { actor: ctx.enemy, enemy: ctx.enemy, stage: ctx.stage }
+        : ctx;
 
   return primitive(scoped, (step.params ?? {}) as PrimitiveParams[typeof name]);
 }

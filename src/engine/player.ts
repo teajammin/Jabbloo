@@ -124,10 +124,21 @@ export function parseChoreography(input: unknown): Choreography {
     if (!isPrimitiveName(move)) continue;
     const params = (entry as { params?: unknown }).params;
     const on = (entry as { on?: unknown }).on;
+    /*
+     * Who the step is aimed at.
+     *
+     * `enemy` is only honoured for moves that describe something happening to
+     * somebody, so an attack cannot be redirected into making the opponent
+     * swing their own weapon at you. `themselves` is honoured for anything,
+     * because that is exactly what it is for: a fighter under somebody else's
+     * control turning on themselves.
+     */
     const performedByEnemy = on === 'enemy' && REACTION_MOVES.has(move);
+    const selfInflicted = on === 'themselves';
     steps.push({
       move,
-      ...(performedByEnemy ? { on: 'enemy' as const } : {}),
+      ...(selfInflicted ? { on: 'themselves' as const }
+        : performedByEnemy ? { on: 'enemy' as const } : {}),
       params: typeof params === 'object' && params !== null ? params : {},
     } as Step);
     if (steps.length >= MAX_STEPS) break;

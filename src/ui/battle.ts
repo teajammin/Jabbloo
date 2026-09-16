@@ -298,7 +298,9 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
         if (opening) {
           caption.textContent = `${name} steps up`;
-          await stage.announce(name, side);
+          // Long enough to read a name somebody invented and look at what
+          // they drew, rather than long enough to notice a card was there.
+          await stage.announce(name, side, 4.6);
           if (disposed) return;
         }
 
@@ -410,8 +412,16 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         play('whoosh');
         // The card carries the names, which no recording can; the voice reads
         // them too where the device happens to have speech of its own.
+        /*
+         * Held for long enough to read.
+         *
+         * A second and a half was the time it takes to notice a card is there,
+         * not to read a name somebody invented and look at the thing they
+         * drew. This is the one beat in the round that is purely anticipation,
+         * so it can afford the seconds.
+         */
         await Promise.all([
-          stage.proclaim(billing, 1.5),
+          stage.proclaim(billing, 4.5),
           narrate(billing),
         ]);
         if (disposed) return;

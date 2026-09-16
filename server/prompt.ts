@@ -89,6 +89,13 @@ These are the ONLY moves that exist. You may not invent others.
 - shrink       {"scale": 0.2-0.95, "duration": s}
 - knockdown    {"duration": s}   (falls flat, sees stars — usually "on": "enemy")
 - dizzy        {"duration": s}   (stunned and wobbling — usually "on": "enemy")
+Every step may carry "on":
+  (omitted)     the attacker does it to their opponent. Nearly everything.
+  "enemy"       it happens TO the opponent — knockdown, dizzy, sicken.
+  "themselves"  the opponent does it to themselves. For hypnotism, mind
+                control, confusion, charms — anything where they have been
+                made to turn on their own side.
+
 - sicken      {"kind": <state>, "intensity": 1-10, "duration": s}
     <state>: poison | burn | curse | love | hypnotised | frozen | shocked
              | stink | confused | drunk
@@ -150,6 +157,31 @@ These are the ONLY moves that exist. You may not invent others.
 Find the closest physical equivalent and commit to it. Players will describe
 magic, anime moves, memes and physical impossibilities — that is the fun.
 
+THE STEPS ARE THE SENTENCE. Their words are read aloud over the animation as it
+plays, so the two have to match beat for beat — a player hearing "then I bite
+their ear off" while watching a kick has been given somebody else's move.
+
+Work through what they wrote in order:
+- Every distinct action in their description gets its own step, in the order
+  they wrote it. "Uppercut, then shoot their leg, then bite" is three steps:
+  punch {style: uppercut}, projectile, bite. Not one punch and a shrug.
+- Do not add actions they did not describe. A flourish nobody asked for at the
+  front pushes their own move to the end of a sentence that has already
+  finished being read.
+- Do not drop actions either. If they wrote four things and you have room for
+  three, shorten each rather than cutting the last one — they will be waiting
+  to hear it.
+- Weight the durations the way the words do. A move described in eight words
+  and one described in fifty should not take the same time, and the step they
+  spent thirty words on is the one to give room to.
+- If a described action has no primitive that fits, use the nearest one rather
+  than skipping the beat: a step that is approximately right keeps the rest in
+  time, and a missing one puts everything after it a beat out.
+
+The same applies to who is doing what. "Make them hit themselves" is the
+opponent's own fist, so it is a punch with "on": "themselves" — not the
+attacker punching them.
+
 - "kamehameha" / "energy blast"  -> beam {kind: energy}, long chargeDuration
 - "throw the sun at them"        -> projectile {kind: sun, size: 260}
 - "shoot fire"                   -> projectile {kind: fire} or beam {kind: fire}
@@ -187,6 +219,13 @@ magic, anime moves, memes and physical impossibilities — that is the fun.
 - "make them sick"               -> the attack, then sicken {kind: poison} on enemy
 - "set them on fire"             -> projectile {kind: fire}, then sicken {kind: burn} on enemy
 - "curse them"                   -> sicken {kind: curse, intensity: 8} on enemy
+- "hypnotise them into hitting themselves"
+                                 -> sicken {kind: hypnotised} on enemy, then
+                                    punch with "on": "themselves"
+- "make them punch their own face" -> punch {style: hook}, "on": "themselves"
+- "confuse them so they attack themselves"
+                                 -> sicken {kind: confused} on enemy, then
+                                    swing with "on": "themselves"
 - "make them fall in love with me" -> taunt, then sicken {kind: love} on enemy
 - "hypnotise them"               -> beam {kind: energy}, then sicken {kind: hypnotised} on enemy
 - "freeze them solid"            -> projectile {kind: ice}, then sicken {kind: frozen} on enemy

@@ -316,7 +316,9 @@ if (inBattle) {
     const seen = await evaluate(`(async () => {
       const found = new Set();
       let frames = 0;
-      for (let i = 0; i < 70; i++) {
+      // The openings are deliberately unhurried — two weapon cards and two
+      // entrances before anything swings — so the window has to outlast them.
+      for (let i = 0; i < 150; i++) {
         await new Promise((r) => setTimeout(r, 250));
         const s = window.__stage;
         if (!s) continue;
