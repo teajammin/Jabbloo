@@ -277,6 +277,9 @@ export default class Room implements Party.Server {
       case 'leave':
         this.onLeave(sender);
         break;
+      case 'kick':
+        if (this.isHost(sender)) this.onKick(message.playerId);
+        break;
       case 'start':
         this.beginGame(sender);
         break;
@@ -773,6 +776,33 @@ export default class Room implements Party.Server {
     // A rematch waits on everyone who is here, and they are not any more.
     this.startRematchIfReady();
     return false;
+  }
+
+  /**
+   * The host removes somebody from the lobby.
+   *
+   * Only in the lobby, and never the host itself. Afterwards their device is
+   * told, so it goes back to the front page rather than sitting in a room that
+   * no longer lists it — and rejoining is allowed, because being removed is
+   * how a room fixes a mistake rather than a punishment.
+   */
+  private onKick(playerId: string): void {
+    if (this.state.phase !== 'lobby') return;
+
+    const player = this.state.players.find((p) => p.id === playerId && !p.isHost);
+    if (!player) return;
+
+    this.state.players = this.state.players.filter((p) => p.id !== playerId);
+    this.broadcastState();
+
+    const device = [...this.room.getConnections()].find((c) => c.id === playerId);
+    if (device) {
+      this.send(device, {
+        type: 'error',
+        reason: 'The host removed you from the room. You can join again.',
+      });
+      this.send(device, { type: 'closed' });
+    }
   }
 
   /**

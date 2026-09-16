@@ -2323,3 +2323,44 @@ body:has(.screen-draw) .help-open { display: none !important; }
 #app.is-arriving > * {
   visibility: hidden;
 }
+
+/*
+ * Removing somebody from the lobby.
+ *
+ * Out of the way until it is wanted: the lobby is mostly for looking at, and a
+ * row of delete buttons invites a mis-tap on a screen full of people who did
+ * nothing wrong. Shown on hover, and on focus so it can be reached without a
+ * mouse — and on a touch screen, where there is no hover, it simply stays
+ * visible, because there is no other way to reach it.
+ */
+.player.can-kick { position: relative; }
+
+.player .kick {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  background: var(--coral);
+  color: var(--on-accent);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.player.can-kick:hover .kick,
+.player .kick:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .player .kick { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player .kick { transition: none; }
+}

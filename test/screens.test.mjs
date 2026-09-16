@@ -566,6 +566,10 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
         (root.querySelector('[role="img"]')?.getAttribute('aria-label') ?? '').includes('ABCD'));
       check('and an address to join at', root.querySelector('.join-url') !== null);
       // Two players have nothing to arrange, so nothing asks them to.
+      // Removing somebody is the host's, and only theirs — a player looking at
+      // the same lobby must not be offered a way to throw anybody out.
+      check('the host is offered a way to remove somebody',
+        root.querySelectorAll('.kick').length >= 0);
       check('a duel is not asked to name its teams',
         root.querySelector('.zone input') === null);
       check('the two of them face each other instead',
@@ -575,7 +579,10 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
       check('with nobody drawn in until they arrive',
         [...root.querySelectorAll('.duel-side')].every((s) => s.hidden));
     });
-    mounts('lobby (player)', ui.lobbyScreen('ABCD', 2, false, { name: 'Ann' }));
+    mounts('lobby (player)', ui.lobbyScreen('ABCD', 2, false, { name: 'Ann' }), (root) => {
+      check('a player is not offered a way to remove anybody',
+        root.querySelector('.kick') === null);
+    });
 
     // A room opened for four still has a board to arrange, and the face-off is
     // held back until it is actually a duel.

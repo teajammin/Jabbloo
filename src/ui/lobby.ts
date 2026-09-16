@@ -76,7 +76,18 @@ export function lobbyScreen(
       roster.replaceChildren();
 
       for (const player of players) {
-        roster.appendChild(playerRow(player, player.id === connection.playerId));
+        roster.appendChild(playerRow(
+          player,
+          player.id === connection.playerId,
+          // Only the host, only before the game starts: once people have drawn
+          // things, a room that can delete a player can delete their work.
+          isHost && state.phase === 'lobby'
+            ? () => {
+                if (!confirm(`Remove ${player.name} from the room?`)) return;
+                connection.send({ type: 'kick', playerId: player.id });
+              }
+            : undefined,
+        ));
       }
 
       // Empty seats, so the host can see at a glance who is still missing.
@@ -326,7 +337,7 @@ async function openPhase(
   }
 }
 
-function playerRow(player: Player, isYou: boolean): HTMLLIElement {
+function playerRow(player: Player, isYou: boolean, onKick?: () => void): HTMLLIElement {
   const avatar = player.photo
     ? el('img', { class: 'avatar', src: player.photo, alt: '' })
     : el('span', { class: 'avatar placeholder' }, player.name.slice(0, 1).toUpperCase());
@@ -337,5 +348,22 @@ function playerRow(player: Player, isYou: boolean): HTMLLIElement {
   );
   if (isYou) row.appendChild(el('span', { class: 'you' }, 'you'));
   if (!player.connected) row.appendChild(el('span', { class: 'you' }, 'reconnecting…'));
+
+  /*
+   * Removing somebody, for the host only.
+   *
+   * Tucked in the corner and shown on hover or focus, because it is rare and
+   * destructive and the lobby is mostly for looking at. Asked about before it
+   * happens: the row it sits on is small, the button is smaller, and the
+   * mistake it prevents is throwing out somebody who did nothing wrong.
+   */
+  if (onKick) {
+    const kick = button('✕', onKick, 'kick');
+    kick.setAttribute('aria-label', `Remove ${player.name} from the room`);
+    kick.title = `Remove ${player.name}`;
+    row.appendChild(kick);
+    row.classList.add('can-kick');
+  }
+
   return row;
 }

@@ -205,6 +205,81 @@ for (const ws of [host, a, b]) ws.close();
   for (const ws of [screen, phone]) ws.close();
 }
 
+// --- the host can remove somebody -------------------------------------------
+//
+// Somebody joins twice by accident, or a stranger wanders in off a shared
+// link. Before the game starts that is a lobby problem with a lobby answer;
+// afterwards a room that can delete a player can delete their work, so it
+// stops being allowed.
+{
+  const code = 'KICK' + Math.floor(Math.random() * 900 + 100);
+  const socket = (id) => new Promise((resolve) => {
+    const ws = new WebSocket(`ws://127.0.0.1:1999/parties/main/${code}?_pk=${id}`);
+    ws.inbox = [];
+    ws.addEventListener('message', (e) => ws.inbox.push(JSON.parse(e.data)));
+    ws.addEventListener('open', () => resolve(ws));
+  });
+  const seen = (ws) => [...ws.inbox].reverse()
+    .find((m) => m.type === 'state' || m.type === 'welcome')?.state;
+
+  const screen = await socket('screen');
+  screen.send(JSON.stringify({ type: 'host', capacity: 4 }));
+  await wait(300);
+
+  const ann = await socket('ann');
+  ann.send(JSON.stringify({ type: 'join', name: 'Ann' }));
+  const bo = await socket('bo');
+  bo.send(JSON.stringify({ type: 'join', name: 'Bo' }));
+  await wait(500);
+
+  const ids = Object.fromEntries((seen(screen)?.players ?? [])
+    .filter((p) => !p.isHost).map((p) => [p.name, p.id]));
+  check('two players are in', Object.keys(ids).length === 2, JSON.stringify(ids));
+
+  // A player cannot remove anybody, including themselves.
+  ann.send(JSON.stringify({ type: 'kick', playerId: ids['Bo'] }));
+  await wait(350);
+  check('a player cannot remove anyone',
+    seen(screen)?.players.some((p) => p.name === 'Bo'),
+    JSON.stringify(seen(screen)?.players.map((p) => p.name)));
+
+  screen.send(JSON.stringify({ type: 'kick', playerId: ids['Bo'] }));
+  await wait(400);
+  check('the host can', !seen(screen)?.players.some((p) => p.name === 'Bo'),
+    JSON.stringify(seen(screen)?.players.map((p) => p.name)));
+  check('and the one who stayed is untouched',
+    seen(screen)?.players.some((p) => p.name === 'Ann'));
+  check('the removed device is told why',
+    bo.inbox.some((m) => m.type === 'error' && /removed you/i.test(m.reason)),
+    JSON.stringify(bo.inbox.map((m) => m.type)));
+
+  // Being removed fixes a mistake; it is not a ban.
+  const again = await socket('bo2');
+  again.send(JSON.stringify({ type: 'join', name: 'Bo' }));
+  await wait(400);
+  check('and can come back', seen(screen)?.players.some((p) => p.name === 'Bo'),
+    JSON.stringify(seen(screen)?.players.map((p) => p.name)));
+
+  // The host is not a player and cannot be removed, or the room would vanish.
+  const hostId = seen(screen)?.players.find((p) => p.isHost)?.id;
+  screen.send(JSON.stringify({ type: 'kick', playerId: hostId }));
+  await wait(300);
+  check('the host cannot remove itself',
+    seen(screen)?.players.some((p) => p.isHost));
+
+  // Once people have made things, their seat stops being the host's to take.
+  screen.send(JSON.stringify({ type: 'start' }));
+  await wait(400);
+  const playing = seen(screen)?.players.find((p) => p.name === 'Ann')?.id;
+  screen.send(JSON.stringify({ type: 'kick', playerId: playing }));
+  await wait(350);
+  check('nobody can be removed once the game has started',
+    seen(screen)?.players.some((p) => p.name === 'Ann'),
+    JSON.stringify(seen(screen)?.players.map((p) => p.name)));
+
+  for (const ws of [screen, ann, bo, again]) ws.close();
+}
+
 // --- two players are not two teams ----------------------------------------
 {
   const code = 'DUEL' + Math.floor(Math.random() * 900 + 100);

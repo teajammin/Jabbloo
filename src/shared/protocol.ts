@@ -427,6 +427,14 @@ export type ClientMessage =
    * marked "reconnecting…" for the next twenty-five seconds.
    */
   | { type: 'leave' }
+  /**
+   * The host removing somebody from the lobby.
+   *
+   * Only before the game starts. Once people have drawn things, a room that
+   * can delete a player can delete their work, and "somebody joined twice by
+   * accident" is a lobby problem rather than a mid-game one.
+   */
+  | { type: 'kick'; playerId: string }
   | { type: 'start' }
   /**
    * A drawing for a slot, as a PNG data URL.

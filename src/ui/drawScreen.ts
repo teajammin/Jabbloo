@@ -343,10 +343,10 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         say('Photo placed');
       }
 
-      // A placed photo can be picked back up and moved or resized, but only
-      // with the select tool — otherwise there would be no way to draw on top
-      // of one.
-      if (tool === 'select' && !canvas.hasFloating && canvas.liftImageAt(at)) {
+      // Anything placed can be picked back up and moved or resized — photos,
+      // squares and circles alike — but only with the select tool, or there
+      // would be no way to draw on top of one.
+      if (tool === 'select' && !canvas.hasFloating && canvas.liftAt(at)) {
         canvas.beginTransformDrag(canvas.transformHandleAt(at) ?? 'move', at);
         transformDrag = true;
         say('Drag to move · corners resize · hold for options');

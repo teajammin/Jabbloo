@@ -16,7 +16,7 @@ export interface ControlHelp {
 }
 
 export const CONTROL_HELP: Record<string, ControlHelp> = {
-  select: { icon: '⬚', name: 'Select', what: 'Drag a box around part of your drawing to copy it. Hold on something to select it whole, or tap a photo to move and resize it again.', key: 'V' },
+  select: { icon: '⬚', name: 'Select', what: 'Drag a box around part of your drawing to copy it. Tap a photo, a square or a circle to pick it back up and move or resize it \u2014 anything you place stays a thing you can move.', key: 'V' },
   pen: { icon: '✏️', name: 'Pen', what: 'Draw freehand. Press harder with a stylus for a thicker line.', key: 'B' },
   eraser: { icon: '⌫', name: 'Eraser', what: 'Rub things out — drawings and photos alike. It erases to transparent, not to white, so you can carve a subject out of a photo by hand.', key: 'E' },
   fill: { icon: '🪣', name: 'Fill', what: 'Tap an area to flood it with the current colour.', key: 'G' },

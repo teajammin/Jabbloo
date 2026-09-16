@@ -16,9 +16,36 @@ import {
  * hundred strokes, so committed work is cached: the canvas only redraws from
  * scratch on undo, and otherwise just draws the newest stroke on top.
  */
+/**
+ * The box a shape occupies, with room for the line it is drawn with.
+ *
+ * `from` and `to` are the corners the pointer dragged between, in either
+ * order, so a rectangle drawn right-to-left has a negative width until this
+ * sorts it out.
+ */
+function shapeBounds(stroke: ShapeStroke): { x: number; y: number; w: number; h: number } {
+  const pad = Math.max(2, stroke.size);
+  const x = Math.min(stroke.from.x, stroke.to.x) - pad;
+  const y = Math.min(stroke.from.y, stroke.to.y) - pad;
+  return {
+    x,
+    y,
+    w: Math.abs(stroke.to.x - stroke.from.x) + pad * 2,
+    h: Math.abs(stroke.to.y - stroke.from.y) + pad * 2,
+  };
+}
+
 export class DrawCanvas {
   readonly canvas: HTMLCanvasElement;
-  private readonly ctx: CanvasRenderingContext2D;
+  /**
+   * Where strokes are painted.
+   *
+   * Not readonly: lifting a shape back out of the drawing paints that one
+   * stroke onto a scratch canvas, through the same routine that put it there
+   * in the first place — a second implementation of every shape would drift
+   * from this one within a week.
+   */
+  private ctx: CanvasRenderingContext2D;
 
   private strokes: Stroke[] = [];
   private redoStack: Stroke[] = [];
@@ -150,6 +177,24 @@ export class DrawCanvas {
 
   endStroke(): void {
     if (this.dragOrigin) { this.dragOrigin = null; return; }
+
+    /*
+     * A tap is not a marquee.
+     *
+     * Pressing the select tool anywhere started a selection of zero size, and
+     * nothing ever cleared it — so a stray tap while arranging photos left a
+     * selection box on screen that could not be got rid of. A marquee is a
+     * drag; anything smaller was somebody touching the picture.
+     */
+    if (this.selection) {
+      const tiny = Math.abs(this.selection.w) < 6 && Math.abs(this.selection.h) < 6;
+      if (tiny) {
+        this.selection = null;
+        this.drawOverlay();
+        this.onChange?.();
+        return;
+      }
+    }
     if (this.selection && !this.live) {
       // A click with no drag clears the marquee rather than leaving a sliver.
       if (Math.abs(this.selection.w) < 4 || Math.abs(this.selection.h) < 4) {
@@ -538,6 +583,88 @@ export class DrawCanvas {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Picks up whatever is under the point — a photo, a square or a circle.
+   *
+   * A drawing is a list of things, so a thing can come back out of it. Photos
+   * already could; shapes could not, which made the difference between "an
+   * object" and "paint" depend on which tool drew it, and nobody thinks of a
+   * square they have just drawn as paint.
+   *
+   * A lifted shape becomes a picture of itself. It could have been kept as a
+   * shape and moved by its corners, but then every handle, resize and crop
+   * would need a second implementation for the sake of something the eye
+   * cannot tell apart at this size.
+   */
+  liftAt(at: Point): boolean {
+    if (this.liftImageAt(at)) return true;
+    if (this.floating) return false;
+
+    for (let i = this.strokes.length - 1; i >= 0; i--) {
+      const stroke = this.strokes[i];
+      if (!stroke || stroke.kind !== 'shape' || stroke.erase) continue;
+
+      const box = shapeBounds(stroke);
+      if (at.x < box.x || at.x > box.x + box.w) continue;
+      if (at.y < box.y || at.y > box.y + box.h) continue;
+
+      const picture = this.pictureOf(stroke, box);
+      if (!picture) return false;
+
+      this.strokes.splice(i, 1);
+      this.floating = { kind: 'image', tool: 'select', data: picture, ...box };
+      this.floatingImage = new Image();
+      this.floatingImage.addEventListener('load', () => this.drawOverlay());
+      this.floatingImage.src = picture;
+      this.selection = null;
+      this.repaint();
+      this.drawOverlay();
+      this.onChange?.();
+      return true;
+    }
+    return false;
+  }
+
+  /** Whether anything that can be picked up sits under this point. */
+  hasObjectAt(at: Point): boolean {
+    if (this.hasImageAt(at)) return true;
+    return this.strokes.some((stroke) => {
+      if (stroke.kind !== 'shape' || stroke.erase) return false;
+      const box = shapeBounds(stroke);
+      return at.x >= box.x && at.x <= box.x + box.w
+        && at.y >= box.y && at.y <= box.y + box.h;
+    });
+  }
+
+  /**
+   * Draws one stroke on its own, so it can be lifted out as a picture.
+   *
+   * Painted through the same routine that put it on the canvas, on a scratch
+   * canvas shifted so the stroke lands at the origin — the alternative is a
+   * second implementation of every shape, which would drift from this one.
+   */
+  private pictureOf(
+    stroke: Stroke, box: { x: number; y: number; w: number; h: number },
+  ): string | null {
+    const scratch = document.createElement('canvas');
+    scratch.width = Math.max(1, Math.round(box.w));
+    scratch.height = Math.max(1, Math.round(box.h));
+    const sctx = scratch.getContext('2d');
+    if (!sctx) return null;
+
+    const real = this.ctx;
+    try {
+      sctx.translate(-box.x, -box.y);
+      this.ctx = sctx;
+      this.paintStroke(stroke);
+      return scratch.toDataURL('image/png');
+    } catch {
+      return null;
+    } finally {
+      this.ctx = real;
+    }
   }
 
   /** Whether a placed photo sits under this point. */
