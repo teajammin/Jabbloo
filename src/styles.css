@@ -772,12 +772,23 @@ input[type='text'] {
 
 .draw-title { margin: 0; font-size: 15px; }
 
-/* The canvas gives way to the toolbar rather than squeezing it off-screen. */
+/*
+ * The canvas takes the space the toolbar does not use — but never less than
+ * this.
+ *
+ * The toolbar used to win outright. Zooming the browser in to draw something
+ * small shrinks the viewport in CSS pixels, the controls keep their size, and
+ * flexbox handed them everything: at 1.5x the canvas fell from 546px to 195px
+ * and by 3x there was none of it left at all. Zooming in to see better made
+ * the thing being looked at disappear.
+ *
+ * With a floor here the toolbar gives way instead, which it can afford to do —
+ * it scrolls, and the canvas does not.
+ */
 .draw-area {
   flex-shrink: 1;
-  /* Takes the space the toolbar does not use, and centres the square in it. */
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: min(46vh, 300px);
   min-width: 0;
   display: grid;
   place-items: center;
@@ -1076,6 +1087,9 @@ input[type='text'] {
     aspect-ratio: 1;
     width: auto;
     max-width: 100%;
+    /* Side by side, the height is the whole column: no floor needed, and one
+       in vh would fight the aspect ratio. */
+    min-height: 0;
   }
 
   .draw-title {

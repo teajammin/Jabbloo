@@ -293,6 +293,21 @@ if (inBattle) {
       }
       return JSON.stringify({ frames, effects: [...found] });
     })()`);
+    // Both bars, and their portraits, have to be on the screen.
+    const barInfo = await evaluate(`(() => {
+      const b = window.__battle;
+      if (!b || !b.bars) return 'no hook';
+      return JSON.stringify(b.bars());
+    })()`);
+    console.log('  health bars:', barInfo);
+    if (typeof barInfo === 'string' && barInfo.startsWith('[')) {
+      const placed = JSON.parse(barInfo);
+      const offscreen = placed.filter((x) => x.left < 0 || x.right > x.stage);
+      offscreen.length === 0
+        ? ok('both health bars are fully on screen')
+        : note(`a health bar runs off the screen: ${JSON.stringify(offscreen)}`);
+    }
+
     console.log('  effects seen:', seen);
 
     /*

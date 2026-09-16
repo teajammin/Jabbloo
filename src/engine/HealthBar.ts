@@ -18,6 +18,9 @@ import { loadTexture } from './assets';
 /** How big a player's own photograph is, beside their bar. */
 const PORTRAIT = 62;
 
+/** How far the portrait and its breathing room extend past the bar. */
+const PORTRAIT_ROOM = PORTRAIT + 14;
+
 const BAR_WIDTH = 380;
 const BAR_HEIGHT = 34;
 const RADIUS = BAR_HEIGHT / 2;
@@ -45,15 +48,12 @@ export class HealthBar extends Container {
   /** Tweened rather than assigned, so the fill can be animated toward it. */
   private readonly value = { fraction: 1 };
   private tween: gsap.core.Tween | null = null;
-  /** Whether room was reserved for the player's own picture. */
-  private readonly hasPhoto: boolean;
   /** Their face, on the outer end of the bar. */
   private readonly portrait = new Container();
 
   constructor(name: string, side: BarSide, colour: number = palette.mint, photo?: string) {
     super();
     this.side = side;
-    this.hasPhoto = Boolean(photo);
 
     // A soft panel behind the whole group. Ink on a pale sky is readable; the
     // same ink over a volcano is not, and the fight should not be legible only
@@ -67,7 +67,7 @@ export class HealthBar extends Container {
      * the edge of the screen with the bar reading inward from it — the way a
      * fighting game arranges them — rather than on top of the name.
      */
-    const room = this.hasPhoto ? PORTRAIT + 14 : 0;
+    const room = PORTRAIT_ROOM;
     const panel = new Graphics();
     panel.beginFill(palette.cream, 0.72);
     panel.drawRoundedRect(
@@ -132,13 +132,20 @@ export class HealthBar extends Container {
       this.fill.x = BAR_WIDTH;
     }
 
-    if (this.hasPhoto) {
-      this.portrait.x = side === 'left'
-        ? -14 - room + 7
-        : BAR_WIDTH + 14 + 7 - 7;
-      this.portrait.y = -14;
-      void this.loadPortrait(photo!);
-    }
+    /*
+     * Always a portrait, and always in the same place.
+     *
+     * Everybody gets one: a photograph if they brought one, and the initial
+     * the lobby already shows them as if they did not — two fighters where
+     * only one has a face looks like the other one failed to load.
+     *
+     * Centred in the panel it sits in, on the outer side. Sitting it outside
+     * the panel put the left-hand one past the edge of the screen.
+     */
+    this.portrait.x = side === 'left' ? -14 - room + 7 : BAR_WIDTH + 21;
+    this.portrait.y = (-46 + BAR_HEIGHT + 16) / 2 - PORTRAIT / 2;
+    this.drawInitial(name);
+    if (photo) void this.loadPortrait(photo);
 
     this.addChild(panel, track, this.fill, this.label, this.amount,
       this.portrait, this.movePlate, this.move);
@@ -154,6 +161,34 @@ export class HealthBar extends Container {
    * which is when it is most wanted. It arrives when it arrives, into space
    * already reserved for it, so nothing moves when it does.
    */
+  /**
+   * The letter everybody gets, under whatever photograph arrives on top.
+   *
+   * Drawn first and left in place: a photo that fails to load, or was never
+   * sent, leaves a face-shaped thing with their initial in it rather than a
+   * hole where the other player has a picture.
+   */
+  private drawInitial(name: string): void {
+    const disc = new Graphics();
+    disc.beginFill(palette.butter);
+    disc.drawCircle(PORTRAIT / 2, PORTRAIT / 2, PORTRAIT / 2);
+    disc.endFill();
+    disc.lineStyle({ width: 3, color: palette.ink, alpha: 0.7 });
+    disc.drawCircle(PORTRAIT / 2, PORTRAIT / 2, PORTRAIT / 2);
+
+    const letter = new Text((name.trim()[0] ?? '?').toUpperCase(), {
+      fontFamily: 'Verdana, Geneva, sans-serif',
+      fontSize: 30,
+      fontWeight: 'bold',
+      fill: palette.ink,
+    });
+    letter.anchor.set(0.5);
+    letter.x = PORTRAIT / 2;
+    letter.y = PORTRAIT / 2;
+
+    this.portrait.addChild(disc, letter);
+  }
+
   private async loadPortrait(url: string): Promise<void> {
     const texture = await loadTexture(url);
     if (!texture || this.destroyed) return;
@@ -278,5 +313,16 @@ export class HealthBar extends Container {
 
   static get width(): number {
     return BAR_WIDTH;
+  }
+
+  /**
+   * How far the group reaches past the bar itself, on its outer side.
+   *
+   * The portrait hangs outside the bar's own box, so the stage has to know
+   * about it to keep the whole thing on screen: without this the left-hand
+   * face was placed off the edge of the arena entirely.
+   */
+  static get overhang(): number {
+    return PORTRAIT_ROOM;
   }
 }

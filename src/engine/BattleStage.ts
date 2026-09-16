@@ -187,7 +187,11 @@ export class BattleStage {
    */
   addHealthBar(bar: HealthBar, side: Side): void {
     const margin = this.width * 0.045;
-    bar.x = side === 'left' ? margin : this.width - margin - HealthBar.width;
+    // The portrait hangs off the outer end, so both bars are inset by it —
+    // otherwise the left-hand face sits off the edge of the screen.
+    bar.x = side === 'left'
+      ? margin + HealthBar.overhang
+      : this.width - margin - HealthBar.width - HealthBar.overhang;
     bar.y = this.height * 0.085;
     this.overlay.addChild(bar);
   }

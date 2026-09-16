@@ -161,6 +161,17 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
             tints: () => Object.fromEntries(
               [...onStage.entries()].map(([id, f]) => [id, f.tint]),
             ),
+            // Where the bars and their portraits actually sit, which is the
+            // one thing a screenshot shows and nothing else can measure.
+            bars: () => [...bars.entries()].map(([id, bar]) => {
+              const box = bar.getBounds();
+              return {
+                id,
+                left: Math.round(box.x),
+                right: Math.round(box.x + box.width),
+                stage: Math.round(stage.width),
+              };
+            }),
             art: () => (art ?? []).map((a) => `${a.playerId}:${a.weapons.length}w`),
             turn: () => state?.turn,
           };
