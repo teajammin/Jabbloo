@@ -382,6 +382,35 @@ if (inBattle) {
 
   console.log('  api calls:', await evaluate(`JSON.stringify(window.__api ?? [], null, 1).slice(0, 1200)`));
 
+  /*
+   * What a screen that reloads mid-fight is shown.
+   *
+   * It used to replay the whole entrance — both names, then VERSUS — for a
+   * fight that started minutes ago, which reads as the game beginning again.
+   * A screen catching up should get the fighters in place and a single FIGHT.
+   */
+  if (process.env['E2E_RELOAD'] === '1') {
+    await send('Page.reload');
+    await wait(1500);
+
+    const captions = await evaluate(`(async () => {
+      const seenText = [];
+      for (let i = 0; i < 44; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+        const node = document.querySelector('.battle-caption');
+        const text = node ? node.textContent.trim() : '';
+        if (text && seenText[seenText.length - 1] !== text) seenText.push(text);
+      }
+      return JSON.stringify(seenText);
+    })()`);
+    console.log('  after reloading, the screen said:', captions);
+    const said = typeof captions === 'string' && captions.startsWith('[') ? JSON.parse(captions) : [];
+    if (said.length === 0) note('the screen said nothing at all after reloading');
+    else if (said.some((line) => /steps up|versus/i.test(line))) {
+      note(`reloading replayed the entrance: ${said.filter((l) => /steps up|versus/i.test(l)).join(' / ')}`);
+    } else ok('reloading does not replay the entrance');
+  }
+
   const shot = await send('Page.captureScreenshot', { format: 'png' });
   if (shot.result?.data) {
     const { writeFileSync } = await import('node:fs');

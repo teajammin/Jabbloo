@@ -160,6 +160,10 @@ export function throw_(ctx: PrimitiveContext, params: ThrowParams = {}) {
     tl.to(weapon, { alpha: 0, duration: Math.min(0.32, seconds * 0.3), ease: 'power2.in' });
   }
 
+  // It lands on something. A swing and a slam both mark their contact, and a
+  // thrown weapon arriving in silence looked like it had missed.
+  burst(tl, ctx, 'impact', contactPoint(ctx), 200, `-=${seconds * 0.3}`);
+
   tl.call(() => ctx.actor.reattachWeapon());
   tl.eventCallback('onInterrupt', () => ctx.actor.reattachWeapon());
   return tl;
