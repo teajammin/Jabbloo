@@ -6,7 +6,7 @@ import { getSettings } from '../settings';
 import { report } from '../errors';
 import { loadingBadge } from './loading';
 import { play } from '../audio';
-import { narrate, hush, say, preloadLines } from './narrator';
+import { narrate, hush, say, preloadLines, hasVoice } from './narrator';
 import { describeBeats } from './commentary';
 import type { RoomConnection } from '../net/room';
 import {
@@ -399,7 +399,9 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         if (disposed) return;
 
         const weaponName = weapon?.name ?? attacker.weaponName;
-        bars.get(attackerId)?.setMove(weaponName, move.prompt);
+        // The weapon, not the sentence about it: the fifty words a player
+        // wrote are spoken over the move rather than printed beside it.
+        bars.get(attackerId)?.setMove(weaponName, '');
         await attacker.revealWeapon().then();
         if (disposed) return;
 
@@ -445,16 +447,39 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         const parsed = engine.parseChoreography(response.choreography);
         const beats = describeBeats(parsed, attacker.name, defender.name, weaponName);
 
+        /*
+         * The player's own words, read over their own move.
+         *
+         * Spoken rather than printed: the fifty words somebody wrote are the
+         * best thing in the round, and a caption of them is read in two
+         * seconds and then sat under the fight taking up the screen. Said out
+         * loud they last exactly as long as the move does.
+         *
+         * Only the description — the beat-by-beat calls were a second voice
+         * talking over the first, and the pictures already say "uppercut".
+         *
+         * Not awaited: it runs alongside the choreography, not before it.
+         */
+        const written = move.prompt.trim();
+        // Whether it will actually be heard — not merely whether the browser
+        // has the API. A device with an empty voice list would otherwise
+        // neither say the words nor show them, and they are the best thing in
+        // the round.
+        const spoken = written.length > 0 && await hasVoice();
+        if (disposed) return;
+        if (spoken) void narrate(written);
+
         const playback = engine.playChoreography(
           { actor: attacker, enemy: defender, stage },
           parsed,
           {
             onStep: (index) => {
+              // With no voice to carry them, the player's own words stay on
+              // screen for the whole move instead — losing them entirely is
+              // the one outcome worth avoiding.
+              if (written && !spoken) return;
               const beat = beats[index];
-              if (!beat) return;
-              if (beat.caption) caption.textContent = beat.caption;
-              // The game's own voice, the same on every machine.
-              if (beat.line) say(beat.line);
+              if (beat?.caption) caption.textContent = beat.caption;
             },
           },
         );

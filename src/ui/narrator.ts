@@ -102,6 +102,19 @@ const LIKELY_MALE = [
 ];
 
 /**
+ * Whether this device will actually say something.
+ *
+ * Different from `canNarrate`, which only asks whether the API exists: a bare
+ * Linux box has the API and an empty voice list, and would silently say
+ * nothing at all. Anything that depends on a line being heard — the move
+ * description, which is no longer printed anywhere — has to ask this instead.
+ */
+export async function hasVoice(): Promise<boolean> {
+  if (!canNarrate()) return false;
+  return (await availableVoices()).length > 0;
+}
+
+/**
  * Whether this browser can speak at all.
  *
  * The API existing is not the same as a voice being installed — a bare Linux

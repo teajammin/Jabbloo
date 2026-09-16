@@ -3,6 +3,7 @@ import { helpDialog } from './help';
 import { getSettings, updateSettings, type Settings } from '../settings';
 import { play, unlockAudio } from '../audio';
 import { VOICES, canNarrate, narrate } from './narrator';
+import { forgetRoom } from './resume';
 
 /**
  * The options menu, reachable from every screen.
@@ -113,6 +114,16 @@ export function mountOptions(): () => void {
 
   const quit = button('Quit to menu', () => {
     if (!confirm('Leave the game and go back to the menu?')) return;
+    /*
+     * Forget the room first, or quitting does nothing at all.
+     *
+     * A tab that reloads goes back to the game it was in — which is what
+     * saves somebody whose browser crashed mid-fight, and exactly wrong here:
+     * quitting reloaded the page and the resume put them straight back into
+     * the fight they had just left. Saying goodbye is what makes it a quit
+     * rather than a refresh.
+     */
+    forgetRoom();
     // A reload rather than a navigation: it closes the room socket, drops the
     // Pixi stage and clears every screen's listeners in one step, which is
     // exactly what quitting should mean.

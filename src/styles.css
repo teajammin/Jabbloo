@@ -2310,3 +2310,16 @@ body:has(.screen-draw) .help-open { display: none !important; }
   opacity: 0.7;
   line-height: 1.45;
 }
+
+/*
+ * A screen that has not finished arriving.
+ *
+ * Hidden rather than removed: it still lays out and still measures, which the
+ * drawing canvas depends on — it sizes itself from the space it is given, and
+ * a screen with no layout would hand it nothing. The backdrop stays visible
+ * behind, so what the room sees is a plain background rather than a page
+ * assembling itself in front of them.
+ */
+#app.is-arriving > * {
+  visibility: hidden;
+}

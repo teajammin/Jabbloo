@@ -1,4 +1,4 @@
-import { Container, Sprite, Texture } from 'pixi.js';
+import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { loadTexture } from './assets';
 import { gripFor, DEFAULT_GRIP, type Grip } from './grip';
 import gsap from 'gsap';
@@ -31,6 +31,16 @@ const WEAPON_HEIGHT_RATIO = 0.55;
  */
 export class Fighter {
   readonly root = new Container();
+  /**
+   * A soft pale glow behind the fighter.
+   *
+   * Drawings are ink on transparency and a lot of them are outlines nobody
+   * filled in, which is fine on a pale battleground and invisible against a
+   * dark forest — the character disappears into the trees and the room is
+   * watching a floating weapon. This puts something behind them to read
+   * against, faint enough not to look like part of the drawing.
+   */
+  private readonly halo = new Graphics();
   readonly limbs = new Container();
   /**
    * Everything that squashes and stretches.
@@ -74,6 +84,7 @@ export class Fighter {
       options.weaponHeight ?? this.targetHeight * WEAPON_HEIGHT_RATIO;
     this._facing = options.facing ?? 'right';
 
+    this.root.addChild(this.halo);
     this.root.addChild(this.limbs);
     this.root.addChild(this.body);
     this.root.addChild(this.hand);
@@ -102,6 +113,7 @@ export class Fighter {
     this.bodySprite.anchor.set(0.5, 1);
     this.bodySprite.scale.set(this.targetHeight / characterTexture.height);
     this.body.addChild(this.bodySprite);
+    this.drawHalo();
 
     this.weaponSprite = new Sprite(weaponTexture);
     // Empty-handed until a weapon is chosen for the turn. A fighter holding
@@ -368,6 +380,36 @@ export class Fighter {
    */
   setTint(colour: number): void {
     this.bodySprite.tint = colour;
+  }
+
+  /**
+   * Paints the glow, sized to the fighter it sits behind.
+   *
+   * Concentric ellipses rather than a blur filter: a filter costs a render
+   * pass per fighter per frame on whatever laptop is hosting, and six rings of
+   * falling alpha are indistinguishable from one at this size and this
+   * softness.
+   */
+  private drawHalo(): void {
+    const width = this.bodySprite.width;
+    const height = this.bodySprite.height;
+    if (width === 0 || height === 0) return;
+
+    const cx = 0;
+    const cy = -height * 0.5;
+    const rings = 6;
+
+    this.halo.clear();
+    for (let i = rings; i >= 1; i--) {
+      const spread = i / rings;
+      this.halo.beginFill(0xffffff, 0.06 * (1 - spread) + 0.015);
+      this.halo.drawEllipse(
+        cx, cy,
+        width * (0.62 + spread * 0.5),
+        height * (0.58 + spread * 0.42),
+      );
+      this.halo.endFill();
+    }
   }
 
   /** What colour they currently are. White means nothing is wrong with them. */

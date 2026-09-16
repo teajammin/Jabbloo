@@ -67,6 +67,24 @@ const evaluate = async (e) => {
 };
 
 await send('Page.enable'); await send('Runtime.enable');
+const NAME = 'the phone harness';
+/*
+ * One harness at a time.
+ *
+ * Both of these drive the same browser tab, so running them together makes
+ * each look like it found a bug in the game — a lobby that never starts, a
+ * room code that never appears — when what actually happened is that the other
+ * one navigated the page out from under it. Saying so is cheaper than working
+ * it out again.
+ */
+const busy = await evaluate('window.__harness ?? ""');
+if (busy) {
+  console.log(`  !! another harness (${busy}) is already driving this browser.`);
+  console.log('     Run them one at a time, or start a second Chrome on another port.');
+  process.exit(1);
+}
+await evaluate(`window.__harness = ${JSON.stringify(NAME)}`);
+
 // A phone by default; `node scripts/e2e.mjs 1440 800` for a laptop, where the
 // toolbar becomes a wrapping column and the layout is a different one.
 const VW = Number(process.argv[2] ?? 390);
@@ -473,5 +491,6 @@ for (const line of [...new Set(logs)].slice(0, 15)) console.log('  ' + line);
 if (logs.length === 0) console.log('  (nothing)');
 
 console.log(`\n${problems.length} problem(s)`);
-host.close(); bo.close(); ws.close();
+host.close(); bo.close(); await evaluate('window.__harness = ""').catch(() => {});
+ws.close();
 process.exit(problems.length ? 1 : 0);

@@ -691,6 +691,78 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   badge.root.remove();
 }
 
+// --- a screen arrives whole -------------------------------------------------
+//
+// Screens used to be mounted straight into the page, so the room watched them
+// assemble: a heading, a line of text, then pictures arriving one at a time.
+// A page putting itself together in front of an audience looks broken even
+// when it is working perfectly.
+
+{
+  const host = document.createElement('div');
+  host.id = 'arrival-test';
+  document.body.appendChild(host);
+  const go = ui.mount(host);
+
+  // A screen with a picture that has not loaded: exactly the case that used
+  // to pop in afterwards.
+  go((root) => {
+    root.appendChild(document.createElement('p')).textContent = 'Heading';
+    const img = document.createElement('img');
+    img.src = '/letters/A.png';
+    root.appendChild(img);
+  });
+
+  check('it is held back while it arrives', host.classList.contains('is-arriving'));
+  // Hidden, not removed: a screen with no layout cannot measure itself, and
+  // the drawing canvas sizes from the space it is given.
+  check('but it is laid out while it waits', host.childElementCount > 0);
+
+  await new Promise((r) => setTimeout(r, 2200));
+  check('and is shown once it is whole or out of time',
+    !host.classList.contains('is-arriving'));
+
+  // A second screen while the first is still waiting must win.
+  go((root) => { root.appendChild(document.createElement('p')).textContent = 'Second'; });
+  await new Promise((r) => setTimeout(r, 2200));
+  check('the newest screen is the one that shows',
+    host.textContent.includes('Second') && !host.classList.contains('is-arriving'));
+
+  host.remove();
+}
+
+// --- quitting has to mean it ------------------------------------------------
+//
+// A tab that reloads goes back to the game it was in, which saves somebody
+// whose browser crashed and is exactly wrong for the quit button: it reloaded
+// the page and the resume put them straight back into the fight they had just
+// left, so the button appeared to do nothing.
+
+{
+  ui.rememberRoom({ code: 'QUIT', isHost: true, capacity: 2 });
+  check('a room is remembered to begin with', ui.rememberedRoom()?.code === 'QUIT');
+
+  const teardown = ui.mountOptions();
+  const realConfirm = window.confirm;
+  try {
+    window.confirm = () => true;
+
+    const quit = [...document.querySelectorAll('button')]
+      .find((b) => /quit to menu/i.test(b.textContent ?? ''));
+    check('the quit button is there', Boolean(quit));
+
+    // jsdom will not navigate and says so; the room being forgotten is the
+    // part that was broken and the part worth checking.
+    try { quit?.click(); } catch { /* "Not implemented: navigation" */ }
+
+    check('quitting forgets the room', ui.rememberedRoom() === null);
+  } finally {
+    window.confirm = realConfirm;
+    teardown?.();
+    ui.forgetRoom();
+  }
+}
+
 // --- a tab that reloads is still in the game ---------------------------------
 //
 // Tabs reload for reasons nobody chose: a renderer crash under memory

@@ -73,6 +73,24 @@ const evaluate = async (expression) => {
 };
 
 await send('Page.enable'); await send('Runtime.enable');
+const NAME = 'the host harness';
+/*
+ * One harness at a time.
+ *
+ * Both of these drive the same browser tab, so running them together makes
+ * each look like it found a bug in the game — a lobby that never starts, a
+ * room code that never appears — when what actually happened is that the other
+ * one navigated the page out from under it. Saying so is cheaper than working
+ * it out again.
+ */
+const busy = await evaluate('window.__harness ?? ""');
+if (busy) {
+  console.log(`  !! another harness (${busy}) is already driving this browser.`);
+  console.log('     Run them one at a time, or start a second Chrome on another port.');
+  process.exit(1);
+}
+await evaluate(`window.__harness = ${JSON.stringify(NAME)}`);
+
 await send('Emulation.setDeviceMetricsOverride',
   { width: VW, height: VH, deviceScaleFactor: 1, mobile: false });
 // A tab that was in a game goes back to it, which is the point of the resume
@@ -424,5 +442,6 @@ for (const line of [...new Set(logs)].slice(0, 12)) console.log('  ' + line);
 if (logs.length === 0) console.log('  (nothing)');
 console.log(`\n${problems.length} problem(s)`);
 for (const s of [ann, bo]) s.close();
+await evaluate('window.__harness = ""').catch(() => {});
 ws.close();
 process.exit(problems.length ? 1 : 0);
