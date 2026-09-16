@@ -4,7 +4,7 @@ import { drawScreen } from './drawScreen';
 import { battlegroundScreen } from './battleground';
 import type { RoomConnection } from '../net/room';
 import {
-  creators, displayName, graceExpired, standIn, stepFor, stepsFor, stillWorking,
+  creators, displayName, graceExpired, longestRemaining, standIn, stepFor, stepsFor, stillWorking,
   type Player, type RoomState,
 } from '../shared/protocol';
 
@@ -259,7 +259,8 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
           : others.length === 1
             ? `Waiting for ${others[0]!.name}.`
             : `Waiting for ${others.length} others.`;
-        clock.setDeadline(longestRemaining(state), 0);
+        const wait = waitingClock(state);
+        clock.setDeadline(wait.endsAt, wait.total);
 
         const key = `${state.phase}:${state.ultRound}:waiting`;
         if (key === lastStep) return;
@@ -291,10 +292,30 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       else showName(step.slot);
     }
 
-    /** The latest anyone is still working until. */
-    function longestRemaining(state: RoomState): number {
-      const ends = stillWorking(state).map((p) => p.progress.endsAt);
-      return ends.length > 0 ? Math.max(...ends) : 0;
+    /*
+     * How long the wait has to run, and what the bar is draining against.
+     *
+     * The deadline moves as people work — somebody finishing early shortens
+     * it — so the bar's full length is remembered from when the wait started
+     * and only reset when the estimate gets *longer*. Recomputing the total
+     * every update would refill the bar every second and it would never
+     * appear to move.
+     */
+    let waitEndsAt = 0;
+    let waitTotal = 1;
+
+    function waitingClock(state: RoomState): { endsAt: number; total: number } {
+      const now = Date.now();
+      const endsAt = now + longestRemaining(state, now);
+
+      if (endsAt > waitEndsAt + 1000 || waitEndsAt === 0) {
+        waitEndsAt = endsAt;
+        waitTotal = Math.max(1, (endsAt - now) / 1000);
+      } else if (endsAt < waitEndsAt) {
+        waitEndsAt = endsAt;
+      }
+
+      return { endsAt: waitEndsAt, total: waitTotal };
     }
 
     /**

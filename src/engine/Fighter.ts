@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { loadTexture } from './assets';
 import { gripFor, DEFAULT_GRIP, type Grip } from './grip';
+import { trimToInk } from './trim';
 import gsap from 'gsap';
 import { Limb } from './Limb';
 import { sampleDominantColour } from './colour';
@@ -107,25 +108,35 @@ export class Fighter {
   }
 
   private build(characterTexture: Texture, weaponTexture: Texture): void {
-    this.bodySprite = new Sprite(characterTexture);
+    const characterInk = trimToInk(characterTexture);
+    this.bodySprite = new Sprite(characterInk);
     // Anchored at bottom-centre so the fighter stands ON the ground line —
     // makes jump/slam maths behave regardless of sprite dimensions.
     this.bodySprite.anchor.set(0.5, 1);
-    this.bodySprite.scale.set(this.targetHeight / characterTexture.height);
+    this.bodySprite.scale.set(this.targetHeight / characterInk.height);
     this.body.addChild(this.bodySprite);
     this.drawHalo();
 
-    this.weaponSprite = new Sprite(weaponTexture);
+    /*
+     * Cropped to what was drawn, so every weapon is the same size.
+     *
+     * A drawing arrives as a whole canvas however much of it was used, so a
+     * weapon sketched in one corner came out a sliver and somebody who filled
+     * the page got a broadsword — the difference being how boldly they drew
+     * rather than anything about the weapon.
+     */
+    const weaponInk = trimToInk(weaponTexture);
+    this.weaponSprite = new Sprite(weaponInk);
     // Empty-handed until a weapon is chosen for the turn. A fighter holding
     // something before anyone picked it is showing a weapon nobody chose.
     this.weaponSprite.visible = false;
     // Anchored near the grip end, so rotation pivots where a hand would hold it.
     this.weaponSprite.anchor.set(0.5, 0.85);
-    this.weaponSprite.scale.set(this.targetWeaponHeight / weaponTexture.height);
+    this.weaponSprite.scale.set(this.targetWeaponHeight / weaponInk.height);
     // Before anything animates it.
     Fighter.understandScale(this.body);
 
-    this.holdProperly(weaponTexture);
+    this.holdProperly(weaponInk);
     this.hand.addChild(this.weaponSprite);
 
     this.buildLimbs(characterTexture);
@@ -235,11 +246,14 @@ export class Fighter {
   async setWeapon(url: string, name?: string): Promise<void> {
     const texture = await loadTexture(url);
     if (!texture) return;
-    this.weaponSprite.texture = texture;
-    this.weaponSprite.scale.set(this.targetWeaponHeight / texture.height);
+    // Same crop as the first weapon: the size a weapon ends up has to mean the
+    // same thing whichever one it is.
+    const ink = trimToInk(texture);
+    this.weaponSprite.texture = ink;
+    this.weaponSprite.scale.set(this.targetWeaponHeight / ink.height);
     // Each weapon is held its own way, so this is worked out per swap rather
     // than once when the fighter was built.
-    this.holdProperly(texture);
+    this.holdProperly(ink);
     // Facing is applied by mirroring the root, so the sprite's own sign has to
     // be reset or a swap mid-fight can leave the new weapon back to front.
     this.weaponSprite.scale.x = Math.abs(this.weaponSprite.scale.x);

@@ -260,6 +260,33 @@ export function ultSteps(round: number): CreationStep[] {
 }
 
 /** The step list the room is working through, whichever phase it is in. */
+/**
+ * How much longer one player has, counting the steps they have not reached.
+ *
+ * Their own deadline only covers the step they are on. Somebody on the first
+ * of six has a deadline seconds away and most of creation still to do, and
+ * somebody on the last has a distant deadline and is nearly finished — so the
+ * furthest-away deadline in the room is not the answer to "how long until
+ * everyone is done", which is the question the waiting screen is asking.
+ */
+export function remainingFor(player: Player, state: RoomState, now = Date.now()): number {
+  if (player.progress.done) return 0;
+
+  const steps = stepsFor(state);
+  const current = Math.max(0, player.progress.endsAt - now);
+  const later = steps
+    .slice(player.progress.step + 1)
+    .reduce((total, step) => total + step.seconds * 1000, 0);
+
+  return current + later;
+}
+
+/** How long until the slowest person still working is finished. */
+export function longestRemaining(state: RoomState, now = Date.now()): number {
+  const waits = stillWorking(state).map((p) => remainingFor(p, state, now));
+  return waits.length > 0 ? Math.max(...waits) : 0;
+}
+
 export function stepsFor(state: RoomState): CreationStep[] {
   if (state.phase === 'creating') return CREATION_STEPS;
   if (state.phase === 'ult') return ultSteps(state.ultRound);

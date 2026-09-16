@@ -202,12 +202,26 @@ export function sicken(ctx: PrimitiveContext, params: SickenParams = {}) {
       });
       // Hearts and stars carry their own colour; a cloud needs tinting.
       if (look.tintMark) floater.tint = tint;
+      /*
+       * Slow enough to be looked at.
+       *
+       * These rose and faded inside a second, which was long enough to know
+       * something had happened and not long enough to see what — and the
+       * whole job of an affliction mark is to say which one it is. It drifts
+       * for a second and a half now and only fades over the last third of
+       * that, so there is a clear second of it sitting there being a heart.
+       */
+      const life = 1.5;
       gsap.to(floater, {
         y: floater.y - 90 - strength * 8,
         x: floater.x + (Math.random() - 0.5) * 40,
-        alpha: 0,
-        duration: 0.9,
+        duration: life,
         ease: 'power1.out',
+      });
+      gsap.to(floater, {
+        alpha: 0,
+        duration: life * 0.35,
+        delay: life * 0.65,
         onComplete: () => despawnEffect(floater),
       });
     }, undefined, seconds * 0.15 + i * (seconds * 0.6 / marks));

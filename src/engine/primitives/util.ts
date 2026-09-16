@@ -158,10 +158,17 @@ export function burst(
         { x: sprite.scale.x * 0.3, y: sprite.scale.y * 0.3 },
         { x: sprite.scale.x, y: sprite.scale.y, duration: 0.18, ease: 'back.out(3)' },
       );
+      /*
+       * Held before it goes.
+       *
+       * An impact that appeared and vanished inside half a second read as a
+       * flicker rather than a hit: long enough to register that something
+       * happened, too short to see what it was.
+       */
       gsap.to(sprite, {
         alpha: 0,
-        duration: 0.3,
-        delay: 0.14,
+        duration: 0.34,
+        delay: 0.62,
         // Guarded because the stage can be destroyed mid-fade — the end of a
         // turn, a rematch, someone quitting — and destroying twice throws.
         onComplete: () => { if (!sprite.destroyed) sprite.destroy(); },

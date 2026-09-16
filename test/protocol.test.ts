@@ -300,5 +300,62 @@ check('a lone second weapon stays in its own slot',
   gappy.weapons[1]?.name === 'Axe' && gappy.weapons[0] === undefined,
   JSON.stringify(gappy.weapons));
 
+/*
+ * How long the room is actually waiting.
+ *
+ * A player's own deadline covers the step they are on and nothing else, so the
+ * furthest-away deadline in the room was not the answer to "how long until
+ * everyone is finished" — somebody on the first of six steps has a deadline
+ * seconds away and almost all of creation still in front of them.
+ */
+import { longestRemaining, remainingFor, stepsFor } from '../src/shared/protocol';
+
+const NOW = 1_000_000;
+// The fixture builds a lobby; creation is the phase that has steps in it.
+const creating = (players: Player[]): RoomState => ({ ...room(players), phase: 'creating' });
+
+const working = (name: string, step: number, endsIn: number): Player => ({
+  ...player(name, 'teamA'),
+  progress: { drawn: [], named: [], step, endsAt: NOW + endsIn, done: false },
+});
+
+const steps = stepsFor(creating([]));
+const secondsAfter = (step: number) =>
+  steps.slice(step + 1).reduce((total, s) => total + s.seconds * 1000, 0);
+
+check('somebody mid-step is owed the rest of that step',
+  remainingFor(working('Ann', steps.length - 1, 9000), creating([]), NOW) === 9000,
+  String(remainingFor(working('Ann', steps.length - 1, 9000), creating([]), NOW)));
+
+check('and every step they have not reached',
+  remainingFor(working('Ann', 0, 9000), creating([]), NOW) === 9000 + secondsAfter(0),
+  String(remainingFor(working('Ann', 0, 9000), creating([]), NOW)));
+
+const finished = (name: string): Player => ({
+  ...player(name, 'teamA'),
+  progress: { drawn: [], named: [], step: steps.length, endsAt: 0, done: true },
+});
+
+check('somebody finished is owed nothing',
+  remainingFor(finished('Ann'), creating([]), NOW) === 0);
+
+/*
+ * The case that was wrong: the person on the later step has the later
+ * deadline, and is the one who will finish first.
+ */
+const early = working('Early', 0, 10_000);
+const late = working('Late', steps.length - 1, 30_000);
+const both = creating([host, early, late]);
+
+check('the slowest is the one with the most left, not the latest deadline',
+  longestRemaining(both, NOW) === remainingFor(early, both, NOW),
+  `${longestRemaining(both, NOW)} vs early ${remainingFor(early, both, NOW)}`);
+check('which is longer than the later deadline on its own',
+  longestRemaining(both, NOW) > 30_000, String(longestRemaining(both, NOW)));
+
+check('a room where everyone has finished waits for nothing',
+  longestRemaining(creating([host, finished('Ann')]), NOW) === 0,
+  String(longestRemaining(creating([host, finished('Ann')]), NOW)));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

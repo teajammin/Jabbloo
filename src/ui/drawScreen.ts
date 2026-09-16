@@ -642,7 +642,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
         // Placing the photo first is the whole point: once it is part of the
         // drawing the eraser cuts into it like anything else, and the player
         // decides what counts as background.
-        icon: '🧽', label: 'Rub bits out', onPick: async () => {
+        icon: '⌫', label: 'Rub bits out', onPick: async () => {
           // Keeps the trim they just made, rather than committing the photo
           // they had before it.
           await settleCrop();
