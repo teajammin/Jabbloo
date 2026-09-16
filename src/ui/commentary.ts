@@ -49,6 +49,89 @@ const THROWN: Record<string, string> = {
  * narrates the recoil and the settle as well as the blow is a voice nobody
  * wants at a party. The blanks are where it shuts up.
  */
+export interface Beat {
+  /** What the caption shows, with names, where there is time to read them. */
+  caption: string;
+  /** Which recording to play, if any. See src/shared/lines.ts. */
+  line: string;
+}
+
+/**
+ * The caption and the recording for each step.
+ *
+ * Two things rather than one because they can afford different amounts of
+ * detail: the caption is read, so it can name people, and the recording is
+ * shouted over an exchange, so it cannot — a fixed set of lines is what lets
+ * the game sound the same in every room rather than depending on whatever
+ * voice the host's laptop happens to have installed.
+ */
+export function describeBeats(
+  choreography: Choreography,
+  attacker: string,
+  defender: string,
+  weapon: string,
+): Beat[] {
+  const captions = describeSteps(choreography, attacker, defender, weapon);
+  const steps = (choreography.steps ?? []) as Step[];
+
+  return steps.map((step, index) => ({
+    caption: captions[index] ?? '',
+    line: lineFor(step, index),
+  }));
+}
+
+/** Which recording a step calls for, or nothing where silence is better. */
+function lineFor(step: Step, index: number): string {
+  if (typeof step !== 'object' || step === null) return '';
+  const move = step.move ?? '';
+  const kind = typeof step.params?.['kind'] === 'string' ? String(step.params['kind']) : '';
+  const style = typeof step.params?.['style'] === 'string' ? String(step.params['style']) : '';
+
+  switch (move) {
+    case 'charge': case 'dash': case 'move_to':
+      return index === 0 ? 'closes' : '';
+    case 'swing': return 'swing';
+    case 'slam': return 'slam';
+    case 'spin_weapon': return 'windup';
+    case 'throw': return 'throw';
+    case 'punch': return style === 'uppercut' ? 'uppercut' : 'punch';
+    case 'kick': return 'kick';
+    case 'headbutt': return 'headbutt';
+    case 'bite': return 'bite';
+    case 'grab': return 'grab';
+    case 'stomp': return 'stomp';
+    case 'projectile':
+      return ['bullet', 'arrow', 'fire', 'ice', 'sun', 'rock'].includes(kind) ? kind : 'incoming';
+    case 'beam': return 'beam';
+    case 'shockwave': return kind === 'stink' ? 'stink' : 'shockwave';
+    case 'summon': return 'summon';
+    case 'sicken': return AFFLICTION_LINES[kind] ?? 'poisoned';
+    case 'knockdown': return 'knockdown';
+    case 'dizzy': return 'dizzy';
+    case 'teleport': return 'teleport';
+    case 'taunt': return 'taunt';
+    case 'inhale': return 'inhale';
+    case 'grow': return 'grow';
+    case 'shrink': return 'shrink';
+    case 'flip': case 'handspring': return 'flip';
+    default: return '';
+  }
+}
+
+/** Which recording each affliction gets. */
+const AFFLICTION_LINES: Record<string, string> = {
+  poison: 'poisoned',
+  burn: 'burning',
+  curse: 'cursed',
+  love: 'love',
+  hypnotised: 'hypnotised',
+  frozen: 'frozen',
+  shocked: 'shocked',
+  stink: 'stink',
+  confused: 'confused',
+  drunk: 'drunk',
+};
+
 export function describeSteps(
   choreography: Choreography,
   attacker: string,

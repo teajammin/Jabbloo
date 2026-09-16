@@ -1,4 +1,5 @@
 import { getSettings } from '../settings';
+import { LINES, lineUrl } from '../shared/lines';
 
 /**
  * The voice that calls the fight.
@@ -162,6 +163,66 @@ function preset(): VoiceChoice {
   return VOICES.find((v) => v.id === wanted) ?? VOICES[0]!;
 }
 
+/*
+ * The game's own voice.
+ *
+ * Recorded once and shipped with the site, so the commentary sounds the same
+ * in every room it is played in. The browser's own speech is still here, but
+ * as the fallback rather than the plan: it is what reads a line that has a
+ * player's name in it, which no recording can.
+ */
+const clips = new Map<string, HTMLAudioElement>();
+let playing: HTMLAudioElement | null = null;
+
+/**
+ * Fetches every recording, so none of them arrives late to its own beat.
+ *
+ * Half a megabyte, once, while the arena is loading anyway — and after that
+ * the commentary costs nothing and cannot be held up by the network.
+ */
+export function preloadLines(): void {
+  if (typeof Audio === 'undefined' || clips.size > 0) return;
+  for (const line of LINES) {
+    const audio = new Audio(lineUrl(line.id));
+    audio.preload = 'auto';
+    clips.set(line.id, audio);
+  }
+}
+
+/**
+ * Plays one recorded line, cutting off whatever was playing.
+ *
+ * Cutting off is right for a fight: the commentary describes what is on screen
+ * now, and a queue would have it calling the previous exchange over this one.
+ */
+export function say(id: string): void {
+  if (!getSettings().narration || typeof Audio === 'undefined') return;
+
+  const source = clips.get(id) ?? new Audio(lineUrl(id));
+  clips.set(id, source);
+
+  if (playing) {
+    playing.pause();
+    playing.currentTime = 0;
+  }
+
+  // A fresh element per play: the same one cannot overlap itself, and a
+  // half-played clip that is asked to start again stutters.
+  const clip = source.cloneNode() as HTMLAudioElement;
+  clip.volume = Math.max(0.15, getSettings().sfx);
+  playing = clip;
+  // Autoplay rules, a missing file, a device with no output: none of them are
+  // worth taking a fight down for.
+  void clip.play().catch(() => {});
+}
+
+/** Stops the recording mid-word. */
+function stopClip(): void {
+  if (!playing) return;
+  playing.pause();
+  playing = null;
+}
+
 /**
  * Says one line, cutting off whatever was being said.
  *
@@ -219,5 +280,6 @@ export function resetNarrator(): void {
 
 /** Stops mid-sentence — for leaving a screen, or a fight being cut short. */
 export function hush(): void {
+  stopClip();
   if (canNarrate()) speechSynthesis.cancel();
 }

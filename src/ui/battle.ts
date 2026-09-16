@@ -6,8 +6,8 @@ import { getSettings } from '../settings';
 import { report } from '../errors';
 import { loadingBadge } from './loading';
 import { play } from '../audio';
-import { narrate, hush } from './narrator';
-import { describeSteps } from './commentary';
+import { narrate, hush, say, preloadLines } from './narrator';
+import { describeBeats } from './commentary';
 import type { RoomConnection } from '../net/room';
 import {
   battlegrounds, graceExpired, isFinalRound, judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
@@ -133,6 +133,9 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         });
         // Effects and lettering together: both are needed the moment the
         // first fighter is announced.
+        // The narrator's recordings ride along with the rest: half a megabyte
+        // once, so no line ever arrives late to its own beat.
+        preloadLines();
         await Promise.all([engine.preloadEffects(), engine.preloadGlyphs()]);
         if (disposed) { stage.destroy(); return; }
 
@@ -317,6 +320,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (opening || resumed === true) {
         resumed = false;
         caption.textContent = 'Fight!';
+        say('fight');
         await stage.proclaim('fight', 0.9);
         if (disposed) return;
       }
@@ -370,6 +374,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (isFinalRound(state!) && !saidFinalRound) {
         saidFinalRound = true;
         caption.textContent = 'Final round — every hit counts double';
+        say('final');
         await stage.proclaim('final round', 1.3);
         if (disposed) return;
       }
@@ -401,6 +406,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         const billing = `${attacker.name} will use the ${weaponName}`;
         caption.textContent = billing;
         play('whoosh');
+        // The card carries the names, which no recording can; the voice reads
+        // them too where the device happens to have speech of its own.
         await Promise.all([
           stage.proclaim(billing, 1.5),
           narrate(billing),
@@ -436,17 +443,18 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
          * the sound off.
          */
         const parsed = engine.parseChoreography(response.choreography);
-        const lines = describeSteps(parsed, attacker.name, defender.name, weaponName);
+        const beats = describeBeats(parsed, attacker.name, defender.name, weaponName);
 
         const playback = engine.playChoreography(
           { actor: attacker, enemy: defender, stage },
           parsed,
           {
             onStep: (index) => {
-              const line = lines[index];
-              if (!line) return;
-              caption.textContent = line;
-              void narrate(line);
+              const beat = beats[index];
+              if (!beat) return;
+              if (beat.caption) caption.textContent = beat.caption;
+              // The game's own voice, the same on every machine.
+              if (beat.line) say(beat.line);
             },
           },
         );

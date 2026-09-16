@@ -164,6 +164,25 @@ const inBattle = ann.state()?.phase === 'battle';
 inBattle ? ok('the fight opens') : note(`never reached the fight (${ann.state()?.phase})`);
 
 if (inBattle) {
+  // Record every recording the narrator starts. Headless Chrome has no audio
+  // output, so what is being checked is that the game asked for it.
+  await evaluate(`(() => {
+    if (window.__spoken) return 'already';
+    window.__spoken = [];
+    // Recorded without touching what play() returns: wrapping the promise was
+    // enough to wedge the fight, and a harness that changes the thing it is
+    // watching is not watching it.
+    const realPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      try {
+        const src = String(this.currentSrc || this.src || '');
+        if (src.includes('/vo/')) window.__spoken.push(src.split('/').pop());
+      } catch {}
+      return realPlay.apply(this, arguments);
+    };
+    return 'hooked';
+  })()`);
+
   // Watch what the choreographer actually hands back. A request that fails
   // falls back to a stock swing, which has no effects in it at all — so a
   // silent fallback and a broken renderer look identical from the outside.
@@ -307,6 +326,16 @@ if (inBattle) {
         ? ok('both health bars are fully on screen')
         : note(`a health bar runs off the screen: ${JSON.stringify(offscreen)}`);
     }
+
+    // What the narrator actually played. Audio elements are created per line,
+    // so counting the ones that were asked to start is the only way to know
+    // the commentary reached the fight rather than staying on disk.
+    const spoken = await evaluate(`JSON.stringify(window.__spoken ?? [])`);
+    console.log('  narrator played:', spoken);
+    const said = typeof spoken === 'string' && spoken.startsWith('[') ? JSON.parse(spoken) : [];
+    said.length > 0
+      ? ok(`the narrator called ${said.length} beats`)
+      : note('the narrator said nothing during the whole exchange');
 
     console.log('  effects seen:', seen);
 

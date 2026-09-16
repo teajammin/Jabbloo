@@ -57,7 +57,9 @@ export function mountOptions(): () => void {
   const voicePicker = (): HTMLElement => {
     if (!canNarrate()) {
       return el('p', { class: 'options-hint' },
-        'This browser cannot speak, so the fight stays quiet.');
+        'The fight is called by the game\u2019s own recorded voice. This browser '
+        + 'has no speech of its own, so lines with players\u2019 names in them stay '
+        + 'on screen rather than being read out.');
     }
 
     const row = el('div', { class: 'options-voices' });
@@ -78,9 +80,9 @@ export function mountOptions(): () => void {
     return el('div', { class: 'options-voice-block' },
       row,
       el('p', { class: 'options-hint' },
-        'Tap one to hear it. Voices come from this device — macOS has far more '
-        + 'natural ones as free downloads under Accessibility, Spoken Content, '
-        + 'System Voice, Manage Voices.'),
+        'The fight itself is called by the game\u2019s own recorded voice, the '
+        + 'same on every device. These choose who reads the lines with players\u2019 '
+        + 'names in them, which no recording can \u2014 tap one to hear it.'),
     );
   };
 
