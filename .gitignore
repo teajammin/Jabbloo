@@ -44,3 +44,9 @@ coverage/
 # Letter-generator review sheet
 letters-sheet.png
 letters-tracing-sheet.png
+
+# Screenshots the end-to-end harnesses save as they run.
+battle-host.png
+battle.png
+creation-phone.png
+vote.png
