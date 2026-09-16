@@ -69,6 +69,29 @@ export function installDom() {
   window.HTMLElement.prototype.scrollIntoView = () => {};
 
   window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+
+  /*
+   * Speech, enough of it to lay out a voice picker.
+   *
+   * jsdom has none, so the picker correctly showed its "this browser cannot
+   * speak" fallback and the test could not see the thing it was checking. This
+   * says nothing out loud — it reports two voices and swallows every
+   * utterance, which is all the interface needs to know.
+   */
+  window.speechSynthesis = {
+    getVoices: () => ([
+      { name: 'Fred', lang: 'en-US', default: true, localService: true },
+      { name: 'Daniel', lang: 'en-GB', default: false, localService: true },
+    ]),
+    speak() {},
+    cancel() {},
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  window.SpeechSynthesisUtterance = class {
+    constructor(text) { this.text = text; }
+    addEventListener() {}
+  };
   // jsdom lays nothing out, so every rect is zero and every pointer coordinate
   // maps to NaN. A fixed square is enough for the drawing tool to behave as if
   // it were on screen.
@@ -110,6 +133,7 @@ export function installDom() {
     'HTMLElement', 'HTMLCanvasElement', 'HTMLInputElement', 'HTMLDialogElement',
     'Image', 'Event', 'CustomEvent', 'PointerEvent', 'MouseEvent', 'KeyboardEvent',
     'FileReader', 'Blob', 'File', 'FormData', 'DOMMatrix', 'Node', 'ResizeObserver',
+    'speechSynthesis', 'SpeechSynthesisUtterance',
     'requestAnimationFrame', 'cancelAnimationFrame', 'getComputedStyle', 'confirm',
   ]) {
     if (window[key] === undefined) continue;

@@ -19,6 +19,10 @@ export interface Settings {
   /** 0–1. Music is the background bed, sfx are the hits and clicks. */
   music: number;
   sfx: number;
+  /** Whether the big screen calls the fight out loud. */
+  narration: boolean;
+  /** Which voice preset does the calling. See src/ui/narrator.ts. */
+  voice: string;
 }
 
 const KEY = 'jabbloo.settings';
@@ -33,6 +37,8 @@ const DEFAULTS: Settings = {
   highContrast: false,
   music: 0.5,
   sfx: 0.8,
+  narration: true,
+  voice: 'announcer',
 };
 
 let current: Settings = { ...DEFAULTS };
@@ -66,6 +72,11 @@ export function loadSettings(): Settings {
         highContrast: flag(stored.highContrast, DEFAULTS.highContrast),
         music: clamp01(stored.music, DEFAULTS.music),
         sfx: clamp01(stored.sfx, DEFAULTS.sfx),
+        narration: flag(stored.narration, DEFAULTS.narration),
+        // Anything unrecognised falls back: a preset can be renamed or
+        // dropped, and a stored id that no longer exists must not mute the
+        // commentary for good.
+        voice: typeof stored.voice === 'string' ? stored.voice : DEFAULTS.voice,
       };
     }
   } catch {

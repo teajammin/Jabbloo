@@ -965,8 +965,16 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   button?.click();
   const dialog = document.querySelector('dialog.options');
   check('clicking it opens the menu', dialog?.open === true);
+  // Three accessibility toggles, plus the one that turns the commentary on.
   const toggles = dialog?.querySelectorAll('input[type="checkbox"]') ?? [];
-  check('accessibility toggles are there', toggles.length === 3, String(toggles.length));
+  check('the toggles are there', toggles.length === 4, String(toggles.length));
+  check('including the one that calls the fight out loud',
+    /call the fight/i.test(dialog?.textContent ?? ''));
+  // A voice nobody can hear is not a choice, so the picker offers a few and
+  // says where better ones come from.
+  check('and a voice to call it in',
+    (dialog?.querySelectorAll('.voice-option') ?? []).length >= 3,
+    String((dialog?.querySelectorAll('.voice-option') ?? []).length));
   toggles[1]?.click();
   check('a toggle reaches the document',
     document.documentElement.hasAttribute('data-large-text'));

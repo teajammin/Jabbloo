@@ -149,9 +149,19 @@ export interface ShrinkParams extends BaseParams {
 export type KnockdownParams = BaseParams;
 export type DizzyParams = BaseParams;
 
+/**
+ * A state somebody is left in, rather than a blow they are dealt.
+ *
+ * Each kind has a colour and something rising off them, because "they are
+ * poisoned now" has to be readable from across a room with no text on screen.
+ */
+export type AfflictionKind =
+  | 'poison' | 'burn' | 'curse' | 'love' | 'hypnotised'
+  | 'frozen' | 'shocked' | 'stink' | 'confused' | 'drunk';
+
 export interface SickenParams extends BaseParams {
-  /** What kind of lingering harm, which decides the colour it turns them. */
-  kind?: 'poison' | 'burn' | 'curse';
+  /** Which affliction, which decides the colour and the marks. */
+  kind?: AfflictionKind;
   /** How badly, 1-10: more marks, rising higher. */
   intensity?: number;
 }

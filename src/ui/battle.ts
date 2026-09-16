@@ -6,6 +6,8 @@ import { getSettings } from '../settings';
 import { report } from '../errors';
 import { loadingBadge } from './loading';
 import { play } from '../audio';
+import { narrate, hush } from './narrator';
+import { describeSteps } from './commentary';
 import type { RoomConnection } from '../net/room';
 import {
   battlegrounds, graceExpired, isFinalRound, judges, STARTING_HEALTH, type BattlegroundId, type PlayerArt, type RoomState, type Turn,
@@ -372,6 +374,40 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         if (disposed) return;
       }
 
+      /*
+       * The weapons, announced one after the other before anything swings.
+       *
+       * Both of them, then the fight — rather than a name, a move, a name, a
+       * move. It is the last beat of anticipation the round has, and reading
+       * out what each of them is about to hold is most of the fun of having
+       * drawn it.
+       */
+      for (const attackerId of order) {
+        if (disposed) return;
+        const attacker = onStage.get(attackerId);
+        const move = turn.moves[attackerId];
+        const entry = artFor(attackerId);
+        if (!attacker || !move) continue;
+
+        const weapon = entry?.weapons[move.weapon];
+        if (weapon) await attacker.setWeapon(weapon.png, weapon.name);
+        if (disposed) return;
+
+        const weaponName = weapon?.name ?? attacker.weaponName;
+        bars.get(attackerId)?.setMove(weaponName, move.prompt);
+        await attacker.revealWeapon().then();
+        if (disposed) return;
+
+        const billing = `${attacker.name} will use the ${weaponName}`;
+        caption.textContent = billing;
+        play('whoosh');
+        await Promise.all([
+          stage.proclaim(billing, 1.5),
+          narrate(billing),
+        ]);
+        if (disposed) return;
+      }
+
       for (const attackerId of order) {
         if (disposed) return;
         const defenderId = order.find((id) => id !== attackerId)!;
@@ -381,20 +417,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         const entry = artFor(attackerId);
         if (!attacker || !defender || !move) continue;
 
-        const weapon = entry?.weapons[move.weapon];
-        if (weapon) await attacker.setWeapon(weapon.png, weapon.name);
-        if (disposed) return;
-
-        const weaponName = weapon?.name ?? attacker.weaponName;
-        // The weapon appears now, with what the player said they would do with
-        // it — the choice is the reveal, so nothing is held before it is made.
-        bars.get(attackerId)?.setMove(weaponName, move.prompt);
-        await attacker.revealWeapon().then();
-        caption.textContent = `${attacker.name} will use the ${weaponName} by ${
-          move.prompt || 'swinging it like an axe'
-        }`;
-
-        play('whoosh');
+        const weaponName = entry?.weapons[move.weapon]?.name ?? attacker.weaponName;
         const response = await requestChoreography({
           prompt: move.prompt || 'swing the weapon at them',
           characterName: attacker.name,
@@ -404,9 +427,28 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         });
         if (disposed) return;
 
+        /*
+         * The commentary runs with the move, not before it.
+         *
+         * Each step says what it is as it happens — the choreography's own
+         * beats are the script, so the voice lands on the swing rather than
+         * describing it afterwards. The caption keeps pace for anyone who has
+         * the sound off.
+         */
+        const parsed = engine.parseChoreography(response.choreography);
+        const lines = describeSteps(parsed, attacker.name, defender.name, weaponName);
+
         const playback = engine.playChoreography(
           { actor: attacker, enemy: defender, stage },
-          engine.parseChoreography(response.choreography),
+          parsed,
+          {
+            onStep: (index) => {
+              const line = lines[index];
+              if (!line) return;
+              caption.textContent = line;
+              void narrate(line);
+            },
+          },
         );
         await playback.finished;
       }
@@ -580,6 +622,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
     return () => {
       disposed = true;
+      hush();
       // Leaving mid-load must not leave the badge behind: it is on <body>, so
       // nothing else would ever take it down.
       loading?.done();

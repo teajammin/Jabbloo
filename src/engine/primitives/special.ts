@@ -1,9 +1,9 @@
 import gsap from 'gsap';
-import { spawnEffect, despawnEffect } from '../effects';
+import { spawnEffect, despawnEffect, type EffectKind } from '../effects';
 import { clamp, directionToEnemy, duration } from './util';
 import type {
   DizzyParams, GrowParams, InhaleParams, KnockdownParams, PrimitiveContext, ShrinkParams,
-  SickenParams,
+  SickenParams, AfflictionKind,
 } from './types';
 
 /**
@@ -137,6 +137,29 @@ export function dizzy(ctx: PrimitiveContext, params: DizzyParams = {}) {
 }
 
 /**
+ * What each affliction looks like.
+ *
+ * A colour and something rising off them, so a state that outlasts the blow
+ * can be read from across a room with no text on screen: green for poison,
+ * pink hearts for love, violet spirals for a curse, blue for frozen. The
+ * player wrote the word; this is the room being told what it meant.
+ */
+const AFFLICTIONS: Record<AfflictionKind, {
+  tint: number; mark: EffectKind; tintMark: boolean;
+}> = {
+  poison: { tint: 0x8fd48a, mark: 'bubble', tintMark: true },
+  burn: { tint: 0xff8a5c, mark: 'fire', tintMark: false },
+  curse: { tint: 0xb07bff, mark: 'dizzy', tintMark: true },
+  love: { tint: 0xff9ec7, mark: 'hearts', tintMark: false },
+  hypnotised: { tint: 0xc79bff, mark: 'dizzy', tintMark: true },
+  frozen: { tint: 0x9fd8f5, mark: 'snowflake', tintMark: false },
+  shocked: { tint: 0xffe37a, mark: 'bolt', tintMark: false },
+  stink: { tint: 0xa9c47a, mark: 'stink', tintMark: false },
+  confused: { tint: 0xd9c7f5, mark: 'confused', tintMark: false },
+  drunk: { tint: 0xe0b877, mark: 'bubble', tintMark: true },
+};
+
+/**
  * Poisons, sickens, infects — whatever the player called it.
  *
  * Applied to the fighter it happens to, like dizzy and knockdown: the move
@@ -154,9 +177,8 @@ export function dizzy(ctx: PrimitiveContext, params: DizzyParams = {}) {
 export function sicken(ctx: PrimitiveContext, params: SickenParams = {}) {
   const seconds = duration(params.duration, 1.2);
   const strength = clamp(params.intensity, 1, 10, 6);
-  const tint = params.kind === 'burn' ? 0xff8a5c
-    : params.kind === 'curse' ? 0xb07bff
-      : 0x8fd48a;
+  const look = AFFLICTIONS[params.kind as AfflictionKind] ?? AFFLICTIONS.poison;
+  const { tint, mark } = look;
 
   const tl = gsap.timeline();
 
@@ -172,20 +194,21 @@ export function sicken(ctx: PrimitiveContext, params: SickenParams = {}) {
   const marks = Math.min(6, 2 + Math.round(strength / 2));
   for (let i = 0; i < marks; i++) {
     tl.call(() => {
-      const mark = spawnEffect(ctx.stage.effects, 'bubble', {
+      const floater = spawnEffect(ctx.stage.effects, mark, {
         x: ctx.actor.root.x + (Math.random() - 0.5) * ctx.actor.width * 0.7,
         y: ctx.actor.root.y - ctx.actor.height * (0.45 + Math.random() * 0.4),
         height: 40 + strength * 5,
         alpha: 0.9,
       });
-      mark.tint = tint;
-      gsap.to(mark, {
-        y: mark.y - 90 - strength * 8,
-        x: mark.x + (Math.random() - 0.5) * 40,
+      // Hearts and stars carry their own colour; a cloud needs tinting.
+      if (look.tintMark) floater.tint = tint;
+      gsap.to(floater, {
+        y: floater.y - 90 - strength * 8,
+        x: floater.x + (Math.random() - 0.5) * 40,
         alpha: 0,
         duration: 0.9,
         ease: 'power1.out',
-        onComplete: () => despawnEffect(mark),
+        onComplete: () => despawnEffect(floater),
       });
     }, undefined, seconds * 0.15 + i * (seconds * 0.6 / marks));
   }

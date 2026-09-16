@@ -2,6 +2,7 @@ import { el, button } from './screens';
 import { helpDialog } from './help';
 import { getSettings, updateSettings, type Settings } from '../settings';
 import { play, unlockAudio } from '../audio';
+import { VOICES, canNarrate, narrate } from './narrator';
 
 /**
  * The options menu, reachable from every screen.
@@ -25,7 +26,7 @@ export function mountOptions(): () => void {
   // --- accessibility --------------------------------------------------------
 
   const toggle = (
-    key: 'reduceMotion' | 'largeText' | 'highContrast',
+    key: 'reduceMotion' | 'largeText' | 'highContrast' | 'narration',
     label: string,
     hint: string,
   ): HTMLElement => {
@@ -40,6 +41,46 @@ export function mountOptions(): () => void {
         el('strong', {}, label),
         el('small', {}, hint),
       ),
+    );
+  };
+
+  // --- commentary -----------------------------------------------------------
+
+  /**
+   * Which voice calls the fight, with a way to hear each one.
+   *
+   * The presets name voices to look for rather than picking from a list,
+   * because what is installed differs from machine to machine — so the only
+   * honest way to choose is to hear what this particular device does with it.
+   * The sample is a real line from a real fight for the same reason.
+   */
+  const voicePicker = (): HTMLElement => {
+    if (!canNarrate()) {
+      return el('p', { class: 'options-hint' },
+        'This browser cannot speak, so the fight stays quiet.');
+    }
+
+    const row = el('div', { class: 'options-voices' });
+    for (const choice of VOICES) {
+      const picked = getSettings().voice === choice.id;
+      const node = button(choice.label, () => {
+        updateSettings({ voice: choice.id });
+        for (const other of row.querySelectorAll('button')) {
+          other.setAttribute('aria-pressed', String(other === node));
+        }
+        play('click');
+        void narrate('Sir Bonkalot will use the Butter Sword!');
+      }, 'ghost voice-option');
+      node.setAttribute('aria-pressed', String(picked));
+      row.appendChild(node);
+    }
+
+    return el('div', { class: 'options-voice-block' },
+      row,
+      el('p', { class: 'options-hint' },
+        'Tap one to hear it. Voices come from this device — macOS has far more '
+        + 'natural ones as free downloads under Accessibility, Spoken Content, '
+        + 'System Voice, Manage Voices.'),
     );
   };
 
@@ -88,6 +129,11 @@ export function mountOptions(): () => void {
     el('h3', { class: 'options-heading' }, 'Audio'),
     slider('sfx', 'Effects'),
     slider('music', 'Music'),
+
+    el('h3', { class: 'options-heading' }, 'Commentary'),
+    toggle('narration', 'Call the fight out loud',
+      'The big screen narrates each move as it happens.'),
+    voicePicker(),
 
     el('h3', { class: 'options-heading' }, 'Help'),
     button('How to play', () => { dialog.close(); help.showModal(); }, 'ghost'),

@@ -89,10 +89,18 @@ These are the ONLY moves that exist. You may not invent others.
 - shrink       {"scale": 0.2-0.95, "duration": s}
 - knockdown    {"duration": s}   (falls flat, sees stars — usually "on": "enemy")
 - dizzy        {"duration": s}   (stunned and wobbling — usually "on": "enemy")
-- sicken      {"kind": poison | burn | curse, "intensity": 1-10, "duration": s}
-    ON THE ENEMY. Lingering harm that shows: they turn a sickly colour and it
-    keeps rising off them. For poison, venom, infection, rot, disease, acid,
-    burning, bleeding, curses — anything that goes on hurting after the move.
+- sicken      {"kind": <state>, "intensity": 1-10, "duration": s}
+    <state>: poison | burn | curse | love | hypnotised | frozen | shocked
+             | stink | confused | drunk
+    ON THE ENEMY. A state they are left in rather than a blow they are dealt:
+    they turn a colour that says which one and it keeps rising off them.
+    poison for venom, infection, rot, disease, acid. burn for fire and
+    bleeding. curse for hexes and magic. love for charm, seduction, a crush.
+    hypnotised for mind control, trance, mesmerising. frozen for ice and
+    freezing. shocked for lightning and electricity. stink for smells.
+    confused for dazed and dizzy spells. drunk for poisoned drinks and
+    staggering. Reach for the closest one — any spell cast on the opponent
+    should leave something on them.
 
 ### Stage
 - shake_screen {"intensity": 1-10, "duration": s}
@@ -179,6 +187,11 @@ magic, anime moves, memes and physical impossibilities — that is the fun.
 - "make them sick"               -> the attack, then sicken {kind: poison} on enemy
 - "set them on fire"             -> projectile {kind: fire}, then sicken {kind: burn} on enemy
 - "curse them"                   -> sicken {kind: curse, intensity: 8} on enemy
+- "make them fall in love with me" -> taunt, then sicken {kind: love} on enemy
+- "hypnotise them"               -> beam {kind: energy}, then sicken {kind: hypnotised} on enemy
+- "freeze them solid"            -> projectile {kind: ice}, then sicken {kind: frozen} on enemy
+- "electrocute them"             -> beam {kind: lightning} or projectile {kind: bolt},
+                                    then sicken {kind: shocked} on enemy
 - "steal their soul"             -> beam {kind: rainbow} then dizzy on enemy
 
 Only when a description is genuinely empty of physical action — gibberish, or
