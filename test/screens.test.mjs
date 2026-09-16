@@ -604,6 +604,58 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   });
 }
 
+// --- the commentary, on somebody else's laptop -------------------------------
+//
+// Speech is the browser's, and what it has differs by machine: a Mac always
+// has Fred and Ralph, Windows has David and Zira, a bare Linux box has
+// nothing at all. A game that only works on the laptop it was written on is
+// not a party game.
+
+{
+  const realSpeech = window.speechSynthesis;
+  const voicesOf = (names) => ({
+    getVoices: () => names.map((name, i) => ({
+      name, lang: 'en-US', default: i === 0, localService: true,
+    })),
+    speak() {}, cancel() {}, addEventListener() {}, removeEventListener() {},
+  });
+
+  const pickedFor = async (names) => {
+    window.speechSynthesis = voicesOf(names);
+    globalThis.speechSynthesis = window.speechSynthesis;
+    ui.resetNarrator();
+    return ui.chosenVoiceName('announcer');
+  };
+
+  try {
+    check('a Mac with nothing downloaded still finds a deep one',
+      ['Daniel', 'Ralph'].includes(await pickedFor(['Samantha', 'Fred', 'Ralph', 'Daniel'])),
+      await pickedFor(['Samantha', 'Fred', 'Ralph', 'Daniel']));
+
+    check('Windows finds its own',
+      (await pickedFor(['Microsoft Zira', 'Microsoft David'])) === 'Microsoft David',
+      await pickedFor(['Microsoft Zira', 'Microsoft David']));
+
+    check('Chrome finds its own',
+      (await pickedFor(['Google US English', 'Google UK English Male']))
+        === 'Google UK English Male',
+      await pickedFor(['Google US English', 'Google UK English Male']));
+
+    // Nothing it asked for: guess at something that suits the character
+    // rather than taking whatever happens to be first.
+    check('an unknown machine still avoids the wrong character',
+      (await pickedFor(['Zira', 'Some Man Voice'])) === 'Some Man Voice',
+      await pickedFor(['Zira', 'Some Man Voice']));
+
+    check('and a machine with no voices at all simply stays quiet',
+      (await pickedFor([])) === null, String(await pickedFor([])));
+  } finally {
+    window.speechSynthesis = realSpeech;
+    globalThis.speechSynthesis = realSpeech;
+    ui.resetNarrator();
+  }
+}
+
 // --- saying the game is busy ------------------------------------------------
 
 {
