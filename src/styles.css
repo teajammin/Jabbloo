@@ -248,8 +248,16 @@ body {
 }
 
 .bubble-text img {
-  /* Height is the target, not the rule: given a narrow column, flexbox shrinks
-     the widths and `height: auto` keeps each glyph in proportion. */
+  /*
+   * Height is the target, not the rule: given a narrow column, flexbox shrinks
+   * the widths and `height: auto` keeps each glyph in proportion.
+   *
+   * Which it could not do. A flex item will not shrink below its own content
+   * width unless told it may, and an image's content width is its pixels — so
+   * on a narrow phone the letters held their size, the row overflowed, and the
+   * last letter of JABBLOO sat off the edge of the screen.
+   */
+  min-width: 0;
   height: auto;
   max-height: var(--bubble-height, 90px);
   width: auto;
