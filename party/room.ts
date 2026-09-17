@@ -24,6 +24,7 @@ import {
   drawBattleground,
   GRACE_SECONDS,
   FALLBACK_CHARACTER_ART,
+  FALLBACK_CHARACTERS,
   FALLBACK_WEAPON_ART,
   FALLBACK_WEAPONS,
   MAX_MESSAGE_BYTES,
@@ -80,8 +81,18 @@ function botMove(player: Player): { weapon: number; prompt: string } {
   };
 }
 
-function defaultName(slot: string): string {
-  if (slot === 'character') return 'Nameless';
+/**
+ * What something is called when nobody named it.
+ *
+ * A character gets a name rather than a label. "Nameless" told a player their
+ * fighter was the one nobody bothered with, which is a poor thing to read on a
+ * big screen in front of a room; one of the stand-in names is the same fact
+ * told as a joke. By seat, so a room never has two of them.
+ */
+function defaultName(slot: string, seat = 0): string {
+  if (slot === 'character') {
+    return FALLBACK_CHARACTERS[seat % FALLBACK_CHARACTERS.length]!;
+  }
   const index = Number(slot.replace('weapon', ''));
   // Anything past the three made in creation is an Ultimate, and naming it
   // so reads better on a weapon button than a fourth stand-in noun would.
@@ -885,7 +896,7 @@ export default class Room implements Party.Server {
           if (!player.progress.drawn.includes(slot)) player.progress.drawn.push(slot);
         }
         if (!this.names.has(key)) {
-          const name = defaultName(slot);
+          const name = defaultName(slot, index);
           this.names.set(key, name);
           if (slot === 'character') player.characterName ||= name;
           else player.weaponNames[Number(slot.replace('weapon', ''))] ||= name;
@@ -1369,7 +1380,8 @@ export default class Room implements Party.Server {
 
     // A blank name still counts: the brief says everything must be named, and
     // a player who runs out of time should not stall the whole room.
-    const clean = (typeof name === 'string' ? name : '').trim().slice(0, 24) || defaultName(slot);
+    const clean = (typeof name === 'string' ? name : '').trim().slice(0, 24)
+      || defaultName(slot, this.seatOf(player));
     this.names.set(`${player.id}:${slot}`, clean);
 
     // Mirrored onto the player so every screen has them without asking.
@@ -1495,13 +1507,25 @@ export default class Room implements Party.Server {
     return judges(this.state).filter((p) => p.connected);
   }
 
+  /**
+   * Which seat a player is in, for anything that has to differ between them.
+   *
+   * The stand-in names are picked by seat so a room never ends up with two
+   * Sir Bonkaloids, and so the same seat gets the same name if a round is
+   * played again.
+   */
+  private seatOf(player: Player): number {
+    return Math.max(0, creators(this.state).findIndex((p) => p.id === player.id));
+  }
+
   /** Everything one player made, for the battle to draw with. */
   creationsFor(playerId: string): { slot: string; png: string; name: string }[] {
     const out: { slot: string; png: string; name: string }[] = [];
+    const seat = creators(this.state).findIndex((p) => p.id === playerId);
     for (const [key, png] of this.art) {
       const [owner, slot] = key.split(':');
       if (owner !== playerId || !slot) continue;
-      out.push({ slot, png, name: this.names.get(key) ?? defaultName(slot) });
+      out.push({ slot, png, name: this.names.get(key) ?? defaultName(slot, seat) });
     }
     return out;
   }

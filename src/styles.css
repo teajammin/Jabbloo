@@ -2372,3 +2372,32 @@ body:has(.screen-draw) .help-open { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .player .kick { transition: none; }
 }
+
+/* ------------------------------------------------------- suggested moves */
+
+/*
+ * A few moves somebody else already wrote.
+ *
+ * Below the Attack button on purpose: they are for the player who has gone
+ * blank, and putting them above it would have everybody read a list before
+ * writing their own — which is the opposite of the point.
+ */
+.ideas-hint {
+  margin: 14px 0 0;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+.move-ideas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  width: min(560px, 100%);
+}
+
+.move-ideas .idea {
+  font-size: 14px;
+  padding: 8px 14px;
+  min-height: 40px;
+}

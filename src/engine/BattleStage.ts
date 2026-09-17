@@ -437,6 +437,37 @@ export class BattleStage {
   }
 
   /**
+   * Walks everybody back to their mark, and waits while they do.
+   *
+   * A move leaves its fighter wherever it finished — charged in, knocked back,
+   * teleported behind somebody — and the next move snapped them home before it
+   * started, so the return read as a glitch between two moves rather than the
+   * end of one. Walking back is the same correction made visible, and it gives
+   * the round a moment to breathe before the other one steps up.
+   *
+   * Positions only. The pose is settled by the move's own last step, and
+   * anything left over is cleared by `reset` when the next move begins.
+   */
+  async returnToMarks(seconds = 0.55): Promise<void> {
+    const walks = [...this.sides.entries()].map(([fighter, side]) => {
+      const home = this.homeX(side);
+      if (Math.abs(fighter.root.x - home) < 2) return null;
+      return gsap.to(fighter.root, {
+        x: home,
+        duration: seconds,
+        ease: 'power2.inOut',
+      });
+    }).filter((tween): tween is gsap.core.Tween => tween !== null);
+
+    if (walks.length === 0) return;
+    await Promise.all(walks.map((tween) => new Promise<void>((resolve) => {
+      tween.eventCallback('onComplete', resolve);
+      // A stage torn down mid-walk must not leave the round waiting.
+      tween.eventCallback('onInterrupt', resolve);
+    })));
+  }
+
+  /**
    * Restores the opening tableau: everyone back on their mark in a neutral
    * pose, and any screen shake offset cleared.
    */

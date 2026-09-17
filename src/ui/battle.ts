@@ -494,6 +494,10 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           },
         );
         await playback.finished;
+        if (disposed) return;
+        // Back to their marks before the other one steps up, so the return is
+        // part of this move rather than a jump at the start of the next.
+        await stage.returnToMarks();
       }
 
       if (disposed) return;

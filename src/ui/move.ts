@@ -1,5 +1,7 @@
 import { el, button, type Screen, goHome } from './screens';
 import { countdown } from './timer';
+import { play } from '../audio';
+import { suggestionsFor } from '../shared/suggestions';
 import type { RoomConnection } from '../net/room';
 import {
   MAX_PROMPT_WORDS, MOVE_SECONDS, isFinalRound, wordCount, type RoomState,
@@ -19,6 +21,16 @@ export function moveScreen(
   characterName: string,
 ): Screen {
   return (root, go) => {
+    /*
+     * Which suggestions this turn gets.
+     *
+     * From the turn number rather than the clock, so every phone in the room
+     * is offered the same few and they become something to talk about — and
+     * so a player who reloads does not get a different set and wonder where
+     * the one they were reading went.
+     */
+    const turnSeed = connection.state?.turn?.index ?? 0;
+
     let weapon = 0;
     let left = false;
     let submitted = false;
@@ -116,12 +128,39 @@ export function moveScreen(
     describe();
     updateCount();
 
+    /*
+     * A few moves somebody else already wrote.
+     *
+     * A blank box and a clock is the hardest part of this game for anybody not
+     * already in the mood, and what people fall back on is "swing it at them"
+     * — the dullest move available and the lowest-scoring one. These are here
+     * to show how far the writing is allowed to go; picking one is fine, and
+     * reading one and then writing something worse is the actual point.
+     *
+     * Filled into the box rather than sent, so it can still be edited — and
+     * the same few for everybody on a given turn, so a room can talk about
+     * them.
+     */
+    const ideas = el('div', { class: 'move-ideas' });
+    for (const idea of suggestionsFor(turnSeed)) {
+      const node = button(idea.label, () => {
+        prompt.value = idea.text;
+        updateCount();
+        prompt.focus();
+        play('click');
+      }, 'ghost idea');
+      node.title = idea.text;
+      ideas.appendChild(node);
+    }
+
     root.append(
       el('main', { class: 'screen screen-move' },
         heading, stakes, clock.root, weaponRow, sentence,
         prompt,
         el('div', { class: 'tool-row' }, counter),
         send, status,
+        el('p', { class: 'ideas-hint' }, 'Stuck? Try one of these, or something worse:'),
+        ideas,
       ),
     );
 

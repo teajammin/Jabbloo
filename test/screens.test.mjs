@@ -738,6 +738,34 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   host.remove();
 }
 
+// --- the instructions have to be true ----------------------------------------
+//
+// How-to-play is prose about numbers that live somewhere else, so it goes
+// stale silently: it promised three weapons for a while after there were two.
+// Reading the numbers out of the game is the only version that cannot drift.
+
+{
+  const help = ui.helpDialog();
+  document.body.appendChild(help);
+  const text = help.textContent ?? '';
+
+  check('it says how many weapons there really are',
+    text.includes(`${ui.WEAPON_COUNT} weapons`), text.slice(0, 80));
+  check('and how many words a move may be',
+    text.includes(String(ui.MAX_PROMPT_WORDS)));
+  check('and what a move is scored out of',
+    text.includes(String(ui.MAX_SCORE)));
+  check('and how much health people start on',
+    text.includes(String(ui.STARTING_HEALTH)));
+  check('and how many rounds there are',
+    text.includes(`${ui.ROUNDS_EACH} rounds`), text.slice(0, 200));
+  // The two rules a player cannot work out by looking.
+  check('it mentions which way to draw a weapon', /to the right/i.test(text));
+  check('and that where you hit matters', /heart|knee/i.test(text));
+
+  help.remove();
+}
+
 // --- quitting has to mean it ------------------------------------------------
 //
 // A tab that reloads goes back to the game it was in, which saves somebody

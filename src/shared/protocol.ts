@@ -125,6 +125,26 @@ export function graceRemaining(player: Player, now = Date.now()): number {
  */
 export const FALLBACK_WEAPONS = ['Sword', 'Axe', 'Hammer'];
 
+/**
+ * Names for a character nobody got round to naming.
+ *
+ * "Nameless" was accurate and miserable: it told a player that their fighter
+ * was the one nobody bothered with, which is a poor thing to read on a big
+ * screen in front of a room. One of these is a character who happens to have
+ * arrived without an introduction, which is the same fact told as a joke.
+ *
+ * Picked by seat rather than at random, so a room never has two Sir Bonkaloids
+ * and the same seat gets the same name if the round is replayed.
+ */
+export const FALLBACK_CHARACTERS = [
+  'Sir Bonkaloid',
+  'The Unlabelled',
+  'Mystery Beast',
+  'Lord Anonymous',
+  'Captain Untitled',
+  'The Nameless Wonder',
+];
+
 export const FALLBACK_WEAPON_ART = [
   '/placeholder-weapon-sword.png',
   '/placeholder-weapon-axe.png',
@@ -147,7 +167,7 @@ export function standIn(slot: string, index = 0): { png: string; name: string } 
   if (slot === 'character') {
     return {
       png: FALLBACK_CHARACTER_ART[index % FALLBACK_CHARACTER_ART.length]!,
-      name: 'Nameless',
+      name: FALLBACK_CHARACTERS[index % FALLBACK_CHARACTERS.length]!,
     };
   }
   const weapon = Number(slot.replace('weapon', '')) || 0;

@@ -17,6 +17,10 @@ export { battleScreen } from '../src/ui/battle';
 export { moveScreen } from '../src/ui/move';
 export { resultsScreen } from '../src/ui/results';
 export { mountOptions } from '../src/ui/options';
+export { helpDialog } from '../src/ui/help';
+export {
+  MAX_PROMPT_WORDS, MAX_SCORE, ROUNDS_EACH, STARTING_HEALTH, WEAPON_COUNT,
+} from '../src/shared/protocol';
 export { mountConnectionBanner } from '../src/ui/connection';
 export { loadingBadge } from '../src/ui/loading';
 export { chosenVoiceName, resetNarrator, VOICES } from '../src/ui/narrator';
