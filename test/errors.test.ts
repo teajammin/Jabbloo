@@ -110,7 +110,7 @@ check('and says the room carries on without them',
 check('an unreachable server blames the wifi',
   says(new TypeError('Failed to fetch')).includes('wifi'));
 check('missing artwork mentions stand-ins',
-  says(new Error('texture /effects/bullet.png failed to decode')).includes('stand-ins'));
+  says(new Error('texture /effects/bullet.webp failed to decode')).includes('stand-ins'));
 check('a renderer that will not start says so',
   says(new Error('Unable to auto-detect a suitable renderer')).includes('arena'));
 check('running out of memory suggests closing tabs',

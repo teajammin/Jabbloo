@@ -36,8 +36,17 @@ export function isEffectKind(value: unknown): value is EffectKind {
   return typeof value === 'string' && (EFFECT_KINDS as readonly string[]).includes(value);
 }
 
+/*
+ * Sprites ship as webp.
+ *
+ * Every effect is preloaded before a fight can begin, and as PNGs the painted
+ * artwork came to two and a half megabytes of loading screen. The same
+ * pictures as webp are under half a megabyte, which is the difference between
+ * a pause and a wait. Supported everywhere this game can run at all — it needs
+ * WebGL, which is a far older requirement than webp.
+ */
 export function effectUrl(kind: EffectKind): string {
-  return `${BASE_PATH}/${kind}.png`;
+  return `${BASE_PATH}/${kind}.webp`;
 }
 
 /**

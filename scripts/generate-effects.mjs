@@ -9,6 +9,7 @@
  *   node scripts/generate-effects.mjs
  */
 
+import { spawnSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -760,3 +761,14 @@ for (const [name, make] of Object.entries(effects)) {
 
 writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));
 console.log(`\nWrote ${Object.keys(effects).length} effect sprites to public/effects/`);
+
+/*
+ * PNG is what this script can encode; webp is what the game loads.
+ *
+ * Without this the sprites are written and nothing picks them up — the game
+ * goes on loading whatever webp was there before, and the generator appears to
+ * do nothing at all.
+ */
+console.log();
+spawnSync(process.execPath, [join(import.meta.dirname, 'compress-effects.mjs')],
+  { stdio: 'inherit' });
