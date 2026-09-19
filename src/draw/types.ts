@@ -9,7 +9,16 @@
 export type ToolName = 'pen' | 'eraser' | 'fill' | 'rect' | 'ellipse' | 'line' | 'select';
 
 /** The six thicknesses the brief calls for, in CSS pixels at 1x. */
-export const THICKNESSES = [2, 5, 10, 18, 30, 48] as const;
+/*
+ * What a brush can be, in canvas pixels.
+ *
+ * Shifted heavier than it started. The canvas is 1024px and gets shown at a
+ * third of that on a phone, so a 2px line was a hairline nobody could see
+ * while drawing and the battleground then lost it completely against a busy
+ * background. The thinnest is now a line rather than a hair, and the thickest
+ * covers ground fast enough to fill a body in a few strokes.
+ */
+export const THICKNESSES = [3, 7, 14, 26, 46, 78] as const;
 export type Thickness = (typeof THICKNESSES)[number];
 
 export interface Point {

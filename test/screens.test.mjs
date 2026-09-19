@@ -287,6 +287,43 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
     });
 }
 
+/*
+ * Running out of time with something written.
+ *
+ * Pressing Attack is how a move is sent, but not pressing it is not the same
+ * as having nothing to say. Somebody who typed an attack and was still
+ * reading it back when the clock ran out used to have it thrown away and an
+ * invented one played instead — which looks, from their side of the room,
+ * exactly like the game ignoring them.
+ */
+{
+  const connection = fakeConnection('a', roomState({ phase: 'battle', turn: turn('picking') }));
+  mounts('move (time ran out)', ui.moveScreen(connection, [{ name: 'Butter Sword' }], 'Bonkalot'),
+    (root) => {
+      const box = root.querySelector('textarea');
+      if (!box) { check('the move screen has a prompt box', false); return; }
+      box.value = 'trip them with the handle';
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+      // No Attack pressed; the turn simply moves on.
+      connection.push({ turn: turn('judging') });
+      const move = connection.sent.find((m) => m.type === 'submitMove');
+      check('what was written is sent anyway', Boolean(move), JSON.stringify(connection.sent));
+      check('and it is what they wrote',
+        move?.prompt === 'trip them with the handle', move?.prompt);
+    });
+}
+
+{
+  const connection = fakeConnection('a', roomState({ phase: 'battle', turn: turn('picking') }));
+  mounts('move (time ran out, nothing written)',
+    ui.moveScreen(connection, [{ name: 'Butter Sword' }], 'Bonkalot'),
+    () => {
+      connection.push({ turn: turn('judging') });
+      check('an empty box sends nothing',
+        !connection.sent.some((m) => m.type === 'submitMove'), JSON.stringify(connection.sent));
+    });
+}
+
 // --- judging on a judge's phone --------------------------------------------
 
 {
@@ -602,6 +639,25 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
 // --- weapons have a direction, characters do not -----------------------------
 
 {
+/*
+ * The colour well holds its own input.
+ *
+ * It used to be hidden off to one side with .sr-only, and closing the phone's
+ * colour picker handed focus back to it — at which point the browser scrolled
+ * the focused element into view and shunted the whole toolbar sideways. In
+ * place and invisible, there is nowhere for it to scroll to.
+ */
+{
+  mounts('the colour well', ui.drawScreen({ title: 'Draw your character' }), (root) => {
+    const well = root.querySelector('.swatch.rainbow');
+    const input = well?.querySelector('input[type="color"]');
+    check('the rainbow well has a colour input inside it', Boolean(input));
+    check('and it is not parked off-screen',
+      input !== null && !input?.classList.contains('sr-only'),
+      input?.className);
+  });
+}
+
   mounts('draw (a weapon)', ui.drawScreen({ title: 'Draw weapon 1', aim: true }), (root) => {
     check('a weapon is told where the enemy is',
       root.querySelector('.aim-guide') !== null);

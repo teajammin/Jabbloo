@@ -29,7 +29,18 @@ export function resultsScreen(connection: RoomConnection, isHost: boolean): Scre
       const names = state.teamNames;
 
       title.replaceChildren(
-        bubbleText(winner ? 'WINNER' : 'A TIE', { height: titleHeight(120), jitter: 5 }),
+                /*
+         * Smaller on a phone.
+         *
+         * The results screen is the one screen that has to show everything at
+         * once — both teams, every player, their numbers and their best line —
+         * and a 120px word across the top of a phone pushed the bottom of it
+         * off the screen.
+         */
+        bubbleText(winner ? 'WINNER' : 'A TIE', {
+          height: titleHeight(window.innerWidth <= 480 ? 76 : 120),
+          jitter: 5,
+        }),
       );
       // A tie only reaches this screen once no more ULTs are owed — the room
       // goes back to the drawing board rather than here while one is. So the

@@ -69,6 +69,11 @@ const [left, right] = await Promise.all([
  */
 (window as unknown as { sandbox: unknown }).sandbox = {
   stage,
+  // The fighters themselves, so a script can ask what a rig is actually made
+  // of — how a weapon ended up held, whether the ink rim got built — instead
+  // of squinting at a screenshot.
+  left,
+  right,
   spawnEffect,
   EFFECT_KINDS,
   effectUrl,

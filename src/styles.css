@@ -971,8 +971,27 @@ input[type='text'] {
   .toolbar { gap: 4px; padding: 3px 0; }
   .tool-row { gap: 5px; padding: 4px 4px 5px; }
   .draw-stage { border-radius: 20px; }
-  .zoom-controls { bottom: auto; top: 10px; right: 10px; }
-  .zoom-controls .tool { min-width: 40px; min-height: 40px; font-size: 19px; }
+  /*
+   * Zoom lives under the thumb, not in the far corner.
+   *
+   * These were 40px buttons pinned to the top-right, which on a phone held
+   * one-handed is the one corner a thumb cannot reach — so getting back out
+   * of a zoom meant putting the drawing down and using the other hand. Bottom
+   * right, laid out along the edge, and big enough to hit without aiming.
+   */
+  .zoom-controls {
+    top: auto;
+    bottom: 10px;
+    right: 10px;
+    flex-direction: row-reverse;
+    gap: 8px;
+  }
+  .zoom-controls .tool { min-width: 48px; min-height: 48px; font-size: 22px; }
+  /* The way back out is the one that should catch the eye. */
+  .zoom-controls .zoom-fit {
+    background: var(--mint);
+    color: var(--on-accent);
+  }
 }
 
 /*
@@ -1203,9 +1222,33 @@ input[type='text'] {
 .swatch.rainbow {
   display: grid;
   place-items: center;
+  position: relative;
+  overflow: hidden;
   background: conic-gradient(
     #f4796f, #fbd268, #a8de9b, #7fcfc4, #8fb8f0, #cbb2ed, #f79bb8, #f4796f
   );
+}
+
+/*
+ * The colour input, invisible but exactly where it appears to be.
+ *
+ * Hiding it off-screen instead cost a layout every time somebody used it: the
+ * phone's colour picker hands focus back on close, the browser scrolls the
+ * focused element into view, and a control parked outside the toolbar took
+ * the whole row with it. Sized to its own well, there is nothing to scroll to
+ * and the tap lands on the input rather than on a label forwarding it.
+ */
+.swatch-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+  background: transparent;
 }
 
 /* ---------------------------------------------------------- photo menu */
@@ -1819,6 +1862,42 @@ body:has(.screen-draw) .backdrop { display: none; }
 
 .results-best { margin: 0; font-size: 14px; opacity: 0.8; }
 .results-quote { display: block; font-style: italic; opacity: 0.75; margin-top: 2px; }
+
+/*
+ * The results screen on a phone.
+ *
+ * It had no phone rules at all and was laid out at desktop size: two padded
+ * team panels, a player card each with a name, a row of numbers and a quoted
+ * line, under a title as tall as a fist. Everything below the fold needed
+ * scrolling to reach, on the one screen people crowd round to read together.
+ * Nothing is removed here — it is the same screen, further away.
+ */
+@media (max-width: 480px) {
+  .screen-results { gap: 8px; }
+  .results-grid { gap: 8px; }
+  .results-team { padding: 10px; gap: 6px; border-radius: 18px; }
+  .results-team-name { font-size: 16px; }
+  .results-total { font-size: 13px; }
+  .results-player { padding: 7px 9px; gap: 2px; border-radius: 14px; }
+  .results-name { font-size: 14px; }
+  .results-numbers { font-size: 13px; gap: 8px; }
+  .results-best { font-size: 12px; }
+  .results-quote { margin-top: 1px; }
+  /* The verdict under the title is a sentence nobody needs at full size. */
+  .screen-results > .lede { font-size: 13px; margin: 0; }
+}
+
+/*
+ * A short phone, held in landscape or with a tall browser bar.
+ *
+ * Below this the panels themselves have to give, so the grid goes to two
+ * columns early rather than stacking into a column taller than the window.
+ */
+@media (max-height: 560px) and (max-width: 759px) {
+  .results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .results-team { padding: 8px; }
+  .results-best { display: none; }
+}
 
 /* ----------------------------------------------------------------- options */
 

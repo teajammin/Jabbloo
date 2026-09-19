@@ -278,6 +278,41 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       say('Back to fit');
     }
 
+    /*
+     * Two more ways out of a zoom, because one was not enough.
+     *
+     * A pinch can be awkward to reverse while holding a phone, and the buttons
+     * are small on the screen where they matter most. A double tap is the
+     * gesture everybody already tries, and a trackpad pinch — which arrives as
+     * a wheel event with ctrlKey set — is what everybody tries on a laptop.
+     */
+    let lastTap = 0;
+    /** Set when a tap was spent on zooming, so it does not also draw. */
+    let tapWasZoom = false;
+    const onDoubleTap = (event: PointerEvent) => {
+      tapWasZoom = false;
+      if (event.pointerType === 'mouse') return;
+      const now = performance.now();
+      const quick = now - lastTap < 320;
+      lastTap = now;
+      // Only ever a way back out: a double tap while drawing at fit would
+      // otherwise zoom somebody in when they meant to dot an eye twice.
+      if (quick && zoom > 1) {
+        canvas.abortStroke();
+        drawing = false;
+        // The stroke this tap would have started is abandoned too — otherwise
+        // getting back to the whole canvas leaves a dot where you tapped.
+        tapWasZoom = true;
+        resetZoom();
+      }
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      nudgeZoom(event.deltaY < 0 ? 1.12 : 1 / 1.12);
+    };
+
     const midpoint = () => {
       const [a, b] = [...pointers.values()];
       return a && b
@@ -304,6 +339,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       }
 
       if (!event.isPrimary) return;
+      if (tapWasZoom) return;
       // Right and middle buttons must not draw, drag or place anything: the
       // context menu handles them, and pointerdown fires first.
       if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -466,6 +502,8 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     };
     surface.addEventListener('contextmenu', onContext);
 
+    surface.addEventListener('pointerdown', onDoubleTap);
+    surface.addEventListener('wheel', onWheel, { passive: false });
     surface.addEventListener('pointerdown', onDown);
     surface.addEventListener('pointermove', onMove);
     surface.addEventListener('pointerup', onUp);
@@ -533,9 +571,12 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       node.setAttribute('aria-label', `Brush size ${t}`);
       node.title = `Brush size ${t}`;
       node.setAttribute('aria-pressed', String(t === size));
+      // Capped: the brushes now run far thicker than the button they are drawn
+      // in, and a dot at true scale would spill out of it.
       const dot = el('span', { class: 'size-dot' });
-      dot.style.width = `${Math.max(4, t * 0.55)}px`;
-      dot.style.height = `${Math.max(4, t * 0.55)}px`;
+      const shown = Math.min(28, Math.max(4, t * 0.55));
+      dot.style.width = `${shown}px`;
+      dot.style.height = `${shown}px`;
       node.appendChild(dot);
       node.addEventListener('click', () => {
         size = t;
@@ -566,9 +607,17 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
       colourRow.appendChild(node);
     }
 
-    // A rainbow well rather than a swatch showing the current colour: it has to
-    // read as "any colour", not as one more preset.
-    const custom = el('input', { type: 'color', class: 'sr-only', value: '#ff6699' });
+    /*
+     * A rainbow well rather than a swatch showing the current colour: it has to
+     * read as "any colour", not as one more preset.
+     *
+     * The input fills the well invisibly rather than being parked off-screen.
+     * A visually-hidden input is still a focusable element at some position,
+     * and closing the phone's colour picker hands focus back to it — at which
+     * point the browser scrolls it into view and drags the whole toolbar
+     * sideways. In place, there is nowhere to scroll to.
+     */
+    const custom = el('input', { type: 'color', class: 'swatch-input', value: '#ff6699' });
     custom.setAttribute('aria-label', 'Pick any colour');
     const customWell = el('label', { class: 'swatch rainbow' }, custom);
     customWell.title = 'Pick any colour';
@@ -913,6 +962,9 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
 
     return () => {
       surface.removeEventListener('pointerdown', onDown);
+      surface.removeEventListener('pointerdown', onDoubleTap);
+      surface.removeEventListener('pointerdown', onDown);
+      surface.removeEventListener('wheel', onWheel);
       surface.removeEventListener('pointermove', onMove);
       surface.removeEventListener('pointerup', onUp);
       surface.removeEventListener('pointercancel', onUp);

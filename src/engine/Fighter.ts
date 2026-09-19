@@ -42,6 +42,16 @@ export class Fighter {
    * against, faint enough not to look like part of the drawing.
    */
   private readonly halo = new Graphics();
+  /**
+   * A rim drawn around the artwork itself.
+   *
+   * The halo behind a fighter is a soft patch of light, which works for a
+   * solid body and does nothing at all for a drawing made of thin lines: the
+   * lines sit over the glow and still read as part of whatever is behind
+   * them. This traces the ink instead, so a single pen stroke keeps its own
+   * edge against a forest, a night sky or a snowfield.
+   */
+  private readonly rim = new Container();
   readonly limbs = new Container();
   /**
    * Everything that squashes and stretches.
@@ -87,6 +97,9 @@ export class Fighter {
 
     this.root.addChild(this.halo);
     this.root.addChild(this.limbs);
+    // Inside `body` rather than `root`: the rim has to squash, stretch and
+    // lean with the fighter, or it peels away the moment anything animates.
+    this.body.addChild(this.rim);
     this.root.addChild(this.body);
     this.root.addChild(this.hand);
   }
@@ -114,6 +127,7 @@ export class Fighter {
     // makes jump/slam maths behave regardless of sprite dimensions.
     this.bodySprite.anchor.set(0.5, 1);
     this.bodySprite.scale.set(this.targetHeight / characterInk.height);
+    this.drawRim(characterInk, this.bodySprite.scale.x, 0.5, 1);
     this.body.addChild(this.bodySprite);
     this.drawHalo();
 
@@ -423,6 +437,37 @@ export class Fighter {
         height * (0.58 + spread * 0.42),
       );
       this.halo.endFill();
+    }
+  }
+
+  /**
+   * Traces a rim around a piece of artwork, in two colours.
+   *
+   * The same texture drawn several times in a ring behind the original, which
+   * is the cheap way to outline an arbitrary shape: no filter, no render
+   * target, and it follows the ink exactly however thin it is.
+   *
+   * Two rings because one cannot win. A pale rim separates dark ink from a
+   * dark background and vanishes against snow; a dark rim does the opposite.
+   * Drawn pale on the inside and dark on the outside, every drawing gets the
+   * one it needs and the other reads as a shadow.
+   */
+  private drawRim(texture: Texture, scale: number, anchorX: number, anchorY: number): void {
+    this.rim.removeChildren();
+    if (texture === Texture.EMPTY || texture.width === 0) return;
+
+    const points = 10;
+    for (const [distance, colour, alpha] of [[5.5, 0x1b1712, 0.5], [2.4, 0xfff6e4, 0.95]] as const) {
+      for (let i = 0; i < points; i++) {
+        const angle = (i / points) * Math.PI * 2;
+        const copy = new Sprite(texture);
+        copy.anchor.set(anchorX, anchorY);
+        copy.scale.set(scale);
+        copy.tint = colour;
+        copy.alpha = alpha;
+        copy.position.set(Math.cos(angle) * distance, Math.sin(angle) * distance);
+        this.rim.addChild(copy);
+      }
     }
   }
 

@@ -202,12 +202,27 @@ export function moveScreen(
         }
 
         clock.setDeadline(0, 1);
-        // Time ran out or the other player finished; either way it is gone.
+        /*
+         * Time ran out or the other player finished; either way the turn is
+         * gone. What somebody wrote is not.
+         *
+         * Writing an attack and not pressing the button is not the same as
+         * writing nothing, and it used to be treated as if it were: the turn
+         * ended, the sentence was thrown away and the AI invented something
+         * else. A weapon is always chosen — the first is selected from the
+         * start — so a non-empty prompt is a complete move and gets sent.
+         */
         if (!submitted) {
+          const written = prompt.value.trim();
           submitted = true;
           send.disabled = true;
           prompt.disabled = true;
-          status.textContent = 'Time — the AI will improvise.';
+          if (written) {
+            connection.send({ type: 'submitMove', weapon, prompt: prompt.value });
+            status.textContent = 'Time — sent what you wrote.';
+          } else {
+            status.textContent = 'Time — the AI will improvise.';
+          }
         }
         leave();
       },
