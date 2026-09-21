@@ -24,6 +24,7 @@ const player = (name: string, role: Player['role'], isHost = false): Player => (
   fights: 0,
   characterName: name,
   weaponNames: [],
+  weaponKinds: [],
   damageDealt: 0,
   damageTaken: 0,
   best: null,
@@ -163,7 +164,8 @@ check('collapses whitespace', trimPrompt(' bonk\n  them ') === 'bonk them');
 import { averageScore, type Turn } from '../src/shared/protocol';
 
 const turnWith = (judged: Record<string, Record<string, number>>): Turn => ({
-  index: 1, fighters: ['ann', 'bo'], moves: {}, judged, damage: {}, notes: {},
+  index: 1, fighters: ['ann', 'bo'], moves: {}, judged, damage: {},
+  guarded: {}, notes: {},
   first: null, phase: 'judging',
 });
 

@@ -1,6 +1,7 @@
 import { el } from './screens';
 import {
-  MAX_PLAYERS, MAX_PROMPT_WORDS, MAX_SCORE, ROUNDS_EACH, STARTING_HEALTH, WEAPON_COUNT,
+  MAX_PLAYERS, MAX_PROMPT_WORDS, MAX_SCORE, OFFENSIVE_BONUS, ROUNDS_EACH,
+  STARTING_HEALTH, WEAPON_COUNT,
 } from '../shared/protocol';
 
 /**
@@ -22,15 +23,21 @@ export function helpDialog(): HTMLDialogElement {
     el('h2', {}, 'How to play'),
     el('ol', { class: 'help-steps' },
       el('li', {}, `Draw a character, then ${WEAPON_COUNT} weapons, on your own phone. `
-        + 'Name each one as you finish it — anything you leave blank gets a stand-in.'),
+        + 'Name each one as you finish it — anything you leave blank gets a stand-in. '
+        + `Say what each weapon is for: an offensive one hits ${OFFENSIVE_BONUS} harder, `
+        + 'a defensive one guards two sides instead of one.'),
       el('li', {}, 'Everyone votes on a battleground. One is drawn from the votes, '
         + 'so a pick is a ticket rather than a majority.'),
-      el('li', {}, `On your turn, pick a weapon and describe how you use it — up to ${
+      el('li', {}, 'On your turn, choose where to guard and where to strike — '
+        + 'top, bottom, left or right. Both of you choose blind. Guard the side '
+        + 'they strike and their hit is halved.'),
+      el('li', {}, `Then pick a weapon and describe how you use it — up to ${
         MAX_PROMPT_WORDS} words. There are examples under the box if you go blank.`),
       el('li', {}, 'The big screen animates what you wrote and reads it out '
         + 'while it plays. Nonsense is fine; it is the point.'),
-      el('li', {}, `Each move is scored out of ${MAX_SCORE}, and that is the damage `
-        + `it does. Everyone starts on ${STARTING_HEALTH} health.`),
+      el('li', {}, `Each move is scored out of ${MAX_SCORE}. That, plus your weapon's `
+        + 'bonus, halved if they guessed your side, is the damage it does. '
+        + `Everyone starts on ${STARTING_HEALTH} health.`),
       el('li', {}, `${ROUNDS_EACH} rounds each. Least damage taken wins. A tie means `
         + 'one more weapon each — an Ultimate — and another round.'),
     ),

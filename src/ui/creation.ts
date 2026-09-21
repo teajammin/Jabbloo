@@ -5,7 +5,8 @@ import { battlegroundScreen } from './battleground';
 import type { RoomConnection } from '../net/room';
 import {
   creators, displayName, graceExpired, longestRemaining, standIn, stepFor, stepsFor, stillWorking,
-  type Player, type RoomState,
+  OFFENSIVE_BONUS,
+  type Player, type RoomState, type WeaponKind,
 } from '../shared/protocol';
 
 /**
@@ -146,12 +147,58 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       });
       input.setAttribute('autocomplete', 'off');
 
+      /*
+       * What the weapon is for, asked where it is named.
+       *
+       * A step of its own would have been cleaner to build and worse to play:
+       * creation is already four drawings and four names against a clock, and
+       * a fifth screen asking one question would be the one everybody rushes.
+       * Beside the name, it is read at the moment the thing becomes a thing.
+       *
+       * Characters are not asked — only weapons have a job.
+       */
+      const isWeapon = slot !== 'character';
+      let kind: WeaponKind = 'offensive';
+      const kindButtons = new Map<WeaponKind, HTMLButtonElement>();
+
+      const kindRow = el('div', { class: 'kind-row' });
+      if (isWeapon) {
+        for (const [value, label, what] of [
+          ['offensive', 'Offensive', `Hits ${OFFENSIVE_BONUS} harder every round`],
+          ['defensive', 'Defensive', 'Guards two sides instead of one'],
+        ] as const) {
+          const node = el('button', { class: `kind-pick is-${value}`, type: 'button' },
+            el('span', { class: 'kind-name' }, label),
+            el('span', { class: 'kind-what' }, what));
+          node.setAttribute('aria-pressed', String(value === kind));
+          node.addEventListener('click', () => {
+            kind = value;
+            for (const [other, button_] of kindButtons) {
+              button_.setAttribute('aria-pressed', String(other === value));
+            }
+          });
+          kindButtons.set(value, node);
+          kindRow.appendChild(node);
+        }
+      }
+
       const send = () => {
-        connection.send({ type: 'submitName', slot, name: input.value });
+        connection.send({
+          type: 'submitName',
+          slot,
+          name: input.value,
+          ...(isWeapon ? { kind } : {}),
+        });
         showWaiting('Named — waiting for everyone else');
       };
 
-      const form = el('form', { class: 'stack' }, input, button('Save', send, 'big primary'));
+      const form = el('form', { class: 'stack' },
+        input,
+        ...(isWeapon ? [
+          el('p', { class: 'kind-ask' }, 'What is it for?'),
+          kindRow,
+        ] : []),
+        button('Save', send, 'big primary'));
       form.addEventListener('submit', (event) => { event.preventDefault(); send(); });
 
       body.append(preview, ...(drawn ? [] : [

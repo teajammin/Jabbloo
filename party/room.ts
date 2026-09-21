@@ -35,10 +35,16 @@ import {
   voters,
   winningTeam,
   type ClientMessage,
+  type Move,
   type Player,
   type PlayerArt,
   type Role,
   type RoomState,
+  type Side,
+  SIDES,
+  guardsFor,
+  blocked,
+  damageFor,
   type ServerMessage,
 } from '../src/shared/protocol';
 
@@ -74,11 +80,61 @@ const pick = <T>(items: readonly T[]): T =>
   items[Math.floor(Math.random() * items.length)]!;
 
 /** What the bot plays on behalf of a player who is not there. */
-function botMove(player: Player): { weapon: number; prompt: string } {
+function botMove(player: Player): Move {
+  const weapon = Math.floor(Math.random() * Math.max(1, player.weaponNames.length));
+  // Guessing at random is exactly what a present player is doing, so a bot
+  // that picks its sides this way is neither easier nor harder to face.
   return {
-    weapon: Math.floor(Math.random() * Math.max(1, player.weaponNames.length)),
+    weapon,
     prompt: pick(BOT_MOVES),
+    defend: pickGuards(guardsFor(player.weaponKinds[weapon])),
+    attack: pick([...SIDES]),
   };
+}
+
+/**
+ * The sides a submitted move chose, made safe.
+ *
+ * Everything here arrives from a phone and none of it can be trusted: a side
+ * that is not a side, six guards from a weapon that allows one, no sides at
+ * all from a client older than this feature. A missing or unusable choice
+ * becomes a random one rather than a refusal — a move that was written and
+ * sent should be played, and guarding nowhere is a punishment nobody chose.
+ */
+function sidesFrom(
+  message: { defend?: unknown; attack?: unknown },
+  allowed: number,
+): { defend: Side[]; attack: Side } {
+  const asSide = (value: unknown): Side | null =>
+    typeof value === 'string' && (SIDES as readonly string[]).includes(value)
+      ? value as Side
+      : null;
+
+  const offered = Array.isArray(message.defend) ? message.defend : [];
+  const defend: Side[] = [];
+  for (const value of offered) {
+    const side = asSide(value);
+    if (side && !defend.includes(side) && defend.length < allowed) defend.push(side);
+  }
+  // Short of what the weapon allows — including none at all — is topped up,
+  // so a defensive weapon always guards the two sides it was chosen for.
+  if (defend.length < allowed) {
+    for (const side of pickGuards(allowed)) {
+      if (!defend.includes(side) && defend.length < allowed) defend.push(side);
+    }
+  }
+
+  return { defend, attack: asSide(message.attack) ?? pick([...SIDES]) };
+}
+
+/** A set of distinct sides to guard, of the size a weapon allows. */
+function pickGuards(count: number): Side[] {
+  const left = [...SIDES];
+  const chosen: Side[] = [];
+  while (chosen.length < count && left.length > 0) {
+    chosen.push(...left.splice(Math.floor(Math.random() * left.length), 1));
+  }
+  return chosen;
 }
 
 /**
@@ -298,7 +354,7 @@ export default class Room implements Party.Server {
         this.onSubmitDrawing(message.slot, message.png, message.done === true, sender);
         break;
       case 'submitName':
-        this.onSubmitName(message.slot, message.name, sender);
+        this.onSubmitName(message.slot, message.name, message.kind, sender);
         break;
       case 'ready':
         this.onReady(sender);
@@ -310,7 +366,7 @@ export default class Room implements Party.Server {
         this.onRequestArt(sender);
         break;
       case 'submitMove':
-        this.onSubmitMove(message.weapon, message.prompt, sender);
+        this.onSubmitMove(message.weapon, message.prompt, message, sender);
         break;
       case 'turnPlayed':
         // Only the host knows when the animation has finished playing.
@@ -414,6 +470,7 @@ export default class Room implements Party.Server {
       fights: 0,
       characterName: '',
       weaponNames: [],
+      weaponKinds: [],
       damageDealt: 0,
       damageTaken: 0,
       best: null,
@@ -509,6 +566,7 @@ export default class Room implements Party.Server {
       fights: 0,
       characterName: '',
       weaponNames: [],
+      weaponKinds: [],
       damageDealt: 0,
       damageTaken: 0,
       best: null,
@@ -899,7 +957,11 @@ export default class Room implements Party.Server {
           const name = defaultName(slot, index);
           this.names.set(key, name);
           if (slot === 'character') player.characterName ||= name;
-          else player.weaponNames[Number(slot.replace('weapon', ''))] ||= name;
+          else {
+            const at = Number(slot.replace('weapon', ''));
+            player.weaponNames[at] ||= name;
+            player.weaponKinds[at] ||= 'offensive';
+          }
           if (!player.progress.named.includes(slot)) player.progress.named.push(slot);
         }
       }
@@ -998,6 +1060,7 @@ export default class Room implements Party.Server {
       moves: {},
       judged: {},
       damage: {},
+      guarded: {},
       notes: {},
       first: null,
       phase: 'picking',
@@ -1185,7 +1248,12 @@ export default class Room implements Party.Server {
     return this.state.phase === 'creating' || this.state.phase === 'ult';
   }
 
-  private onSubmitMove(weapon: number, prompt: string, sender: Party.Connection): void {
+  private onSubmitMove(
+    weapon: number,
+    prompt: string,
+    sides: { defend?: unknown; attack?: unknown },
+    sender: Party.Connection,
+  ): void {
     const turn = this.state.turn;
     if (!turn || turn.phase !== 'picking') return;
     if (!turn.fighters.includes(sender.id)) return;
@@ -1198,9 +1266,11 @@ export default class Room implements Party.Server {
     const player = this.state.players.find((p) => p.id === sender.id);
     const owned = Math.max(1, player?.weaponNames.length ?? WEAPON_COUNT);
 
+    const slot = Math.max(0, Math.min(owned - 1, Math.floor(weapon) || 0));
     turn.moves[sender.id] = {
-      weapon: Math.max(0, Math.min(owned - 1, Math.floor(weapon) || 0)),
+      weapon: slot,
       prompt: trimPrompt(prompt),
+      ...sidesFrom(sides, guardsFor(player?.weaponKinds[slot])),
     };
     this.broadcastState();
 
@@ -1230,7 +1300,28 @@ export default class Room implements Party.Server {
       const player = this.state.players.find((p) => p.id === id);
       turn.moves[id] = player && !player.connected
         ? botMove(player)
-        : { weapon: 0, prompt: '' };
+        : {
+          weapon: 0,
+          prompt: '',
+          defend: pickGuards(guardsFor(player?.weaponKinds[0])),
+          attack: pick([...SIDES]),
+        };
+    }
+
+    /*
+     * Who guessed right, decided now that both moves are in.
+     *
+     * Once and on the server: the big screen needs it to play the guard
+     * catching the blow, and the scoring needs it to halve the damage. Worked
+     * out twice, those two could disagree — a fighter blocking on screen and
+     * taking it in full on the health bar.
+     */
+    for (const attackerId of turn.fighters) {
+      const defenderId = turn.fighters.find((id) => id !== attackerId);
+      turn.guarded[attackerId] = blocked(
+        turn.moves[attackerId],
+        defenderId ? turn.moves[defenderId] : undefined,
+      );
     }
 
     turn.first = turn.fighters[Math.floor(Math.random() * 2)]!;
@@ -1308,9 +1399,25 @@ export default class Room implements Party.Server {
     if (!turn || turn.phase !== 'judging') return;
 
     for (const attackerId of turn.fighters) {
+      /*
+       * What the judges gave, then what the weapon and the guessing did to it.
+       *
+       * Order matters and is the order the rules were written in: an
+       * offensive weapon adds its bonus to the blow, and a guard then halves
+       * the blow it caught — bonus included, because the guard caught the
+       * whole thing. The final round doubles whatever is left.
+       */
+      const move = turn.moves[attackerId];
+      const attackerNow = this.state.players.find((p) => p.id === attackerId);
+      const offensive = attackerNow?.weaponKinds[move?.weapon ?? 0] !== 'defensive';
+
       // The last round counts double, so a fight is never over until it is.
-      const scored = averageScore(turn, attackerId);
-      const dealt = final ? scored * FINAL_ROUND_MULTIPLIER : scored;
+      const dealt = damageFor({
+        scored: averageScore(turn, attackerId),
+        offensive,
+        guarded: turn.guarded[attackerId] ?? false,
+        multiplier: final ? FINAL_ROUND_MULTIPLIER : 1,
+      });
       turn.damage[attackerId] = dealt;
 
       const attacker = this.state.players.find((p) => p.id === attackerId);
@@ -1326,7 +1433,6 @@ export default class Room implements Party.Server {
         // Ties keep the earlier hit; the brief says pick any of them, and the
         // first is as good a choice as a random one and easier to reason about.
         if (!attacker.best || dealt > attacker.best.damage) {
-          const move = turn.moves[attackerId];
           attacker.best = {
             weapon: attacker.weaponNames[move?.weapon ?? 0] || 'their weapon',
             prompt: move?.prompt ?? '',
@@ -1374,7 +1480,12 @@ export default class Room implements Party.Server {
     this.broadcastState();
   }
 
-  private onSubmitName(slot: string, name: string, sender: Party.Connection): void {
+  private onSubmitName(
+    slot: string,
+    name: string,
+    kind: unknown,
+    sender: Party.Connection,
+  ): void {
     const player = this.state.players.find((p) => p.id === sender.id);
     if (!player || !this.isCreating()) return;
 
@@ -1388,7 +1499,17 @@ export default class Room implements Party.Server {
     if (slot === 'character') player.characterName = clean;
     else {
       const index = Number(slot.replace('weapon', ''));
-      if (Number.isInteger(index)) player.weaponNames[index] = clean;
+      if (Number.isInteger(index)) {
+        player.weaponNames[index] = clean;
+        /*
+         * What the weapon is for, chosen alongside its name.
+         *
+         * Anything that is not the word "defensive" is offensive, which is
+         * what every weapon was before this existed — so a phone that never
+         * asked the question still produces a weapon that works.
+         */
+        player.weaponKinds[index] = kind === 'defensive' ? 'defensive' : 'offensive';
+      }
     }
 
     if (!player.progress.named.includes(slot)) player.progress.named.push(slot);

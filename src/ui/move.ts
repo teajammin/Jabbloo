@@ -4,8 +4,23 @@ import { play } from '../audio';
 import { suggestionsFor } from '../shared/suggestions';
 import type { RoomConnection } from '../net/room';
 import {
-  MAX_PROMPT_WORDS, MOVE_SECONDS, isFinalRound, wordCount, type RoomState,
+  MAX_PROMPT_WORDS, MOVE_SECONDS, isFinalRound, wordCount, SIDES, guardsFor,
+  type RoomState, type Side, type WeaponKind,
 } from '../shared/protocol';
+
+/**
+ * An arrow per side, so the grid reads without its labels.
+ *
+ * On a phone the words are small and the layout is doing most of the work;
+ * the arrow is what makes "top" obvious at a glance while holding the thing
+ * in one hand.
+ */
+const SIDE_MARKS: Record<Side, string> = {
+  top: '\u2191',
+  bottom: '\u2193',
+  left: '\u2190',
+  right: '\u2192',
+};
 
 /**
  * The move screen, on a fighter's phone.
@@ -17,7 +32,7 @@ import {
  */
 export function moveScreen(
   connection: RoomConnection,
-  weapons: { name: string }[],
+  weapons: { name: string; kind?: WeaponKind }[],
   characterName: string,
 ): Screen {
   return (root, go) => {
@@ -34,6 +49,16 @@ export function moveScreen(
     let weapon = 0;
     let left = false;
     let submitted = false;
+
+    /**
+     * Where to guard, and where to aim.
+     *
+     * Both are chosen before either player sees anything, which is the whole
+     * of the game here: a guard that catches the blow halves it, and neither
+     * side has anything to go on but the other one's habits.
+     */
+    let defend: Side[] = ['left'];
+    let attack: Side = 'right';
 
     const clock = countdown();
     const heading = el('h1', { class: 'creation-title' }, 'Your turn');
@@ -52,6 +77,85 @@ export function moveScreen(
 
     const counter = el('span', { class: 'move-count' }, `0 / ${MAX_PROMPT_WORDS}`);
     const send = button('Attack', () => submit(), 'big primary');
+
+    /**
+     * A ring of four sides laid out where they are.
+     *
+     * Named buttons in a row would work and read as a form. Arranged around a
+     * middle instead, "top" is above and "left" is to the left, so the choice
+     * is a place on a body rather than a word off a list — which is what it
+     * has to feel like to be worth guessing about.
+     */
+    function sidePicker(
+      className: string,
+      onChange: (chosen: Side[]) => void,
+    ): { root: HTMLElement; set: (chosen: Side[], max: number) => void } {
+      const buttons = new Map<Side, HTMLButtonElement>();
+      const grid = el('div', { class: `side-grid ${className}` });
+      let chosen: Side[] = [];
+      let max = 1;
+
+      const paint = () => {
+        for (const [side, node] of buttons) {
+          node.setAttribute('aria-pressed', String(chosen.includes(side)));
+        }
+      };
+
+      for (const side of SIDES) {
+        const node = el('button', { class: `side-pick side-${side}`, type: 'button' },
+          el('span', { class: 'side-mark' }, SIDE_MARKS[side]),
+          el('span', { class: 'side-word' }, side));
+        node.setAttribute('aria-label', side);
+        node.addEventListener('click', () => {
+          if (chosen.includes(side)) {
+            // Never down to nothing: with one guard allowed, tapping the one
+            // you have chosen means "this one", not "none of them".
+            if (chosen.length > 1) chosen = chosen.filter((s) => s !== side);
+          } else {
+            // Oldest choice drops out, so a second tap always shows a change
+            // rather than being ignored once the limit is reached.
+            chosen = [...chosen, side].slice(-max);
+          }
+          paint();
+          onChange(chosen);
+          play('click');
+        });
+        buttons.set(side, node);
+        grid.appendChild(node);
+      }
+
+      return {
+        root: grid,
+        set: (next, limit) => {
+          max = limit;
+          chosen = next.slice(-limit);
+          paint();
+        },
+      };
+    }
+
+    const defenceNote = el('p', { class: 'side-note' });
+    const defencePicker = sidePicker('is-defence', (chosen) => { defend = chosen; });
+    const attackPicker = sidePicker('is-attack', (chosen) => {
+      attack = chosen[0] ?? 'right';
+    });
+
+    /** Re-reads the chosen weapon: a shield guards two sides, a sword one. */
+    function refreshGuards(): void {
+      const kind = weapons[weapon]?.kind ?? 'offensive';
+      const allowed = guardsFor(kind);
+      if (defend.length > allowed) defend = defend.slice(-allowed);
+      while (defend.length < allowed) {
+        const spare = SIDES.find((side) => !defend.includes(side));
+        if (!spare) break;
+        defend = [...defend, spare];
+      }
+      defencePicker.set(defend, allowed);
+      attackPicker.set([attack], 1);
+      defenceNote.textContent = allowed > 1
+        ? 'A defensive weapon guards two sides — pick both.'
+        : 'Pick the side you guard. An offensive weapon guards one.';
+    }
 
     function describe(): void {
       const name = weapons[weapon]?.name ?? 'their weapon';
@@ -72,12 +176,16 @@ export function moveScreen(
         node.setAttribute('aria-pressed', String(i === index));
       }
       describe();
+      // Switching to a shield hands them a second guard; switching away takes
+      // it back, and leaving a stale one on screen would promise a block the
+      // server is not going to honour.
+      refreshGuards();
     }
 
     function submit(): void {
       if (submitted) return;
       submitted = true;
-      connection.send({ type: 'submitMove', weapon, prompt: prompt.value });
+      connection.send({ type: 'submitMove', weapon, prompt: prompt.value, defend, attack });
       status.textContent = 'Sent — watch the big screen.';
       send.disabled = true;
       prompt.disabled = true;
@@ -126,6 +234,7 @@ export function moveScreen(
 
     prompt.addEventListener('input', updateCount);
     describe();
+    refreshGuards();
     updateCount();
 
     /*
@@ -156,6 +265,28 @@ export function moveScreen(
     root.append(
       el('main', { class: 'screen screen-move' },
         heading, stakes, clock.root, weaponRow, sentence,
+        /*
+         * The two guesses come before the writing.
+         *
+         * In that order because that is the order they are decided in: a
+         * guard is a reaction to what you think is coming, an aim is a bet on
+         * where they are not looking, and the fifty words are a description
+         * of a blow whose direction is already settled. Putting the writing
+         * first would have people describe an overhead slam and then pick
+         * "left" underneath it.
+         */
+        el('section', { class: 'strategy-box' },
+          el('h2', { class: 'strategy-title' }, 'Defensive position'),
+          el('p', { class: 'strategy-what' }, 'Where will you dodge or shield?'),
+          defencePicker.root,
+          defenceNote),
+        el('section', { class: 'strategy-box' },
+          el('h2', { class: 'strategy-title' }, 'Offensive position'),
+          el('p', { class: 'strategy-what' }, 'Where will you strike them?'),
+          attackPicker.root,
+          el('p', { class: 'side-note' },
+            'Guard the side they strike and their hit is halved. So is yours if they guess yours.')),
+        el('h2', { class: 'strategy-title' }, 'How you fight'),
         prompt,
         el('div', { class: 'tool-row' }, counter),
         send, status,
@@ -218,7 +349,7 @@ export function moveScreen(
           send.disabled = true;
           prompt.disabled = true;
           if (written) {
-            connection.send({ type: 'submitMove', weapon, prompt: prompt.value });
+            connection.send({ type: 'submitMove', weapon, prompt: prompt.value, defend, attack });
             status.textContent = 'Time — sent what you wrote.';
           } else {
             status.textContent = 'Time — the AI will improvise.';

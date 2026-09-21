@@ -288,6 +288,58 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
 }
 
 /*
+ * Guarding and aiming.
+ *
+ * Both are chosen blind, so the only thing that can be checked from here is
+ * that what somebody pressed is what gets sent — and that a defensive weapon
+ * really does hand them the second guard it promises, since that is the whole
+ * reason anybody would draw one.
+ */
+{
+  const connection = fakeConnection('a', roomState({ phase: 'battle', turn: turn('picking') }));
+  mounts('move (strategy)',
+    ui.moveScreen(connection, [{ name: 'Butter Sword', kind: 'offensive' }], 'Bonkalot'),
+    (root) => {
+      const boxes = [...root.querySelectorAll('.strategy-title')].map((n) => n.textContent);
+      check('there is a defensive position box', boxes.includes('Defensive position'), boxes.join('|'));
+      check('and an offensive position box', boxes.includes('Offensive position'), boxes.join('|'));
+      check('and the writing comes after them',
+        boxes.indexOf('How you fight') > boxes.indexOf('Offensive position'), boxes.join('|'));
+
+      const guard = root.querySelector('.is-defence .side-top');
+      const aim = root.querySelector('.is-attack .side-bottom');
+      guard?.click();
+      aim?.click();
+
+      const attack = [...root.querySelectorAll('button')].find((b) => /attack/i.test(b.textContent));
+      attack?.click();
+      const move = connection.sent.find((m) => m.type === 'submitMove');
+      check('the sides chosen are the sides sent',
+        move?.defend?.includes('top') === true && move?.attack === 'bottom',
+        JSON.stringify(move));
+      check('an offensive weapon guards exactly one side',
+        move?.defend?.length === 1, JSON.stringify(move?.defend));
+    });
+}
+
+{
+  const connection = fakeConnection('a', roomState({ phase: 'battle', turn: turn('picking') }));
+  mounts('move (defensive weapon)',
+    ui.moveScreen(connection, [{ name: 'Big Shield', kind: 'defensive' }], 'Bonkalot'),
+    (root) => {
+      const pressed = [...root.querySelectorAll('.is-defence .side-pick')]
+        .filter((n) => n.getAttribute('aria-pressed') === 'true');
+      check('a defensive weapon starts with two sides guarded',
+        pressed.length === 2, String(pressed.length));
+
+      const attack = [...root.querySelectorAll('button')].find((b) => /attack/i.test(b.textContent));
+      attack?.click();
+      const move = connection.sent.find((m) => m.type === 'submitMove');
+      check('and sends both of them', move?.defend?.length === 2, JSON.stringify(move?.defend));
+    });
+}
+
+/*
  * Running out of time with something written.
  *
  * Pressing Attack is how a move is sent, but not pressing it is not the same

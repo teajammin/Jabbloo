@@ -12,6 +12,16 @@ export interface ChoreographRequest {
   weaponName?: string;
   enemyName?: string;
   /**
+   * Which side the opponent is guarding, and whether it caught this blow.
+   *
+   * Settled on the server before either move plays, so the choreography can
+   * be written knowing how it ends — a blow that the health bar is about to
+   * halve should look like it was stopped, not land cleanly and then quietly
+   * count for less.
+   */
+  guardedSide?: string;
+  blocked?: boolean;
+  /**
    * Which game this is for, and which screen is asking.
    *
    * The deployed backend takes these to the room and asks whether that screen

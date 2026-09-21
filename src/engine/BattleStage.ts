@@ -7,6 +7,10 @@ import type { BattlegroundId } from './theme';
 import type { Fighter } from './Fighter';
 import { BubbleText } from './BubbleText';
 import { HealthBar } from './HealthBar';
+import { spawnEffect } from './effects';
+// The stage's own Side is which half a fighter stands on; this one is where
+// on a body a blow is aimed. Two different questions, so two different names.
+import type { Side as GuardSide } from '../shared/protocol';
 
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
@@ -234,6 +238,91 @@ export class BattleStage {
     tl.to(text, { y: text.y - 90, duration: 1.1, ease: 'power2.out' }, 0);
     tl.to(text, { alpha: 0, duration: 0.4, ease: 'power2.in' }, 0.7);
     tl.eventCallback('onComplete', () => { if (!text.destroyed) text.destroy(); });
+  }
+
+  /**
+   * Raises a guard on the sides a fighter chose to cover.
+   *
+   * Shown before the blow rather than as it lands, because the guess was made
+   * before either player saw anything and the screen should say so: the shield
+   * is up, and then it is either in the way or it is not.
+   *
+   * Returns the way to take it down again — whoever put it up is the only one
+   * who knows when the exchange it belongs to is finished.
+   */
+  showGuard(fighter: Fighter, sides: readonly GuardSide[]): () => void {
+    const shields: Sprite[] = [];
+    const reach = Math.max(fighter.height * 0.42, 54);
+    const middle = fighter.root.y - fighter.height * 0.5;
+
+    for (const side of sides) {
+      const shield = spawnEffect(this.effects, 'shield', {
+        x: fighter.root.x + (side === 'left' ? -reach : side === 'right' ? reach : 0),
+        y: side === 'top' ? middle - reach
+          : side === 'bottom' ? middle + reach
+            : middle,
+        height: fighter.height * 0.42,
+      });
+      if (!shield) continue;
+      shield.alpha = 0;
+      shields.push(shield);
+      gsap.fromTo(shield,
+        { alpha: 0 },
+        { alpha: 0.85, duration: 0.22, ease: 'power2.out' });
+      // A slow breath, so a guard that is up for a whole exchange does not
+      // read as a sticker somebody left on the screen.
+      gsap.to(shield.scale, {
+        x: shield.scale.x * 1.06, y: shield.scale.y * 1.06,
+        duration: 0.9, repeat: -1, yoyo: true, ease: 'sine.inOut',
+      });
+    }
+
+    return () => {
+      for (const shield of shields) {
+        gsap.killTweensOf([shield, shield.scale]);
+        if (!shield.destroyed) shield.destroy();
+      }
+      shields.length = 0;
+    };
+  }
+
+  /**
+   * HIT or MISS, over the fighter it happened to.
+   *
+   * The one thing on screen that says whether the guessing came off. Without
+   * it a blocked blow is just a blow that did less damage, and the round's
+   * whole decision is invisible.
+   */
+  async callResult(fighter: Fighter, hit: boolean): Promise<void> {
+    const text = new Text(hit ? 'HIT!' : 'MISS!', {
+      fontFamily: 'Verdana, Geneva, sans-serif',
+      fontSize: 72,
+      fontWeight: 'bold',
+      fill: hit ? palette.coral : palette.mint,
+      stroke: palette.cream,
+      strokeThickness: 9,
+    });
+    text.anchor.set(0.5, 0.5);
+    text.x = fighter.root.x;
+    text.y = fighter.root.y - fighter.height * 0.62;
+    this.effects.addChild(text);
+
+    const tl = gsap.timeline();
+    tl.fromTo(text.scale,
+      { x: 0.3, y: 0.3 },
+      { x: 1.1, y: 1.1, duration: 0.2, ease: 'back.out(3)' });
+    tl.to(text.scale, { x: 1, y: 1, duration: 0.1 });
+    // A miss slides off the way the blow went; a hit stays where it landed.
+    if (!hit) tl.to(text, { x: text.x + 70, duration: 0.7, ease: 'power2.out' }, 0.2);
+    tl.to(text, { alpha: 0, duration: 0.3, ease: 'power2.in' }, 0.75);
+
+    await new Promise<void>((resolve) => {
+      tl.eventCallback('onComplete', () => {
+        gsap.killTweensOf([text, text.scale]);
+        if (!text.destroyed) text.destroy();
+        resolve();
+      });
+    });
   }
 
   /**

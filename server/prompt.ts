@@ -12,6 +12,10 @@ export interface FightContext {
   enemyName: string;
   /** The player's own words. Capped upstream at 50 words. */
   prompt: string;
+  /** Where the opponent is holding their guard, if anywhere. */
+  guardedSide?: string;
+  /** Whether that guard is about to catch this blow. */
+  blocked?: boolean;
 }
 
 export const SYSTEM_PROMPT = `You are the choreographer for Jabbloo, a silly multiplayer fighting game where players draw their own characters and weapons, then describe how they attack.
@@ -247,6 +251,25 @@ export function buildUserMessage(fight: FightContext): string {
     `Character: ${fight.characterName}`,
     `Weapon: ${fight.weaponName}`,
     `Opponent: ${fight.enemyName}`,
+    /*
+     * How it ends, told up front.
+     *
+     * The outcome is decided before either move plays — both players chose a
+     * side blind and the server worked out whether the guard caught it — so
+     * the choreography can be written towards it. Without this the blow lands
+     * cleanly on screen and then counts for half on the health bar, which
+     * reads as the game losing track of its own fight.
+     */
+    ...(fight.guardedSide
+      ? [`${fight.enemyName} is guarding their ${fight.guardedSide} side.`]
+      : []),
+    ...(fight.blocked
+      ? [
+        `That guard STOPS this attack. Choreograph it landing on the guard:`,
+        `the blow should be deflected, glance off, or be caught — never connect`,
+        `cleanly. End with the attacker rebuffed rather than the opponent hurt.`,
+      ]
+      : []),
     ``,
     `The player says:`,
     `"${fight.prompt}"`,

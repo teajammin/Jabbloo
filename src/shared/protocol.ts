@@ -50,6 +50,77 @@ export function isFinalRound(state: RoomState): boolean {
 export const STARTING_HEALTH = 100;
 /** The brief's scale: a move is worth up to this much damage. */
 export const MAX_SCORE = 33;
+/**
+ * The four places a fighter can guard or aim at.
+ *
+ * Four rather than more because both players choose blind and the guess has
+ * to be worth making: at four, a guard lands one time in four, which is often
+ * enough to be worth thinking about and rare enough that a hit still feels
+ * like the normal outcome.
+ */
+export const SIDES = ['left', 'right', 'top', 'bottom'] as const;
+export type Side = (typeof SIDES)[number];
+
+/** What a drawn weapon is for. Chosen when it is named. */
+export type WeaponKind = 'offensive' | 'defensive';
+
+/** Extra damage an offensive weapon adds to every hit it lands. */
+export const OFFENSIVE_BONUS = 8;
+
+/** How many sides a weapon lets its owner guard at once. */
+export function guardsFor(kind: WeaponKind | undefined): number {
+  return kind === 'defensive' ? 2 : 1;
+}
+
+/**
+ * What a blocked hit is worth.
+ *
+ * Half, not nothing: a guess that came off should change the round without
+ * ending it, and a move somebody wrote fifty words about should still land
+ * for something.
+ */
+export const BLOCKED_DAMAGE = 0.5;
+
+/**
+ * Whether a guard caught the blow.
+ *
+ * The defender's own move carries where they guarded — both players commit
+ * before either sees anything, which is the whole point of choosing.
+ */
+export function blocked(attack: Move | undefined, defence: Move | undefined): boolean {
+  if (!attack || !defence) return false;
+  return defence.defend.includes(attack.attack);
+}
+
+/**
+ * What a blow is finally worth.
+ *
+ * Kept here, as arithmetic over plain numbers, because it is the rule the
+ * whole strategy layer exists to express and the one place a mistake is
+ * invisible: every input is a number between nought and a hundred, so a wrong
+ * order of operations produces a believable figure rather than an error.
+ *
+ * The order is the order the rules were written in. An offensive weapon adds
+ * its bonus to the blow; a guard then halves what it caught, bonus included,
+ * because the guard caught the whole thing; the final round doubles whatever
+ * is left.
+ */
+export function damageFor(input: {
+  /** What the judges gave it, out of [[MAX_SCORE]]. */
+  scored: number;
+  /** Whether the weapon used was an offensive one. */
+  offensive: boolean;
+  /** Whether the defender guarded the side it came at. */
+  guarded: boolean;
+  /** The last-round multiplier, or 1 on any other round. */
+  multiplier: number;
+}): number {
+  let dealt = input.scored;
+  if (input.offensive) dealt += OFFENSIVE_BONUS;
+  if (input.guarded) dealt *= BLOCKED_DAMAGE;
+  return dealt * input.multiplier;
+}
+
 /** How long judges have to score an exchange. */
 export const JUDGE_SECONDS = 30;
 
@@ -213,6 +284,14 @@ export interface Player {
    */
   characterName: string;
   weaponNames: string[];
+  /**
+   * What each weapon is for, by the same index as its name.
+   *
+   * Separate from the names so an older client that never sent one leaves a
+   * gap rather than a wrong answer — an absent kind reads as offensive, which
+   * is what every weapon was before there was a choice.
+   */
+  weaponKinds: WeaponKind[];
   /** Totals for the stats screen, accumulated across the fight. */
   damageDealt: number;
   damageTaken: number;
@@ -318,6 +397,17 @@ export interface Move {
   /** Index into their three weapons. */
   weapon: number;
   prompt: string;
+  /**
+   * Where they are guarding.
+   *
+   * A list because a defensive weapon guards two sides. Always at least one:
+   * a move that arrived without a choice is given one rather than being
+   * treated as guarding nowhere, which would quietly punish anyone whose
+   * phone was older than this feature.
+   */
+  defend: Side[];
+  /** Where they are aiming. */
+  attack: Side;
 }
 
 /** What is happening on the battle stage right now. */
@@ -345,6 +435,14 @@ export interface Turn {
   judged: Record<string, Record<string, number>>;
   /** The averaged damage each fighter dealt, once judging has closed. */
   damage: Record<string, number>;
+  /**
+   * Whose blow the other one guarded against, worked out when moves close.
+   *
+   * Settled before the exchange plays rather than during judging, because the
+   * big screen has to show the guard catching the blow as it happens — and a
+   * result the animation invented for itself could disagree with the damage.
+   */
+  guarded: Record<string, boolean>;
   /** What the AI judge said, shown on the big screen. */
   notes: Record<string, string>;
   /**
@@ -465,13 +563,13 @@ export type ClientMessage =
    * room moves on as soon as the last person is ready.
    */
   | { type: 'submitDrawing'; slot: string; png: string; done?: boolean }
-  | { type: 'submitName'; slot: string; name: string }
+  | { type: 'submitName'; slot: string; name: string; kind?: WeaponKind }
   /** Done early; the step advances once everyone has said so. */
   | { type: 'ready' }
   | { type: 'voteBattleground'; id: string }
   /** The host asks for everyone's artwork once the battle starts. */
   | { type: 'requestArt' }
-  | { type: 'submitMove'; weapon: number; prompt: string }
+  | { type: 'submitMove'; weapon: number; prompt: string; defend?: Side[]; attack?: Side }
   /** The host reports that the exchange has finished playing. */
   /** The host reports the exchange has finished playing; judging opens. */
   | { type: 'turnPlayed' }

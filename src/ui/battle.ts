@@ -437,11 +437,17 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         if (!attacker || !defender || !move) continue;
 
         const weaponName = entry?.weapons[move.weapon]?.name ?? attacker.weaponName;
+        const guarding = turn.moves[defenderId]?.defend ?? [];
+        const stopped = turn.guarded[attackerId] === true;
         const response = await requestChoreography({
           prompt: move.prompt || 'swing the weapon at them',
           characterName: attacker.name,
           weaponName,
           enemyName: defender.name,
+          // Written towards the outcome it already has: a blow the health bar
+          // is about to halve should look like it was stopped.
+          ...(guarding.length ? { guardedSide: guarding.join(' and ') } : {}),
+          ...(stopped ? { blocked: true } : {}),
           ...credentials(),
         });
         if (disposed) return;
@@ -477,24 +483,63 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         // the round.
         const spoken = written.length > 0 && await hasVoice();
         if (disposed) return;
+        /*
+         * The subtitle is what the voice is saying.
+         *
+         * These used to be two different scripts running at once: the voice
+         * read the fifty words the player wrote while the caption underneath
+         * described the choreography beat by beat, so anybody reading was
+         * reading one thing and hearing another. Whichever text is chosen,
+         * both now carry it — the caption is a subtitle, and a subtitle that
+         * disagrees with the voice is worse than none.
+         */
+        if (written) caption.textContent = written;
         if (spoken) void narrate(written);
+
+        /*
+         * The guard goes up before the blow, not as it lands.
+         *
+         * Both players committed before either saw anything, so the shield is
+         * already where it is — showing it first is what makes the next
+         * second worth watching, because the room can see whether the guess
+         * was right before the game says so.
+         *
+         * The defender's own move carries where they guarded; whether it
+         * caught anything was settled on the server when both moves came in,
+         * so the picture and the health bar cannot disagree.
+         */
+        const dropGuard = guarding.length > 0
+          ? stage.showGuard(defender, guarding)
+          : () => {};
 
         const playback = engine.playChoreography(
           { actor: attacker, enemy: defender, stage },
           parsed,
           {
             onStep: (index) => {
-              // With no voice to carry them, the player's own words stay on
-              // screen for the whole move instead — losing them entirely is
-              // the one outcome worth avoiding.
-              if (written && !spoken) return;
+              // Somebody's own words hold the screen for the whole move,
+              // spoken or not: they are the best thing in the round and the
+              // voice is already reading them.
+              if (written) return;
               const beat = beats[index];
-              if (beat?.caption) caption.textContent = beat.caption;
+              if (!beat?.caption) return;
+              // Nothing written, so the choreography narrates itself — and
+              // says out loud exactly what it is putting on screen.
+              caption.textContent = beat.caption;
+              void narrate(beat.caption);
             },
           },
         );
         await playback.finished;
+        if (disposed) { dropGuard(); return; }
+
+        // Whether the guessing came off. Without this a blocked blow is only
+        // a blow that did less damage, and the round's whole decision never
+        // appears on screen.
+        await stage.callResult(defender, !turn.guarded[attackerId]);
+        dropGuard();
         if (disposed) return;
+
         // Back to their marks before the other one steps up, so the return is
         // part of this move rather than a jump at the start of the next.
         await stage.returnToMarks();
@@ -744,8 +789,14 @@ function phoneView(
     // mid-sentence never rebuilds the screen and wipes what was typed.
     if (turn.phase === 'picking' && !showing) {
       showing = true;
+      // The kind travels with the name: it decides how many sides that weapon
+      // lets its owner guard, which the move screen has to know before they
+      // choose.
       const weapons = (me.weaponNames.length ? me.weaponNames : ['Sword', 'Axe', 'Hammer'])
-        .map((name) => ({ name: name || 'Weapon' }));
+        .map((name, index) => ({
+          name: name || 'Weapon',
+          kind: me.weaponKinds?.[index] ?? 'offensive',
+        }));
       go(moveScreen(connection, weapons, me.characterName || me.name));
     }
   };

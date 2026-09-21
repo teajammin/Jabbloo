@@ -31,6 +31,10 @@ function fightFrom(body: Record<string, unknown>): FightContext {
     characterName: clampName(body['characterName'], 'The fighter'),
     weaponName: clampName(body['weaponName'], 'their weapon'),
     enemyName: clampName(body['enemyName'], 'their opponent'),
+    guardedSide: typeof body['guardedSide'] === 'string'
+      ? String(body['guardedSide']).slice(0, 8)
+      : '',
+    blocked: body['blocked'] === true,
   };
 }
 
