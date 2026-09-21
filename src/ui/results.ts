@@ -1,3 +1,4 @@
+import { setTrack } from '../music';
 import { el, button, goHome, type Screen } from './screens';
 import { bubbleText, titleHeight } from './bubbleText';
 import type { RoomConnection } from '../net/room';
@@ -16,6 +17,8 @@ import {
  */
 export function resultsScreen(connection: RoomConnection, isHost: boolean): Screen {
   return (root, go) => {
+    if (isHost) setTrack('theme');
+
     const title = el('div', { class: 'results-title' });
     const verdict = el('p', { class: 'lede' });
     const table = el('div', { class: 'results-grid' });

@@ -1,3 +1,4 @@
+import { duckMusic } from '../music';
 import { getSettings } from '../settings';
 import { LINES, lineUrl } from '../shared/lines';
 
@@ -224,13 +225,23 @@ export function say(id: string): void {
   const clip = source.cloneNode() as HTMLAudioElement;
   clip.volume = Math.max(0.15, getSettings().sfx);
   playing = clip;
+  /*
+   * The music steps back for as long as this is speaking.
+   *
+   * Done here rather than at every call site, so anything that ever speaks
+   * gets it without remembering to. A bed at full level under a voice reading
+   * out the fifty words somebody wrote turns them into mumbling.
+   */
+  duckMusic(true);
+  clip.addEventListener('ended', () => duckMusic(false), { once: true });
   // Autoplay rules, a missing file, a device with no output: none of them are
   // worth taking a fight down for.
-  void clip.play().catch(() => {});
+  void clip.play().catch(() => { duckMusic(false); });
 }
 
 /** Stops the recording mid-word. */
 function stopClip(): void {
+  duckMusic(false);
   if (!playing) return;
   playing.pause();
   playing = null;
@@ -262,9 +273,18 @@ export async function narrate(text: string): Promise<void> {
   // Rides the effects volume: it is part of the fight, not the music bed.
   utterance.volume = Math.max(0.15, getSettings().sfx);
 
+  duckMusic(true);
   await new Promise<void>((resolve) => {
     let settled = false;
-    const finish = () => { if (!settled) { settled = true; resolve(); } };
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      // Whichever way this ended — finished, failed, or never started — the
+      // music has to come back up, or one silent voice leaves it quiet for
+      // the rest of the game.
+      duckMusic(false);
+      resolve();
+    };
     utterance.addEventListener('end', finish, { once: true });
     utterance.addEventListener('error', finish, { once: true });
     // A voice that never starts must not hold up a fight.
@@ -293,6 +313,7 @@ export function resetNarrator(): void {
 
 /** Stops mid-sentence — for leaving a screen, or a fight being cut short. */
 export function hush(): void {
+  duckMusic(false);
   stopClip();
   if (canNarrate()) speechSynthesis.cancel();
 }

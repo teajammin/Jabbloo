@@ -1,3 +1,4 @@
+import { setTrack } from '../music';
 import { el, type Screen, goHome } from './screens';
 import { countdown } from './timer';
 import { bubbleText, titleHeight } from './bubbleText';
@@ -19,6 +20,8 @@ import { toCss } from '../engine/theme';
  */
 export function battlegroundScreen(connection: RoomConnection, isHost: boolean): Screen {
   return (root, go) => {
+    if (isHost) setTrack('theme');
+
     const clock = countdown();
     const heading = el('div', { class: 'ground-heading' });
     const grid = el('div', { class: 'ground-grid' });

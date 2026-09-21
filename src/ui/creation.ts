@@ -1,3 +1,4 @@
+import { setTrack } from '../music';
 import { el, button, type Screen, goHome } from './screens';
 import { countdown } from './timer';
 import { drawScreen } from './drawScreen';
@@ -22,6 +23,8 @@ import {
 
 export function creationScreen(connection: RoomConnection, isHost: boolean): Screen {
   return (root, go) => {
+    if (isHost) setTrack('theme');
+
     let lastStep = '';
     /** Set once this screen has handed over, so it cannot hand over twice. */
     let leaving = false;

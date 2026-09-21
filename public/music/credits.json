@@ -1,0 +1,21 @@
+{
+  "_note": "Where the music came from. Both filenames follow Pixabay's download naming (artist-title-id), so the licence below is inferred from that and is worth confirming before this game is shared widely.",
+  "battle": {
+    "file": "battle.mp3",
+    "from": "emmraan-home-work-267239.mp3",
+    "artist": "Emmraan",
+    "title": "Home Work",
+    "source": "https://pixabay.com/music/",
+    "licence": "Pixabay Content License (no attribution required)",
+    "plays": "during a fight"
+  },
+  "theme": {
+    "file": "theme.mp3",
+    "from": "sergequadrado-funny-friends-15545.mp3",
+    "artist": "SergeQuadrado",
+    "title": "Funny Friends",
+    "source": "https://pixabay.com/music/",
+    "licence": "Pixabay Content License (no attribution required)",
+    "plays": "everywhere else, on a loop"
+  }
+}

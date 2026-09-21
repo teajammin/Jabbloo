@@ -17,10 +17,33 @@ export type Cue = 'click' | 'whoosh' | 'hit' | 'fanfare' | 'countdown';
 let context: AudioContext | null = null;
 let unlocked = false;
 
+/** Told whenever a gesture lets sound start, so music can begin at the same moment. */
+const onUnlock = new Set<() => void>();
+
 /** Called from a real user gesture; anything earlier is refused by the browser. */
 export function unlockAudio(): void {
+  const first = !unlocked;
   unlocked = true;
   void context?.resume();
+  // Music asked for before the first tap has been waiting for this.
+  if (first) for (const listener of onUnlock) listener();
+}
+
+/** Runs when sound becomes allowed, or straight away if it already is. */
+export function whenAudioUnlocked(listener: () => void): void {
+  if (unlocked) { listener(); return; }
+  onUnlock.add(listener);
+}
+
+/**
+ * The shared audio context, for anything that needs more than a cue.
+ *
+ * One context rather than one each: browsers cap how many a page may have,
+ * and a second one created for music would be the one that fails to start on
+ * the laptop that has already opened a few tabs of this game.
+ */
+export function audioContext(): AudioContext | null {
+  return ensureContext();
 }
 
 function ensureContext(): AudioContext | null {

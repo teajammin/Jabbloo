@@ -1,3 +1,4 @@
+import { enableMusic, setTrack } from '../music';
 import { bubbleText, titleHeight } from './bubbleText';
 import { el, button, goHome, type Navigate, type Screen } from './screens';
 import { RoomConnection } from '../net/room';
@@ -32,6 +33,22 @@ export function lobbyScreen(
   join?: JoinDetails,
 ): Screen {
   return (root, go) => {
+    /*
+     * The big screen is the only one with music.
+     *
+     * Seven devices playing the same track, each a fraction of a second out
+     * from the others, is not music — and the phones are in people's hands
+     * being drawn on, which is not where a soundtrack belongs. Same rule the
+     * narrator already follows.
+     *
+     * Started here rather than at the front door because this is the first
+     * screen that knows which device is hosting.
+     */
+    if (isHost) {
+      enableMusic();
+      setTrack('theme');
+    }
+
     const connection = new RoomConnection(code);
     let handedOver = false;
 

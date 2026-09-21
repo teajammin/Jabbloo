@@ -1,3 +1,4 @@
+import { setTrack } from '../music';
 import { el, type Screen, goHome } from './screens';
 import { moveScreen } from './move';
 import { requestChoreography, requestJudgement } from '../api';
@@ -28,6 +29,11 @@ import {
 export function battleScreen(connection: RoomConnection, isHost: boolean): Screen {
   return (root, go) => {
     if (!isHost) return phoneView(connection, go, root);
+
+    // The fight has its own track. The theme comes back when the screen that
+    // follows this one asks for it.
+    setTrack('battle');
+
 
     let disposed = false;
     let art: PlayerArt[] | null = null;
