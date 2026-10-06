@@ -35,6 +35,7 @@ function fightFrom(body: Record<string, unknown>): FightContext {
       ? String(body['guardedSide']).slice(0, 8)
       : '',
     blocked: body['blocked'] === true,
+    partlyBlocked: body['partlyBlocked'] === true,
   };
 }
 

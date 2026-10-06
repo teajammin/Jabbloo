@@ -1854,13 +1854,21 @@ body:has(.screen-draw) .backdrop { display: none; }
  * the same weight as the fifty words underneath, and a row of four buttons
  * under a label reads like a setting somebody forgot to default.
  */
+/*
+ * Tight around the box, generous around each arrow.
+ *
+ * The padding was the wrong way round: a thick margin held the box away from
+ * everything while the four targets inside it were crowded against each
+ * other, which on a phone is the one place the spacing matters — these are
+ * tapped in a hurry against a clock.
+ */
 .strategy-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   width: 100%;
-  padding: 12px;
+  padding: 6px 4px 8px;
   border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
@@ -1881,8 +1889,8 @@ body:has(.screen-draw) .backdrop { display: none; }
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, auto);
-  gap: 6px;
-  width: min(280px, 100%);
+  gap: 10px;
+  width: min(300px, 100%);
 }
 
 .side-pick.side-top { grid-area: 1 / 2; }
@@ -1894,9 +1902,9 @@ body:has(.screen-draw) .backdrop { display: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  padding: 8px 4px;
-  min-height: 52px;
+  gap: 2px;
+  padding: 14px 10px;
+  min-height: 62px;
   border: none;
   border-radius: 14px;
   background: var(--paper);
@@ -1921,10 +1929,11 @@ body:has(.screen-draw) .backdrop { display: none; }
 .side-pick[aria-pressed='true'] .side-word { opacity: 0.9; }
 
 @media (max-width: 480px) {
-  .strategy-box { padding: 9px; gap: 6px; }
+  .strategy-box { padding: 4px 2px 6px; gap: 4px; }
   .strategy-title { font-size: 15px; }
-  .side-grid { width: min(240px, 100%); gap: 5px; }
-  .side-pick { min-height: 46px; padding: 6px 3px; }
+  .strategy-what { font-size: 12px; }
+  .side-grid { width: min(270px, 100%); gap: 9px; }
+  .side-pick { min-height: 58px; padding: 12px 8px; }
 }
 
 /* ----------------------------------------------------------------- results */

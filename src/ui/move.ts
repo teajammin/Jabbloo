@@ -4,7 +4,7 @@ import { play } from '../audio';
 import { suggestionsFor } from '../shared/suggestions';
 import type { RoomConnection } from '../net/room';
 import {
-  MAX_PROMPT_WORDS, MOVE_SECONDS, isFinalRound, wordCount, SIDES, guardsFor,
+  MAX_PROMPT_WORDS, MOVE_SECONDS, isFinalRound, wordCount, SIDES, guardsFor, attacksFor,
   type RoomState, type Side, type WeaponKind,
 } from '../shared/protocol';
 
@@ -58,7 +58,7 @@ export function moveScreen(
      * side has anything to go on but the other one's habits.
      */
     let defend: Side[] = ['left'];
-    let attack: Side = 'right';
+    let attack: Side[] = ['right'];
 
     const clock = countdown();
     const heading = el('h1', { class: 'creation-title' }, 'Your turn');
@@ -136,25 +136,45 @@ export function moveScreen(
 
     const defenceNote = el('p', { class: 'side-note' });
     const defencePicker = sidePicker('is-defence', (chosen) => { defend = chosen; });
-    const attackPicker = sidePicker('is-attack', (chosen) => {
-      attack = chosen[0] ?? 'right';
-    });
+    const attackNote = el('p', { class: 'side-note' });
+    const attackPicker = sidePicker('is-attack', (chosen) => { attack = chosen; });
 
-    /** Re-reads the chosen weapon: a shield guards two sides, a sword one. */
+    /** Fills a choice out to the number of sides the weapon allows. */
+    function fit(chosen: Side[], allowed: number): Side[] {
+      const next = chosen.slice(-allowed);
+      for (const side of SIDES) {
+        if (next.length >= allowed) break;
+        if (!next.includes(side)) next.push(side);
+      }
+      return next;
+    }
+
+    /**
+     * Re-reads the chosen weapon.
+     *
+     * A shield guards two sides and strikes one; a sword strikes two and
+     * guards one. Both numbers move together when the weapon changes, and
+     * leaving a stale one on screen would promise something the server is not
+     * going to honour.
+     */
     function refreshGuards(): void {
       const kind = weapons[weapon]?.kind ?? 'offensive';
-      const allowed = guardsFor(kind);
-      if (defend.length > allowed) defend = defend.slice(-allowed);
-      while (defend.length < allowed) {
-        const spare = SIDES.find((side) => !defend.includes(side));
-        if (!spare) break;
-        defend = [...defend, spare];
-      }
-      defencePicker.set(defend, allowed);
-      attackPicker.set([attack], 1);
-      defenceNote.textContent = allowed > 1
+      const guards = guardsFor(kind);
+      const attacks = attacksFor(kind);
+
+      defend = fit(defend, guards);
+      attack = fit(attack, attacks);
+      defencePicker.set(defend, guards);
+      attackPicker.set(attack, attacks);
+
+      defenceNote.textContent = guards > 1
         ? 'A defensive weapon guards two sides — pick both.'
-        : 'Pick the side you guard. An offensive weapon guards one.';
+        : 'A defensive weapon would guard two. This one guards one.';
+      attackNote.textContent = attacks > 1
+        ? 'An offensive weapon strikes two sides — pick both. Every side they '
+          + 'guard takes something off the blow.'
+        : 'One side, all or nothing. Guard the side they strike and their hit '
+          + 'is halved — and the same for yours.';
     }
 
     function describe(): void {
@@ -284,8 +304,7 @@ export function moveScreen(
           el('h2', { class: 'strategy-title' }, 'Offensive position'),
           el('p', { class: 'strategy-what' }, 'Where will you strike them?'),
           attackPicker.root,
-          el('p', { class: 'side-note' },
-            'Guard the side they strike and their hit is halved. So is yours if they guess yours.')),
+          attackNote),
         el('h2', { class: 'strategy-title' }, 'How you fight'),
         prompt,
         el('div', { class: 'tool-row' }, counter),

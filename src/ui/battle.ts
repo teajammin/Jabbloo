@@ -230,6 +230,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         fighter.destroy();
       }
       onStage = new Map();
+      stage.clearGuards();
       stage.clearHealthBars();
       bars = new Map();
 
@@ -444,7 +445,11 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
 
         const weaponName = entry?.weapons[move.weapon]?.name ?? attacker.weaponName;
         const guarding = turn.moves[defenderId]?.defend ?? [];
-        const stopped = turn.guarded[attackerId] === true;
+        const striking = move.attack ?? [];
+        // Fully caught is what reads as a miss; a blow that got through in one
+        // of the two places it landed is still a hit, for less.
+        const caught = turn.guarded[attackerId] ?? 0;
+        const stopped = caught >= 1;
         const response = await requestChoreography({
           prompt: move.prompt || 'swing the weapon at them',
           characterName: attacker.name,
@@ -453,7 +458,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
           // Written towards the outcome it already has: a blow the health bar
           // is about to halve should look like it was stopped.
           ...(guarding.length ? { guardedSide: guarding.join(' and ') } : {}),
-          ...(stopped ? { blocked: true } : {}),
+          ...(stopped ? { blocked: true } : caught > 0 ? { partlyBlocked: true } : {}),
           ...credentials(),
         });
         if (disposed) return;
@@ -514,8 +519,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
          * caught anything was settled on the server when both moves came in,
          * so the picture and the health bar cannot disagree.
          */
-        const dropGuard = guarding.length > 0
-          ? stage.showGuard(defender, guarding)
+        const dropGuard = guarding.length > 0 || striking.length > 0
+          ? stage.showSides(defender, { guarded: guarding, attacked: striking })
           : () => {};
 
         const playback = engine.playChoreography(
@@ -542,7 +547,7 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         // Whether the guessing came off. Without this a blocked blow is only
         // a blow that did less damage, and the round's whole decision never
         // appears on screen.
-        await stage.callResult(defender, !turn.guarded[attackerId]);
+        await stage.callResult(defender, !stopped);
         dropGuard();
         if (disposed) return;
 

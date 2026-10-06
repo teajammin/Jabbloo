@@ -14,8 +14,10 @@ export interface FightContext {
   prompt: string;
   /** Where the opponent is holding their guard, if anywhere. */
   guardedSide?: string;
-  /** Whether that guard is about to catch this blow. */
+  /** Whether that guard is about to catch this blow whole. */
   blocked?: boolean;
+  /** Whether it catches some of it — an attack in two places, guarded in one. */
+  partlyBlocked?: boolean;
 }
 
 export const SYSTEM_PROMPT = `You are the choreographer for Jabbloo, a silly multiplayer fighting game where players draw their own characters and weapons, then describe how they attack.
@@ -269,7 +271,13 @@ export function buildUserMessage(fight: FightContext): string {
         `the blow should be deflected, glance off, or be caught — never connect`,
         `cleanly. End with the attacker rebuffed rather than the opponent hurt.`,
       ]
-      : []),
+      : fight.partlyBlocked
+        ? [
+          `That guard catches PART of this attack. Choreograph it half-stopped:`,
+          `the first of it is turned aside and the rest gets through. It should`,
+          `land, but scrappily — not the clean hit it was meant to be.`,
+        ]
+        : []),
     ``,
     `The player says:`,
     `"${fight.prompt}"`,

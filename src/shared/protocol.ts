@@ -73,6 +73,19 @@ export function guardsFor(kind: WeaponKind | undefined): number {
 }
 
 /**
+ * How many sides a weapon strikes at once.
+ *
+ * The mirror of the guard count, and what makes the two kinds trades rather
+ * than a better and a worse: an offensive weapon hits harder and at two
+ * places, which is far harder to shut out completely — and impossible to get
+ * entirely clean, because a defender covering either place takes something
+ * off it. A defensive weapon strikes one place, all or nothing.
+ */
+export function attacksFor(kind: WeaponKind | undefined): number {
+  return kind === 'defensive' ? 1 : 2;
+}
+
+/**
  * What a blocked hit is worth.
  *
  * Half, not nothing: a guess that came off should change the round without
@@ -82,14 +95,27 @@ export function guardsFor(kind: WeaponKind | undefined): number {
 export const BLOCKED_DAMAGE = 0.5;
 
 /**
- * Whether a guard caught the blow.
+ * How much of a blow a guard caught, from none of it to all of it.
  *
- * The defender's own move carries where they guarded — both players commit
- * before either sees anything, which is the whole point of choosing.
+ * Proportional rather than yes-or-no, because an attack can land in two
+ * places and a guard can cover one of them. Covering one of two takes half
+ * the blow's exposure away; covering both takes all of it. An attack in one
+ * place is the same rule with nothing to be partial about.
+ *
+ * Both players commit before either sees anything, which is the whole point
+ * of choosing.
  */
-export function blocked(attack: Move | undefined, defence: Move | undefined): boolean {
-  if (!attack || !defence) return false;
-  return defence.defend.includes(attack.attack);
+export function caughtFraction(attack: Move | undefined, defence: Move | undefined): number {
+  if (!attack || !defence) return 0;
+  const aimed = attack.attack;
+  if (aimed.length === 0) return 0;
+  const caught = aimed.filter((side) => defence.defend.includes(side)).length;
+  return caught / aimed.length;
+}
+
+/** Whether a guard caught the whole blow, which is what reads as a miss. */
+export function fullyBlocked(attack: Move | undefined, defence: Move | undefined): boolean {
+  return caughtFraction(attack, defence) >= 1;
 }
 
 /**
@@ -110,14 +136,17 @@ export function damageFor(input: {
   scored: number;
   /** Whether the weapon used was an offensive one. */
   offensive: boolean;
-  /** Whether the defender guarded the side it came at. */
-  guarded: boolean;
+  /** How much of it the guard caught, 0 to 1. See [[caughtFraction]]. */
+  caught: number;
   /** The last-round multiplier, or 1 on any other round. */
   multiplier: number;
 }): number {
   let dealt = input.scored;
   if (input.offensive) dealt += OFFENSIVE_BONUS;
-  if (input.guarded) dealt *= BLOCKED_DAMAGE;
+  // A fully caught blow keeps [[BLOCKED_DAMAGE]] of itself; a half-caught one
+  // loses half of what a full catch would have taken off it.
+  const caught = Math.max(0, Math.min(1, input.caught));
+  dealt *= 1 - (1 - BLOCKED_DAMAGE) * caught;
   return dealt * input.multiplier;
 }
 
@@ -406,8 +435,13 @@ export interface Move {
    * phone was older than this feature.
    */
   defend: Side[];
-  /** Where they are aiming. */
-  attack: Side;
+  /**
+   * Where they are aiming.
+   *
+   * A list for the same reason `defend` is one: an offensive weapon strikes
+   * two places at once.
+   */
+  attack: Side[];
 }
 
 /** What is happening on the battle stage right now. */
@@ -441,8 +475,12 @@ export interface Turn {
    * Settled before the exchange plays rather than during judging, because the
    * big screen has to show the guard catching the blow as it happens — and a
    * result the animation invented for itself could disagree with the damage.
+   *
+   * How much of it was caught rather than whether it was: an attack on two
+   * sides against a guard on one is half stopped, and both the damage and the
+   * picture have to agree about that.
    */
-  guarded: Record<string, boolean>;
+  guarded: Record<string, number>;
   /** What the AI judge said, shown on the big screen. */
   notes: Record<string, string>;
   /**
@@ -569,7 +607,7 @@ export type ClientMessage =
   | { type: 'voteBattleground'; id: string }
   /** The host asks for everyone's artwork once the battle starts. */
   | { type: 'requestArt' }
-  | { type: 'submitMove'; weapon: number; prompt: string; defend?: Side[]; attack?: Side }
+  | { type: 'submitMove'; weapon: number; prompt: string; defend?: Side[]; attack?: Side[] }
   /** The host reports that the exchange has finished playing. */
   /** The host reports the exchange has finished playing; judging opens. */
   | { type: 'turnPlayed' }

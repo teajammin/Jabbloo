@@ -43,7 +43,8 @@ import {
   type Side,
   SIDES,
   guardsFor,
-  blocked,
+  caughtFraction,
+  attacksFor,
   damageFor,
   type ServerMessage,
 } from '../src/shared/protocol';
@@ -79,6 +80,14 @@ const BOT_MOVES = [
 const pick = <T>(items: readonly T[]): T =>
   items[Math.floor(Math.random() * items.length)]!;
 
+/**
+ * How long the board is held after the final vote.
+ *
+ * Long enough to look up and see what everybody chose, short enough that it
+ * reads as a pause before the draw rather than as the game having stalled.
+ */
+const LAST_VOTE_PAUSE_MS = 1400;
+
 /** What the bot plays on behalf of a player who is not there. */
 function botMove(player: Player): Move {
   const weapon = Math.floor(Math.random() * Math.max(1, player.weaponNames.length));
@@ -87,8 +96,8 @@ function botMove(player: Player): Move {
   return {
     weapon,
     prompt: pick(BOT_MOVES),
-    defend: pickGuards(guardsFor(player.weaponKinds[weapon])),
-    attack: pick([...SIDES]),
+    defend: pickSides(guardsFor(player.weaponKinds[weapon])),
+    attack: pickSides(attacksFor(player.weaponKinds[weapon])),
   };
 }
 
@@ -103,32 +112,39 @@ function botMove(player: Player): Move {
  */
 function sidesFrom(
   message: { defend?: unknown; attack?: unknown },
-  allowed: number,
-): { defend: Side[]; attack: Side } {
+  guards: number,
+  attacks: number,
+): { defend: Side[]; attack: Side[] } {
+  return {
+    defend: cleanSides(message.defend, guards),
+    attack: cleanSides(message.attack, attacks),
+  };
+}
+
+/** A list of distinct real sides, exactly as long as the weapon allows. */
+function cleanSides(offered: unknown, allowed: number): Side[] {
   const asSide = (value: unknown): Side | null =>
     typeof value === 'string' && (SIDES as readonly string[]).includes(value)
       ? value as Side
       : null;
 
-  const offered = Array.isArray(message.defend) ? message.defend : [];
-  const defend: Side[] = [];
-  for (const value of offered) {
+  const chosen: Side[] = [];
+  // A bare string is what a client from before this was a list would send.
+  const list = Array.isArray(offered) ? offered : [offered];
+  for (const value of list) {
     const side = asSide(value);
-    if (side && !defend.includes(side) && defend.length < allowed) defend.push(side);
+    if (side && !chosen.includes(side) && chosen.length < allowed) chosen.push(side);
   }
-  // Short of what the weapon allows — including none at all — is topped up,
-  // so a defensive weapon always guards the two sides it was chosen for.
-  if (defend.length < allowed) {
-    for (const side of pickGuards(allowed)) {
-      if (!defend.includes(side) && defend.length < allowed) defend.push(side);
-    }
+  // Short of what the weapon allows — including none at all — is topped up, so
+  // a weapon always covers or strikes the number of places it was chosen for.
+  for (const side of pickSides(allowed)) {
+    if (!chosen.includes(side) && chosen.length < allowed) chosen.push(side);
   }
-
-  return { defend, attack: asSide(message.attack) ?? pick([...SIDES]) };
+  return chosen;
 }
 
-/** A set of distinct sides to guard, of the size a weapon allows. */
-function pickGuards(count: number): Side[] {
+/** A set of distinct sides, of the size a weapon allows. */
+function pickSides(count: number): Side[] {
   const left = [...SIDES];
   const chosen: Side[] = [];
   while (chosen.length < count && left.length > 0) {
@@ -996,9 +1012,22 @@ export default class Room implements Party.Server {
     this.state.votes[player.id] = id;
     this.broadcastState();
 
-    // Close as soon as everyone has picked; nobody should sit out the clock.
+    /*
+     * Close once everyone has picked — but not in the same breath.
+     *
+     * It used to close the instant the last vote arrived, which meant the
+     * last person's pick appeared and the draw started in the same frame.
+     * Nobody ever saw both choices on the board: the screen exists to show
+     * who wanted what before the draw makes it moot, and it was showing that
+     * for one player only.
+     *
+     * Still nobody sitting out the clock — a beat, not a wait.
+     */
     const waiting = voters(this.state).filter((p) => p.connected && !this.state.votes[p.id]);
-    if (waiting.length === 0) this.closeVote();
+    if (waiting.length === 0) {
+      if (this.stepTimer) clearTimeout(this.stepTimer);
+      this.stepTimer = setTimeout(() => this.closeVote(), LAST_VOTE_PAUSE_MS);
+    }
   }
 
   /**
@@ -1270,7 +1299,11 @@ export default class Room implements Party.Server {
     turn.moves[sender.id] = {
       weapon: slot,
       prompt: trimPrompt(prompt),
-      ...sidesFrom(sides, guardsFor(player?.weaponKinds[slot])),
+      ...sidesFrom(
+        sides,
+        guardsFor(player?.weaponKinds[slot]),
+        attacksFor(player?.weaponKinds[slot]),
+      ),
     };
     this.broadcastState();
 
@@ -1303,8 +1336,8 @@ export default class Room implements Party.Server {
         : {
           weapon: 0,
           prompt: '',
-          defend: pickGuards(guardsFor(player?.weaponKinds[0])),
-          attack: pick([...SIDES]),
+          defend: pickSides(guardsFor(player?.weaponKinds[0])),
+          attack: pickSides(attacksFor(player?.weaponKinds[0])),
         };
     }
 
@@ -1318,7 +1351,7 @@ export default class Room implements Party.Server {
      */
     for (const attackerId of turn.fighters) {
       const defenderId = turn.fighters.find((id) => id !== attackerId);
-      turn.guarded[attackerId] = blocked(
+      turn.guarded[attackerId] = caughtFraction(
         turn.moves[attackerId],
         defenderId ? turn.moves[defenderId] : undefined,
       );
@@ -1415,7 +1448,7 @@ export default class Room implements Party.Server {
       const dealt = damageFor({
         scored: averageScore(turn, attackerId),
         offensive,
-        guarded: turn.guarded[attackerId] ?? false,
+        caught: turn.guarded[attackerId] ?? 0,
         multiplier: final ? FINAL_ROUND_MULTIPLIER : 1,
       });
       turn.damage[attackerId] = dealt;

@@ -54,7 +54,7 @@ ws.addEventListener('message', (e) => {
   const m = JSON.parse(e.data);
   if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); return; }
   if (m.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(m.params.type)) {
-    logs.push(m.params.type + ': ' + m.params.args.map((a) => a.value ?? a.description ?? '').join(' ').slice(0, 180));
+    logs.push(m.params.type + ': ' + m.params.args.map((a) => a.value ?? a.description ?? '').join(' ').slice(0, process.env['E2E_STACK'] ? 1200 : 180));
   }
   if (m.method === 'Runtime.exceptionThrown') {
     const d = m.params.exceptionDetails?.exception?.description

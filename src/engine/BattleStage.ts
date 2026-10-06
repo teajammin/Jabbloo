@@ -48,6 +48,18 @@ export class BattleStage {
   readonly fighters = new Container();
   /** Where projectiles, beams and impacts live. Above fighters, below UI. */
   readonly effects = new Container();
+  /**
+   * Guards, which belong to the whole exchange rather than to one blow.
+   *
+   * Separate from `effects` because that layer is emptied between moves and a
+   * raised shield is not a spent effect — it stands for a choice made before
+   * either fighter moved and has to still be there when the blow arrives. It
+   * was in `effects`, and `reset()` destroyed the sprites while their own
+   * pulse was still animating them: reading `.scale` on a destroyed sprite
+   * throws inside the animation ticker, which stops every tween on the page.
+   * The fight froze on the first exchange.
+   */
+  readonly guards = new Container();
   readonly overlay = new Container();
 
   private readonly backdrop = new Graphics();
@@ -90,6 +102,7 @@ export class BattleStage {
     this.world.addChild(this.ground);
     this.world.addChild(this.fighters);
     this.world.addChild(this.effects);
+    this.world.addChild(this.guards);
     this.app.stage.addChild(this.world);
     this.app.stage.addChild(this.overlay);
 
@@ -237,52 +250,106 @@ export class BattleStage {
     tl.to(text.scale, { x: 1, y: 1, duration: 0.12 });
     tl.to(text, { y: text.y - 90, duration: 1.1, ease: 'power2.out' }, 0);
     tl.to(text, { alpha: 0, duration: 0.4, ease: 'power2.in' }, 0.7);
-    tl.eventCallback('onComplete', () => { if (!text.destroyed) text.destroy(); });
+    tl.eventCallback('onComplete', () => {
+      // Same rule as everywhere: stop animating it, then take it away.
+      gsap.killTweensOf([text, text.scale]);
+      if (!text.destroyed) text.destroy();
+    });
   }
 
   /**
-   * Raises a guard on the sides a fighter chose to cover.
+   * Shows what both fighters chose, around the one being attacked.
    *
-   * Shown before the blow rather than as it lands, because the guess was made
-   * before either player saw anything and the screen should say so: the shield
-   * is up, and then it is either in the way or it is not.
+   * Four blind choices decide how much of a blow lands and none of them were
+   * visible: the health bar moved by a different amount and nobody could see
+   * why. Each struck side is marked on the defender — red where the blow got
+   * through, green where the guard caught it — and a shield sits on every
+   * side they covered.
    *
-   * Returns the way to take it down again — whoever put it up is the only one
-   * who knows when the exchange it belongs to is finished.
+   * Kept very faint on purpose. This is the fight's reasoning shown in the
+   * margin, not a heads-up display over the top of the artwork people drew.
+   *
+   * Returns the way to take it all down again: whoever put it up is the only
+   * one who knows when the exchange it belongs to has finished.
    */
-  showGuard(fighter: Fighter, sides: readonly GuardSide[]): () => void {
+  showSides(
+    fighter: Fighter,
+    choice: { guarded: readonly GuardSide[]; attacked: readonly GuardSide[] },
+  ): () => void {
     const shields: Sprite[] = [];
+    const panels: Graphics[] = [];
+    const pulses: gsap.core.Tween[] = [];
+
     const reach = Math.max(fighter.height * 0.42, 54);
     const middle = fighter.root.y - fighter.height * 0.5;
+    const at = (side: GuardSide) => ({
+      x: fighter.root.x + (side === 'left' ? -reach : side === 'right' ? reach : 0),
+      y: side === 'top' ? middle - reach : side === 'bottom' ? middle + reach : middle,
+    });
 
-    for (const side of sides) {
-      const shield = spawnEffect(this.effects, 'shield', {
-        x: fighter.root.x + (side === 'left' ? -reach : side === 'right' ? reach : 0),
-        y: side === 'top' ? middle - reach
-          : side === 'bottom' ? middle + reach
-            : middle,
+    // The struck sides, coloured by what became of them.
+    for (const side of choice.attacked) {
+      const caught = choice.guarded.includes(side);
+      const spot = at(side);
+      const size = Math.max(fighter.height * 0.34, 44);
+
+      const panel = new Graphics();
+      panel.beginFill(caught ? 0x6ee07f : 0xf0555f, 1);
+      panel.drawRoundedRect(-size / 2, -size / 2, size, size, size * 0.28);
+      panel.endFill();
+      panel.position.set(spot.x, spot.y);
+      panel.alpha = 0;
+      this.guards.addChild(panel);
+      panels.push(panel);
+      // Very dim: enough to read as a colour on that side of them, not enough
+      // to sit on top of the drawing.
+      gsap.to(panel, { alpha: caught ? 0.16 : 0.2, duration: 0.3, ease: 'power2.out' });
+    }
+
+    for (const side of choice.guarded) {
+      const spot = at(side);
+      const shield = spawnEffect(this.guards, 'shield', {
+        x: spot.x,
+        y: spot.y,
         height: fighter.height * 0.42,
       });
       if (!shield) continue;
       shield.alpha = 0;
       shields.push(shield);
-      gsap.fromTo(shield,
-        { alpha: 0 },
-        { alpha: 0.85, duration: 0.22, ease: 'power2.out' });
-      // A slow breath, so a guard that is up for a whole exchange does not
-      // read as a sticker somebody left on the screen.
-      gsap.to(shield.scale, {
+      gsap.fromTo(shield, { alpha: 0 }, { alpha: 0.85, duration: 0.22, ease: 'power2.out' });
+      pulses.push(gsap.to(shield.scale, {
         x: shield.scale.x * 1.06, y: shield.scale.y * 1.06,
         duration: 0.9, repeat: -1, yoyo: true, ease: 'sine.inOut',
-      });
+        /*
+         * A tween that never ends has to check its target is still there.
+         *
+         * Nothing else on this stage runs forever, so nothing else can be
+         * caught out by something destroying what it animates. This one can,
+         * and the cost of being wrong is every animation on the page stopping
+         * at once — which is exactly how the fight froze on the first
+         * exchange — so it checks rather than trusting its owner to tidy up.
+         */
+        onUpdate: function (this: gsap.core.Tween) {
+          if (shield.destroyed) this.kill();
+        },
+      }));
     }
 
     return () => {
-      for (const shield of shields) {
-        gsap.killTweensOf([shield, shield.scale]);
-        if (!shield.destroyed) shield.destroy();
+      // Tweens first, always: killing them after the destroy leaves a frame in
+      // which one of them can still touch what is no longer there.
+      for (const pulse of pulses) pulse.kill();
+      for (const thing of [...shields, ...panels]) {
+        // Checked before anything is read off it. `scale` on a destroyed
+        // display object throws, and this runs after a whole exchange during
+        // which something else may well have tidied up first.
+        if (thing.destroyed) continue;
+        gsap.killTweensOf([thing, thing.scale]);
+        thing.destroy();
       }
       shields.length = 0;
+      panels.length = 0;
+      pulses.length = 0;
     };
   }
 
@@ -560,13 +627,48 @@ export class BattleStage {
    * Restores the opening tableau: everyone back on their mark in a neutral
    * pose, and any screen shake offset cleared.
    */
+  /**
+   * Clears the stage between moves.
+   *
+   * Deliberately leaves the guards alone. This runs at the start of every
+   * choreography, and a choreography is one blow inside an exchange — while
+   * the shields standing around the defender belong to the exchange as a
+   * whole. Sweeping them here destroyed them a moment after they were raised
+   * and a moment before the code that raised them tried to take them down,
+   * which threw, killed the exchange loop, and froze the fight on its first
+   * attack. They are cleared by whoever raised them, or by `clearGuards`.
+   */
   reset(): void {
     this.world.position.set(0, 0);
+    /*
+     * Tweens die with what they animate, and before it.
+     *
+     * Destroying a display object leaves any tween still running on it
+     * reading properties off a null transform, and that throw happens inside
+     * the animation ticker — which stops every other tween on the page. One
+     * effect swept away half a frame early is the difference between a
+     * flourish ending and a fight freezing where it stands.
+     */
+    for (const child of this.effects.children) gsap.killTweensOf([child, child.scale]);
     this.effects.removeChildren().forEach((child) => child.destroy());
     for (const [fighter, side] of this.sides) {
       fighter.resetPose();
       this.place(fighter, side);
     }
+  }
+
+  /**
+   * Takes down every guard, whoever put it there.
+   *
+   * For the end of a turn, and for anything that went wrong in the middle of
+   * one: the fighters are about to leave, and a shield left hanging in the
+   * air beside nobody is worse than one that never appeared.
+   */
+  clearGuards(): void {
+    for (const child of this.guards.children) {
+      gsap.killTweensOf([child, child.scale]);
+    }
+    this.guards.removeChildren().forEach((child) => child.destroy());
   }
 
   /** The fighters currently on stage, in insertion order. */

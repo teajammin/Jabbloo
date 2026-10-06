@@ -315,10 +315,12 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
       attack?.click();
       const move = connection.sent.find((m) => m.type === 'submitMove');
       check('the sides chosen are the sides sent',
-        move?.defend?.includes('top') === true && move?.attack === 'bottom',
+        move?.defend?.includes('top') === true && move?.attack?.includes('bottom') === true,
         JSON.stringify(move));
       check('an offensive weapon guards exactly one side',
         move?.defend?.length === 1, JSON.stringify(move?.defend));
+      check('and strikes exactly two',
+        move?.attack?.length === 2, JSON.stringify(move?.attack));
     });
 }
 
@@ -336,6 +338,7 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
       attack?.click();
       const move = connection.sent.find((m) => m.type === 'submitMove');
       check('and sends both of them', move?.defend?.length === 2, JSON.stringify(move?.defend));
+      check('while striking only one', move?.attack?.length === 1, JSON.stringify(move?.attack));
     });
 }
 

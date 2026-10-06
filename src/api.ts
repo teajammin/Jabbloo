@@ -21,6 +21,7 @@ export interface ChoreographRequest {
    */
   guardedSide?: string;
   blocked?: boolean;
+  partlyBlocked?: boolean;
   /**
    * Which game this is for, and which screen is asking.
    *
