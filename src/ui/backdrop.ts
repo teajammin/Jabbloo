@@ -12,7 +12,7 @@ import { getSettings, onSettingsChange } from '../settings';
  * Over them, a fixed film of noise, which is what stops a large area of flat
  * dark looking like an empty div.
  *
- * The colours are deep versions of the game's own: the ink the page is drawn
+ * The colours are the game's own candy at full strength: the ground is where
  * on, warmed toward plum on one side and cooled toward indigo and teal on the
  * other. They are meant to be noticed only if you look for them — the accents
  * and the players' drawings are what should carry colour.
@@ -24,18 +24,23 @@ import { getSettings, onSettingsChange } from '../settings';
 /**
  * The lights: a colour, how big it is, and the small journey it makes.
  *
- * Each is only a few shades off the paper it sits on. On a dark ground a
- * little colour goes a long way, and these are meant to be felt rather than
- * looked at — the accents and the players' drawings carry the colour.
+ * Each is a saturated field rather than a tint, large enough to own a corner
+ * of the screen. That is the whole correction: the ground used to be one flat
+ * dark rectangle with small accents on top of it, which is what made a game
+ * built out of candy colours read as muted.
  *
- * Journeys are short on purpose. The colours move around a little; they do not
- * travel.
+ * Journeys are short on purpose. The fields drift; they do not travel. A ground
+ * that moves enough to notice competes with the drawings on top of it.
  */
 const LIGHTS = [
-  { colour: '#4a3568', size: 78, from: [22, 28], to: [34, 40], seconds: 46 },  // plum
-  { colour: '#2f3a6b', size: 86, from: [74, 22], to: [62, 34], seconds: 58 },  // indigo
-  { colour: '#26505c', size: 72, from: [28, 76], to: [40, 64], seconds: 52 },  // teal
-  { colour: '#4a2f52', size: 64, from: [78, 74], to: [66, 62], seconds: 64 },  // mauve
+  // Gumball Fields: a violet ground with saturated gumballs pushing in from
+  // the corners. Deliberately larger and far more saturated than the plum wash
+  // they replace — colour owning whole regions is the point, and a dark flat
+  // ground with small accents on top is exactly what read as muted.
+  { colour: '#ffd84d', size: 92, from: [88, 6], to: [74, 18], seconds: 54 },   // lemon
+  { colour: '#ff5c8a', size: 104, from: [4, 86], to: [18, 72], seconds: 62 },  // bubblegum
+  { colour: '#3fd9c0', size: 86, from: [94, 92], to: [80, 78], seconds: 50 },  // spearmint
+  { colour: '#8a5cff', size: 110, from: [40, 34], to: [54, 46], seconds: 70 }, // grape
 ];
 
 /**
@@ -72,7 +77,7 @@ export function mountBackdrop(): () => void {
     const light = document.createElement('div');
     light.className = 'backdrop-light';
     light.style.background =
-      `radial-gradient(circle at center, ${colour} 0%, ${colour} 30%, ${colour}00 70%)`;
+      `radial-gradient(circle at center, ${colour} 0%, ${colour} 34%, ${colour}00 72%)`;
     light.style.width = `${size}%`;
     light.style.left = `${from[0]}%`;
     light.style.top = `${from[1]}%`;

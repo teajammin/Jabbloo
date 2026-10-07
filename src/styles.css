@@ -21,24 +21,45 @@
  * change of mind is a change here and nowhere else.
  */
 :root {
-  /* Surfaces, from the back of the screen forward. */
-  --paper: #211d2c;
-  --panel: #2c2739;
-  --panel-high: #383049;
-  --line: rgba(244, 238, 251, 0.14);
+  /*
+   * Surfaces, from the back of the screen forward.
+   *
+   * Gumball Fields: the ground is grape, not near-black, and the drifting
+   * fields in src/ui/backdrop.ts are saturated enough to own the corners they
+   * sit in. The chrome above it is the same hue carried darker, so a toolbar
+   * belongs to the ground instead of floating on it.
+   */
+  --paper: #3a2a6e;
+  --panel: #2e1f5c;
+  --panel-high: #412e7d;
+  --line: rgba(255, 253, 247, 0.18);
 
   /* Type. */
   --text: #f4eefb;
   --text-dim: #a79cba;
-  --on-accent: #1a1622;
+  --on-accent: #33260a;
 
   /* Accents. One does the leading; the rest are for meaning. */
-  --accent: #9a7bf0;
-  --team-a: #e8746a;
-  --team-b: #3fb6c4;
-  --judge: #9a7bf0;
-  --waiting: #e8b155;
-  --good: #7ed39b;
+  --accent: #ffd84d;
+  --accent-deep: #c9a013;
+  --team-a: #ff5c8a;
+  --team-b: #3fd9c0;
+  --judge: #c6a0ff;
+  --waiting: #ffb347;
+  --good: #4ade80;
+
+  /*
+   * Guard and strike, one vocabulary everywhere.
+   *
+   * The same green and red the arena already paints on a defender's sides, so
+   * what a player presses on their phone and what the room watches land are
+   * the same two colours. A side that is both guarded and struck shows one
+   * sticker split corner to corner, green half and red half.
+   */
+  --guard: #4ade80;
+  --guard-ink: #04291a;
+  --strike: #ff4d5e;
+  --strike-ink: #ffffff;
 
   /*
    * A plain figure, for a player who brought no photo of their own.
@@ -62,6 +83,23 @@
   --lavender: #c9b6ec;
   --blossom: #f7a8c4;
   --peach: #ffc49b;
+
+  /*
+   * Sticker stock.
+   *
+   * A sticker is paper whatever you stick it on, so the stock does not change
+   * with the ground: cream, a white kiss-cut margin, an ink die line, a seated
+   * drop. Built out of translucency instead, the same markup reads as a glass
+   * panel and the sticker idea evaporates — which is exactly what happened to
+   * four of the five palettes before this one was chosen.
+   */
+  --stock: #fffdf7;
+  --die: #ffffff;
+  --die-ink: #2c1a5c;
+  --die-shade: #4a2fa8;
+  --die-ghost: rgba(255, 253, 247, 0.42);
+  --on-stock: #2c1a5c;
+  --on-stock-dim: #6b5a9e;
 
   --radius: 28px;
   /* On a dark ground a chunky ink shadow disappears; depth comes from a lift
@@ -1845,51 +1883,106 @@ body:has(.screen-draw) .backdrop { display: none; }
 .kind-pick.is-defensive[aria-pressed='true'] { background: var(--mint); color: var(--on-accent); }
 .kind-pick[aria-pressed='true'] .kind-what { opacity: 0.85; }
 
+/* ----------------------------------------------------------------- sticker */
+
+/*
+ * A die-cut sticker.
+ *
+ * Cream stock, a white kiss-cut margin, an ink die line, a seated drop, and one
+ * narrow off-axis gloss. The two rings are what make it read as cut out of a
+ * sheet rather than drawn as a card — a single border is a card, two are a
+ * sticker. Used for the creation library, the guard and strike pads, and the
+ * attack box; deliberately not for toolbars and clocks, because a sticker album
+ * is stickers on a page rather than a page made of stickers.
+ */
+.sticker {
+  position: relative;
+  background: var(--stock);
+  color: var(--on-stock);
+  border: none;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 4px var(--die),
+    0 0 0 5.5px var(--die-ink),
+    0 6px 0 var(--die-shade),
+    0 16px 26px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* Vinyl sheen. Narrow and off-axis, so it reads as a sheen rather than as a
+   gradient somebody applied. */
+.sticker::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(118deg, transparent 40%, rgba(255, 255, 255, 0.7) 50%, transparent 60%);
+  opacity: 0.45;
+}
+
+/* Pressed on by hand, so no two sit at quite the same angle. */
+.sticker.is-tilted { transform: rotate(-1.4deg); }
+.sticker.is-tilted:nth-child(2n) { transform: rotate(1.1deg); }
+.sticker.is-tilted:nth-child(3n) { transform: rotate(-0.6deg); }
+
+/* Not peeled yet: the die line without the stock. */
+.sticker.is-empty {
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text);
+  box-shadow: inset 0 0 0 2.5px var(--die-ghost);
+  transform: none;
+}
+.sticker.is-empty::after { display: none; }
+
+/* Pressing one down seats it into the page rather than lifting it. */
+.sticker:active:not(.is-empty) {
+  transform: translateY(3px) rotate(0);
+  box-shadow:
+    0 0 0 4px var(--die),
+    0 0 0 5.5px var(--die-ink),
+    0 3px 0 var(--die-shade),
+    0 8px 14px -10px rgba(0, 0, 0, 0.5);
+}
+
 /* ---------------------------------------------------------------- strategy */
 
 /*
- * The two guesses, before the writing.
+ * Guard and strike, chosen blind, on one ring of four sides.
  *
- * Each is a box rather than a row of controls because they are decisions of
- * the same weight as the fifty words underneath, and a row of four buttons
- * under a label reads like a setting somebody forgot to default.
- */
-/*
- * Tight around the box, generous around each arrow.
- *
- * The padding was the wrong way round: a thick margin held the box away from
- * everything while the four targets inside it were crowded against each
- * other, which on a phone is the one place the spacing matters — these are
- * tapped in a hurry against a clock.
+ * Previously two separate grids, which made the two choices look like two
+ * unrelated questions and left no way to say "I am guarding the side I am also
+ * striking". One ring, two roles, and a side holding both shows it: the sticker
+ * splits corner to corner, green for the guard and red for the strike.
  */
 .strategy-box {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   width: 100%;
-  padding: 6px 4px 8px;
-  border-radius: var(--radius);
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  padding: 8px 6px 10px;
 }
 
-.strategy-title { margin: 0; font-size: 17px; text-align: center; }
-.strategy-what { margin: 0; font-size: 13px; opacity: 0.7; text-align: center; }
-.side-note { margin: 0; font-size: 12px; opacity: 0.6; text-align: center; max-width: 34ch; }
+.strategy-title {
+  margin: 0;
+  font-size: 17px;
+  text-align: center;
+}
+.strategy-what { margin: 0; font-size: 13px; opacity: 0.72; text-align: center; }
+.side-note { margin: 0; font-size: 12px; opacity: 0.66; text-align: center; max-width: 36ch; }
 
 /*
  * Four sides, laid out where they are.
  *
  * A three-by-three grid with the middle left empty: the hole is the fighter,
- * and every button sits on the side of them it names. Choosing "top" then
- * means pointing at the top of somebody rather than reading a word.
+ * and every sticker sits on the side of them it names. Choosing "top" means
+ * pointing at the top of somebody rather than reading a word off a list.
  */
 .side-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, auto);
-  gap: 10px;
+  gap: 12px;
   width: min(300px, 100%);
 }
 
@@ -1902,38 +1995,144 @@ body:has(.screen-draw) .backdrop { display: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  padding: 14px 10px;
+  padding: 12px 8px;
   min-height: 62px;
-  border: none;
-  border-radius: 14px;
-  background: var(--paper);
-  color: var(--text);
   font: inherit;
   cursor: pointer;
+  /* The sticker's own ::after carries the gloss, so the split goes on a
+     ::before underneath it. */
+  isolation: isolate;
 }
 
-.side-mark { font-size: 20px; line-height: 1; }
-.side-word { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.65; }
+.side-mark { font-size: 21px; line-height: 1; font-weight: 800; }
+.side-word {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.78;
+}
 
-/* Guarding and striking are different jobs, so they are different colours —
-   a player checking their choices at a glance should not have to read. */
-.side-grid.is-defence .side-pick[aria-pressed='true'] {
-  background: var(--mint);
-  color: var(--on-accent);
+/*
+ * The middle of the ring: who is being guarded and struck.
+ */
+.side-centre {
+  grid-area: 2 / 2;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+  opacity: 0.55;
+  color: var(--text);
 }
-.side-grid.is-attack .side-pick[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--on-accent);
+
+/*
+ * One role: the stock itself takes the colour, the die line stays.
+ */
+.side-pick.is-guard {
+  background: var(--guard);
+  color: var(--die-ink);
+  box-shadow:
+    0 0 0 4px var(--die),
+    0 0 0 5.5px var(--die-ink),
+    0 6px 0 color-mix(in srgb, var(--guard) 52%, #000),
+    0 16px 26px -12px rgba(0, 0, 0, 0.5);
 }
-.side-pick[aria-pressed='true'] .side-word { opacity: 0.9; }
+.side-pick.is-strike {
+  background: var(--strike);
+  /* The same ink as every other chosen state. White reads at 3.2:1 on this
+     red — fine for the 21px arrow, and nowhere near enough for the 10px word
+     under it. One ink across all three states passes at every size. */
+  color: var(--die-ink);
+  box-shadow:
+    0 0 0 4px var(--die),
+    0 0 0 5.5px var(--die-ink),
+    0 6px 0 color-mix(in srgb, var(--strike) 52%, #000),
+    0 16px 26px -12px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Both roles on one side.
+ *
+ * Cut corner to corner with the guard green above the diagonal and the strike
+ * red below it, the die line unbroken around the outside so it stays one
+ * sticker rather than becoming two. The label takes the darker of the two inks
+ * so it is legible over either half, and a hairline of stock along the cut
+ * keeps the two colours from vibrating against each other.
+ */
+.side-pick.is-both {
+  background: var(--guard);
+  /*
+   * The sticker's own ink, not either half's.
+   *
+   * The label sits on the diagonal, so it is over green and red at once: white
+   * reads at 3.2:1 on the red and 1.7:1 on the green, which is unreadable on
+   * the half that matters least to lose. The die ink clears AA on both.
+   */
+  color: var(--die-ink);
+  box-shadow:
+    0 0 0 4px var(--die),
+    0 0 0 5.5px var(--die-ink),
+    0 6px 0 color-mix(in srgb, var(--strike) 52%, #000),
+    0 16px 26px -12px rgba(0, 0, 0, 0.5);
+}
+.side-pick.is-both::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to bottom left,
+    var(--strike) 0 calc(50% - 1.5px),
+    var(--stock) calc(50% - 1.5px) calc(50% + 1.5px),
+    transparent calc(50% + 1.5px) 100%
+  );
+}
+
+/* The one thing colour alone must not carry: what a pressed side is for. */
+.side-roles {
+  display: flex;
+  gap: 4px;
+  margin-top: 1px;
+}
+.side-roles i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.side-roles i.r-guard { background: var(--guard); }
+.side-roles i.r-strike { background: var(--strike); }
+
+/* A key, because green and red are the two colours most often confused. */
+.side-legend {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.side-legend span { display: flex; align-items: center; gap: 5px; }
+.side-legend i {
+  width: 11px;
+  height: 11px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1.5px var(--die-ink);
+}
+.side-legend i.k-guard { background: var(--guard); }
+.side-legend i.k-strike { background: var(--strike); }
+.side-legend i.k-both {
+  background: linear-gradient(to bottom left, var(--strike) 0 48%, var(--stock) 48% 52%, var(--guard) 52% 100%);
+}
 
 @media (max-width: 480px) {
-  .strategy-box { padding: 4px 2px 6px; gap: 4px; }
+  .strategy-box { padding: 4px 2px 8px; gap: 6px; }
   .strategy-title { font-size: 15px; }
   .strategy-what { font-size: 12px; }
-  .side-grid { width: min(270px, 100%); gap: 9px; }
-  .side-pick { min-height: 58px; padding: 12px 8px; }
+  .side-grid { width: min(272px, 100%); gap: 10px; }
+  .side-pick { min-height: 58px; padding: 10px 6px; }
 }
 
 /* ----------------------------------------------------------------- results */
@@ -2105,13 +2304,18 @@ body:has(.screen-draw) .help-open { display: none !important; }
  * game, not a different-looking one.
  */
 [data-high-contrast] {
-  --paper: #14111c;
-  --panel: #241f31;
-  --panel-high: #332b45;
+  --paper: #1d1340;
+  --panel: #180f36;
+  --panel-high: #281a5c;
   --text: #ffffff;
-  --text-dim: #cdc4dd;
-  --line: rgba(255, 255, 255, 0.3);
+  --text-dim: #ded6f5;
+  --line: rgba(255, 255, 255, 0.34);
   --shadow: 0 3px 0 rgba(0, 0, 0, 0.6);
+  /* The stock stays stock; its die line and its text go harder. */
+  --die-ink: #130a2e;
+  --on-stock: #130a2e;
+  --on-stock-dim: #453578;
+  --guard-ink: #00180d;
 }
 
 [data-high-contrast] button,

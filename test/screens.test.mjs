@@ -288,39 +288,64 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
 }
 
 /*
- * Guarding and aiming.
+ * Guarding and aiming, on one ring.
  *
- * Both are chosen blind, so the only thing that can be checked from here is
- * that what somebody pressed is what gets sent — and that a defensive weapon
- * really does hand them the second guard it promises, since that is the whole
- * reason anybody would draw one.
+ * Both are chosen blind, so the only things checkable from here are that what
+ * somebody pressed is what gets sent, that a weapon hands over the number of
+ * sides it promises, and — the reason the two grids became one ring — that a
+ * single side can be both guarded and struck, which is a legal move the old
+ * interface had no way to express.
  */
 {
   const connection = fakeConnection('a', roomState({ phase: 'battle', turn: turn('picking') }));
   mounts('move (strategy)',
     ui.moveScreen(connection, [{ name: 'Butter Sword', kind: 'offensive' }], 'Bonkalot'),
     (root) => {
-      const boxes = [...root.querySelectorAll('.strategy-title')].map((n) => n.textContent);
-      check('there is a defensive position box', boxes.includes('Defensive position'), boxes.join('|'));
-      check('and an offensive position box', boxes.includes('Offensive position'), boxes.join('|'));
-      check('and the writing comes after them',
-        boxes.indexOf('How you fight') > boxes.indexOf('Offensive position'), boxes.join('|'));
-
-      const guard = root.querySelector('.is-defence .side-top');
-      const aim = root.querySelector('.is-attack .side-bottom');
-      guard?.click();
-      aim?.click();
+      const titles = [...root.querySelectorAll('.strategy-title')].map((n) => n.textContent);
+      check('guard and strike share one box', titles.includes('Guard and strike'), titles.join('|'));
+      check('and the writing comes after it',
+        titles.indexOf('How you fight') > titles.indexOf('Guard and strike'), titles.join('|'));
+      check('there is one ring, not two grids',
+        root.querySelectorAll('.side-grid').length === 1,
+        String(root.querySelectorAll('.side-grid').length));
 
       const attack = [...root.querySelectorAll('button')].find((b) => /attack/i.test(b.textContent));
       attack?.click();
       const move = connection.sent.find((m) => m.type === 'submitMove');
-      check('the sides chosen are the sides sent',
-        move?.defend?.includes('top') === true && move?.attack?.includes('bottom') === true,
-        JSON.stringify(move));
-      check('an offensive weapon guards exactly one side',
-        move?.defend?.length === 1, JSON.stringify(move?.defend));
-      check('and strikes exactly two',
-        move?.attack?.length === 2, JSON.stringify(move?.attack));
+      check('an offensive weapon guards one side and strikes two',
+        move?.defend?.length === 1 && move?.attack?.length === 2,
+        JSON.stringify({ defend: move?.defend, attack: move?.attack }));
+    });
+}
+
+/*
+ * One tap cycles a side: nothing, guard, strike, both.
+ */
+{
+  const connection = fakeConnection('a', roomState({ phase: 'battle', turn: turn('picking') }));
+  mounts('move (one side, both roles)',
+    ui.moveScreen(connection, [{ name: 'Butter Sword', kind: 'offensive' }], 'Bonkalot'),
+    (root) => {
+      const top = root.querySelector('.side-pick.side-top');
+      if (!top) { check('the ring has a top side', false); return; }
+
+      // Cycle it until it holds both roles, which is at most four taps.
+      let both = false;
+      for (let i = 0; i < 4 && !both; i++) {
+        top.click();
+        both = top.classList.contains('is-both');
+      }
+      check('a side can hold guard and strike at once', both, top.className);
+      check('and says so without relying on colour',
+        /guarding and striking/.test(top.getAttribute('aria-label') ?? ''),
+        top.getAttribute('aria-label') ?? '');
+
+      const attack = [...root.querySelectorAll('button')].find((b) => /attack/i.test(b.textContent));
+      attack?.click();
+      const move = connection.sent.find((m) => m.type === 'submitMove');
+      check('and that overlap reaches the server',
+        move?.defend?.includes('top') && move?.attack?.includes('top'),
+        JSON.stringify({ defend: move?.defend, attack: move?.attack }));
     });
 }
 
@@ -329,16 +354,17 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   mounts('move (defensive weapon)',
     ui.moveScreen(connection, [{ name: 'Big Shield', kind: 'defensive' }], 'Bonkalot'),
     (root) => {
-      const pressed = [...root.querySelectorAll('.is-defence .side-pick')]
-        .filter((n) => n.getAttribute('aria-pressed') === 'true');
+      const guarding = [...root.querySelectorAll('.side-pick')]
+        .filter((n) => n.classList.contains('is-guard') || n.classList.contains('is-both'));
       check('a defensive weapon starts with two sides guarded',
-        pressed.length === 2, String(pressed.length));
+        guarding.length === 2, String(guarding.length));
 
       const attack = [...root.querySelectorAll('button')].find((b) => /attack/i.test(b.textContent));
       attack?.click();
       const move = connection.sent.find((m) => m.type === 'submitMove');
-      check('and sends both of them', move?.defend?.length === 2, JSON.stringify(move?.defend));
-      check('while striking only one', move?.attack?.length === 1, JSON.stringify(move?.attack));
+      check('and sends two guards with one strike',
+        move?.defend?.length === 2 && move?.attack?.length === 1,
+        JSON.stringify({ defend: move?.defend, attack: move?.attack }));
     });
 }
 

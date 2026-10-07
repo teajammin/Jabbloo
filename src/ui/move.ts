@@ -79,65 +79,104 @@ export function moveScreen(
     const send = button('Attack', () => submit(), 'big primary');
 
     /**
-     * A ring of four sides laid out where they are.
+     * One ring of four sides, carrying both choices at once.
      *
-     * Named buttons in a row would work and read as a form. Arranged around a
-     * middle instead, "top" is above and "left" is to the left, so the choice
-     * is a place on a body rather than a word off a list — which is what it
-     * has to feel like to be worth guessing about.
+     * It was two separate grids, which made guarding and striking look like two
+     * unrelated questions and left no way at all to say "I am guarding the side
+     * I am also striking" — a legal and often sensible move the interface could
+     * not express. One ring solves both: a side holds either role, or both, and
+     * a side holding both is drawn as one sticker split corner to corner.
+     *
+     * Arranged around an empty middle rather than listed, so "top" is above and
+     * "left" is to the left: the choice is a place on a body, not a word off a
+     * list, which is what it has to feel like to be worth guessing about.
      */
-    function sidePicker(
-      className: string,
-      onChange: (chosen: Side[]) => void,
-    ): { root: HTMLElement; set: (chosen: Side[], max: number) => void } {
+    function sideRing(
+      onChange: () => void,
+    ): { root: HTMLElement; paint: () => void } {
       const buttons = new Map<Side, HTMLButtonElement>();
-      const grid = el('div', { class: `side-grid ${className}` });
-      let chosen: Side[] = [];
-      let max = 1;
+      const grid = el('div', { class: 'side-grid' });
 
       const paint = () => {
         for (const [side, node] of buttons) {
-          node.setAttribute('aria-pressed', String(chosen.includes(side)));
+          const guarding = defend.includes(side);
+          const striking = attack.includes(side);
+          node.classList.toggle('is-guard', guarding && !striking);
+          node.classList.toggle('is-strike', striking && !guarding);
+          node.classList.toggle('is-both', guarding && striking);
+          node.setAttribute('aria-pressed', String(guarding || striking));
+          /*
+           * Said in words as well as in colour.
+           *
+           * Green and red are the pair most often indistinguishable, and this
+           * is the one control where getting it wrong costs a player the round.
+           */
+          const roles = [guarding && 'guarding', striking && 'striking']
+            .filter(Boolean).join(' and ');
+          node.setAttribute('aria-label', roles ? `${side}, ${roles}` : side);
+          const dots = node.querySelector('.side-roles');
+          if (dots) {
+            dots.replaceChildren(
+              ...(guarding ? [el('i', { class: 'r-guard' })] : []),
+              ...(striking ? [el('i', { class: 'r-strike' })] : []),
+            );
+          }
         }
+        onChange();
       };
 
       for (const side of SIDES) {
-        const node = el('button', { class: `side-pick side-${side}`, type: 'button' },
+        const node = el('button', { class: `side-pick sticker side-${side}`, type: 'button' },
           el('span', { class: 'side-mark' }, SIDE_MARKS[side]),
-          el('span', { class: 'side-word' }, side));
-        node.setAttribute('aria-label', side);
+          el('span', { class: 'side-word' }, side),
+          el('span', { class: 'side-roles' }));
+
+        /*
+         * One tap cycles the roles this side holds.
+         *
+         * Two separate grids needed two taps in two places to express one
+         * intention. Cycling keeps it to one target: nothing, guard, strike,
+         * both, and round again — and each step is refused rather than allowed
+         * when the weapon has no capacity left for it, so the interface never
+         * promises a block the server will not honour.
+         */
         node.addEventListener('click', () => {
-          if (chosen.includes(side)) {
-            // Never down to nothing: with one guard allowed, tapping the one
-            // you have chosen means "this one", not "none of them".
-            if (chosen.length > 1) chosen = chosen.filter((s) => s !== side);
+          const kind = weapons[weapon]?.kind ?? 'offensive';
+          const guards = guardsFor(kind);
+          const strikes = attacksFor(kind);
+          const guarding = defend.includes(side);
+          const striking = attack.includes(side);
+
+          if (!guarding && !striking) {
+            defend = [...defend, side].slice(-guards);
+          } else if (guarding && !striking) {
+            defend = defend.filter((s) => s !== side);
+            attack = [...attack, side].slice(-strikes);
+          } else if (striking && !guarding) {
+            defend = [...defend, side].slice(-guards);
           } else {
-            // Oldest choice drops out, so a second tap always shows a change
-            // rather than being ignored once the limit is reached.
-            chosen = [...chosen, side].slice(-max);
+            defend = defend.filter((s) => s !== side);
+            attack = attack.filter((s) => s !== side);
           }
+
+          // A weapon always covers and strikes the number of places it was
+          // chosen for; cycling a side off tops the rest back up.
+          defend = fit(defend, guards);
+          attack = fit(attack, strikes);
           paint();
-          onChange(chosen);
           play('click');
         });
+
         buttons.set(side, node);
         grid.appendChild(node);
       }
 
-      return {
-        root: grid,
-        set: (next, limit) => {
-          max = limit;
-          chosen = next.slice(-limit);
-          paint();
-        },
-      };
+      grid.appendChild(el('span', { class: 'side-centre' }, 'you'));
+      return { root: grid, paint };
     }
 
-    const defenceNote = el('p', { class: 'side-note' });
-    const defencePicker = sidePicker('is-defence', (chosen) => { defend = chosen; });
-    const attackNote = el('p', { class: 'side-note' });
-    const attackPicker = sidePicker('is-attack', (chosen) => { attack = chosen; });
+    const ringNote = el('p', { class: 'side-note' });
+    const ring = sideRing(() => { /* the note is rewritten by refreshGuards */ });
 
     /** Fills a choice out to the number of sides the weapon allows. */
     function fit(chosen: Side[], allowed: number): Side[] {
@@ -164,17 +203,11 @@ export function moveScreen(
 
       defend = fit(defend, guards);
       attack = fit(attack, attacks);
-      defencePicker.set(defend, guards);
-      attackPicker.set(attack, attacks);
+      ring.paint();
 
-      defenceNote.textContent = guards > 1
-        ? 'A defensive weapon guards two sides — pick both.'
-        : 'A defensive weapon would guard two. This one guards one.';
-      attackNote.textContent = attacks > 1
-        ? 'An offensive weapon strikes two sides — pick both. Every side they '
-          + 'guard takes something off the blow.'
-        : 'One side, all or nothing. Guard the side they strike and their hit '
-          + 'is halved — and the same for yours.';
+      ringNote.textContent = attacks > 1
+        ? `Strike ${attacks} sides, guard ${guards}. Tap a side to cycle it: guard, strike, both.`
+        : `Strike ${attacks} side, guard ${guards}. Tap a side to cycle it: guard, strike, both.`;
     }
 
     function describe(): void {
@@ -296,15 +329,15 @@ export function moveScreen(
          * "left" underneath it.
          */
         el('section', { class: 'strategy-box' },
-          el('h2', { class: 'strategy-title' }, 'Defensive position'),
-          el('p', { class: 'strategy-what' }, 'Where will you dodge or shield?'),
-          defencePicker.root,
-          defenceNote),
-        el('section', { class: 'strategy-box' },
-          el('h2', { class: 'strategy-title' }, 'Offensive position'),
-          el('p', { class: 'strategy-what' }, 'Where will you strike them?'),
-          attackPicker.root,
-          attackNote),
+          el('h2', { class: 'strategy-title' }, 'Guard and strike'),
+          el('p', { class: 'strategy-what' },
+            'Both of you choose blind. Guard the side they strike and their hit is halved.'),
+          ring.root,
+          el('div', { class: 'side-legend' },
+            el('span', {}, el('i', { class: 'k-guard' }), 'Guard'),
+            el('span', {}, el('i', { class: 'k-strike' }), 'Strike'),
+            el('span', {}, el('i', { class: 'k-both' }), 'Both')),
+          ringNote),
         el('h2', { class: 'strategy-title' }, 'How you fight'),
         prompt,
         el('div', { class: 'tool-row' }, counter),
