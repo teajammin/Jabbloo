@@ -328,7 +328,15 @@ export interface Player {
   best: { weapon: string; prompt: string; damage: number } | null;
 }
 
-export type Phase = 'lobby' | 'creating' | 'battleground' | 'battle' | 'ult' | 'results';
+export type Phase =
+  | 'lobby'
+  | 'creating'
+  /** Deciding how each weapon is held, once, before anybody fights. */
+  | 'placing'
+  | 'battleground'
+  | 'battle'
+  | 'ult'
+  | 'results';
 
 /**
  * How many weapons each player makes.
@@ -373,6 +381,15 @@ export const CREATION_BUDGET_SECONDS = 285;
 
 /** The same, for an Ultimate: one more weapon, drawn and named. */
 export const ULT_BUDGET_SECONDS = 80;
+
+/**
+ * How long a player has to decide where one weapon sits on their fighter.
+ *
+ * Short on purpose. It is one decision — hand here, point it that way — and a
+ * long clock on a single drag turns a flourish into a chore. Running out keeps
+ * wherever it was last dragged to, so the time pressure costs nothing.
+ */
+export const PLACE_SECONDS = 20;
 
 /** Which budget this phase runs on. */
 export function budgetFor(state: RoomState): number {

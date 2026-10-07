@@ -535,6 +535,22 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     connection.on({
       onClosed: () => goHome(go),
       onState: (state) => {
+        /*
+         * Creation now ends in placing rather than in the vote.
+         *
+         * Guarded by `leaving` like the others: the handover waits on a dynamic
+         * import, state keeps arriving while that is in flight, and without the
+         * guard a second screen gets mounted on top of the first.
+         */
+        if (state.phase === 'placing' && !leaving) {
+          leaving = true;
+          clock.stop();
+          void (async () => {
+            const { placingScreen } = await import('./placing');
+            go(placingScreen(connection, isHost));
+          })();
+          return;
+        }
         if (state.phase === 'battleground') {
           clock.stop();
           go(battlegroundScreen(connection, isHost));

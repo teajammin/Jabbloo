@@ -44,6 +44,7 @@ import {
   type Grip,
   SIDES,
   budgetFor,
+  PLACE_SECONDS,
   longestRemaining,
   MIN_WEAPONS,
   guardsFor,
@@ -399,7 +400,8 @@ export default class Room implements Party.Server {
         this.onVote(message.id, sender);
         break;
       case 'creationDone':
-        this.onCreationDone(sender);
+        if (this.state.phase === 'placing') this.onPlacingDone(sender);
+        else this.onCreationDone(sender);
         break;
       case 'placeWeapon':
         this.onPlaceWeapon(message.index, message.grip, sender);
@@ -1015,7 +1017,83 @@ export default class Room implements Party.Server {
   private finishCreation(): void {
     this.stopCreationClock();
     if (this.state.phase === 'ult') this.beginSuddenDeath();
-    else this.beginVote();
+    else this.beginPlacing();
+  }
+
+  // ------------------------------------------------------------------ placing
+
+  /**
+   * Everybody decides how their weapons are held.
+   *
+   * Between creation and the vote rather than inside a turn: the grip belongs
+   * to the weapon, not to one use of it, so it is settled once while everyone
+   * is still in making mood. Twenty seconds per weapon, and running out keeps
+   * whatever it was last dragged to.
+   */
+  private beginPlacing(): void {
+    this.state.phase = 'placing';
+    const now = Date.now();
+    for (const player of this.state.players) {
+      player.progress.step = 0;
+      player.progress.done = false;
+      // One clock per weapon they actually made, so nobody waits on a slot
+      // they left empty.
+      player.progress.endsAt = now + PLACE_SECONDS * 1000 * Math.max(1, this.weaponsOf(player));
+    }
+    this.state.stepEndsAt = Math.max(
+      ...this.state.players.map((p) => p.progress.endsAt),
+      now,
+    );
+    this.startPlacingClock();
+    this.broadcastState();
+  }
+
+  /** How many weapons this player actually drew. */
+  private weaponsOf(player: Player): number {
+    let made = 0;
+    for (let i = 0; i < WEAPON_COUNT + 2; i++) {
+      if (this.art.has(`${player.id}:weapon${i}`)) made++;
+    }
+    return made;
+  }
+
+  private startPlacingClock(): void {
+    if (this.creationClock) clearInterval(this.creationClock);
+    this.creationClock = setInterval(() => {
+      if (this.state.phase !== 'placing') {
+        this.stopCreationClock();
+        return;
+      }
+      const now = Date.now();
+      let moved = false;
+      for (const player of creators(this.state)) {
+        if (player.progress.done || player.progress.endsAt > now) continue;
+        player.progress.done = true;
+        player.progress.endsAt = 0;
+        moved = true;
+      }
+      if (moved) {
+        this.finishPlacingIfEveryoneIsDone();
+        this.broadcastState();
+      }
+    }, 500);
+  }
+
+  /** "I am happy with where everything sits." */
+  private onPlacingDone(sender: Party.Connection): void {
+    const player = this.state.players.find((p) => p.id === sender.id);
+    if (!player || this.state.phase !== 'placing' || player.progress.done) return;
+    player.progress.done = true;
+    player.progress.endsAt = 0;
+    this.finishPlacingIfEveryoneIsDone();
+    this.broadcastState();
+  }
+
+  private finishPlacingIfEveryoneIsDone(): void {
+    const working = creators(this.state).filter((p) => !p.progress.done && p.connected);
+    if (working.length > 0) return;
+    this.stopCreationClock();
+    this.beginVote();
   }
 
   // -------------------------------------------------------------- battleground

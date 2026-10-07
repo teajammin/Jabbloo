@@ -1944,6 +1944,110 @@ body:has(.screen-draw) .backdrop { display: none; }
     0 8px 14px -10px rgba(0, 0, 0, 0.5);
 }
 
+/* ----------------------------------------------------------------- placing */
+
+/*
+ * Putting a weapon on a fighter.
+ *
+ * The fighter is the page and the weapon is a sticker being pressed onto it, so
+ * the fighter gets the stock and the weapon gets nothing behind it at all —
+ * which is also literally true of the artwork, since both arrive as PNGs with
+ * transparent grounds.
+ */
+.place-stage {
+  position: relative;
+  width: min(340px, 86vw);
+  aspect-ratio: 3 / 4;
+  margin: 0 auto;
+  border-radius: 22px;
+  background: var(--stock);
+  box-shadow:
+    0 0 0 4px var(--die),
+    0 0 0 5.5px var(--die-ink),
+    0 6px 0 var(--die-shade),
+    0 18px 30px -14px rgba(0, 0, 0, 0.55);
+  touch-action: none;
+  overflow: hidden;
+}
+
+.place-fighter {
+  position: absolute;
+  inset: 6% 10% 4%;
+  width: 80%;
+  height: 90%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* The weapon: dragged by its middle, turned and resized by its two handles. */
+.place-tool {
+  position: absolute;
+  width: 34%;
+  aspect-ratio: 1;
+  cursor: grab;
+  touch-action: none;
+}
+.place-tool:active { cursor: grabbing; }
+.place-tool-art {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.3));
+}
+
+/* Where the hand actually goes. Marked, because the whole decision is about
+   this point and nothing else on screen says where it is. */
+.place-grip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2.5px var(--die-ink);
+  pointer-events: none;
+}
+
+.place-handle {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--stock);
+  box-shadow: 0 0 0 2.5px var(--die-ink), 0 3px 0 var(--die-shade);
+  touch-action: none;
+}
+/* Named by what they do, placed where the gesture wants them: turning reaches
+   up and out, resizing pulls down and away. */
+.place-turn { right: -12px; top: -12px; }
+.place-turn::after,
+.place-size::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  background: var(--die-ink);
+}
+.place-turn::after {
+  /* A curved arrow, for rotation. */
+  clip-path: path('M8 2a6 6 0 1 0 6 6h-2a4 4 0 1 1-4-4z');
+}
+.place-size { right: -12px; bottom: -12px; }
+.place-size::after {
+  /* A diagonal, for scale. */
+  clip-path: polygon(0 100%, 100% 0, 100% 40%, 40% 100%);
+}
+
+.place-hint {
+  margin: 14px auto 0;
+  max-width: 34ch;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
 /* ----------------------------------------------------------------- library */
 
 /*

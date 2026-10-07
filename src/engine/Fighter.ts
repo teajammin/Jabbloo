@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { loadTexture } from './assets';
 import { gripFor, DEFAULT_GRIP, type Grip } from './grip';
+import type { Grip as ChosenGrip } from '../shared/protocol';
 import { trimToInk } from './trim';
 import gsap from 'gsap';
 import { Limb } from './Limb';
@@ -257,7 +258,7 @@ export class Fighter {
    * turn, and rebuilding the whole fighter would lose their position on stage
    * and restart the entrance.
    */
-  async setWeapon(url: string, name?: string): Promise<void> {
+  async setWeapon(url: string, name?: string, chosen?: ChosenGrip): Promise<void> {
     const texture = await loadTexture(url);
     if (!texture) return;
     // Same crop as the first weapon: the size a weapon ends up has to mean the
@@ -267,7 +268,7 @@ export class Fighter {
     this.weaponSprite.scale.set(this.targetWeaponHeight / ink.height);
     // Each weapon is held its own way, so this is worked out per swap rather
     // than once when the fighter was built.
-    this.holdProperly(ink);
+    this.holdProperly(ink, chosen);
     // Facing is applied by mirroring the root, so the sprite's own sign has to
     // be reset or a swap mid-fight can leave the new weapon back to front.
     this.weaponSprite.scale.x = Math.abs(this.weaponSprite.scale.x);
@@ -287,7 +288,24 @@ export class Fighter {
    * the player made it, because a confident wrong answer is worse than the
    * plain one.
    */
-  private holdProperly(texture: Texture): void {
+  private holdProperly(texture: Texture, chosen?: ChosenGrip): void {
+    /*
+     * The player's own answer beats the measurement.
+     *
+     * Measuring is a good guess and still only a guess: a pistol and an axe are
+     * the same shape to it — a chunky blob on a long shaft — so one of the two
+     * always came out held by the wrong end. When the player has said where the
+     * hand goes, there is nothing left to infer.
+     */
+    if (chosen) {
+      this.grip = { x: chosen.x, y: chosen.y, rotation: chosen.rotation, confidence: 1 };
+      this.weaponSprite.anchor.set(chosen.x, chosen.y);
+      this.weaponSprite.rotation = chosen.rotation;
+      // Their scale is relative to however big the rig would have drawn it.
+      this.weaponSprite.scale.set(this.weaponSprite.scale.x * chosen.scale);
+      return;
+    }
+
     const grip = gripFor(texture);
     this.grip = grip;
 

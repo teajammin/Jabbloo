@@ -336,6 +336,11 @@ async function openPhase(
     case 'ult':
       go(creationScreen(connection, isHost));
       return;
+    case 'placing': {
+      const { placingScreen } = await import('./placing');
+      go(placingScreen(connection, isHost));
+      return;
+    }
     case 'battleground':
       go(battlegroundScreen(connection, isHost));
       return;

@@ -404,7 +404,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
         if (!attacker || !move) continue;
 
         const weapon = entry?.weapons[move.weapon];
-        if (weapon) await attacker.setWeapon(weapon.png, weapon.name);
+        // The grip the player chose in the placing phase, where they have one.
+        if (weapon) await attacker.setWeapon(weapon.png, weapon.name, weapon.grip);
         if (disposed) return;
 
         const weaponName = weapon?.name ?? attacker.weaponName;

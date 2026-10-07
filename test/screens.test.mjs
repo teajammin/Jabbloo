@@ -245,6 +245,42 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   });
 }
 
+/*
+ * Deciding how a weapon is held.
+ *
+ * The one thing worth pinning down from here is that the player's own answer
+ * reaches the server, because the whole point of this screen is replacing a
+ * measurement the engine used to make for them — and a measurement that was
+ * wrong for every gun anybody drew.
+ */
+{
+  const state = roomState({ phase: 'placing' });
+  const connection = fakeConnection('a', state);
+  mounts('placing', ui.placingScreen(connection, false), (root) => {
+    check('it asks the server for the artwork',
+      connection.sent.some((m) => m.type === 'requestArt'), JSON.stringify(connection.sent));
+
+    // The artwork arrives a piece at a time, as the room sends it.
+    connection.art([{ playerId: 'a', character: { png: 'data:image/png;base64,AAA', name: 'Bonkalot' }, weapons: [] }]);
+    connection.art([{ playerId: 'a', character: null, weapons: [{ png: 'data:image/png;base64,AAA', name: 'Pan', index: 0 }] }]);
+
+    const stage = root.querySelector('.place-stage');
+    check('the fighter and the weapon are both on the page',
+      stage !== null && root.querySelector('.place-tool') !== null);
+
+    const ready = [...root.querySelectorAll('button')].find((b) => /ready|next/i.test(b.textContent));
+    ready?.click();
+    const placed = connection.sent.find((m) => m.type === 'placeWeapon');
+    check('a grip reaches the server', Boolean(placed), JSON.stringify(connection.sent.map((m) => m.type)));
+    check('and it carries a position and a turn',
+      typeof placed?.grip?.x === 'number' && typeof placed?.grip?.rotation === 'number',
+      JSON.stringify(placed?.grip));
+    check('with only one weapon, finishing says so',
+      connection.sent.some((m) => m.type === 'creationDone'),
+      JSON.stringify(connection.sent.map((m) => m.type)));
+  });
+}
+
 // --- battleground vote ------------------------------------------------------
 
 {

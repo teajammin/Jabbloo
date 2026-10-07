@@ -12,6 +12,7 @@ export { createRoomScreen } from '../src/ui/createRoom';
 export { joinRoomScreen } from '../src/ui/joinRoom';
 export { drawScreen } from '../src/ui/drawScreen';
 export { creationScreen } from '../src/ui/creation';
+export { placingScreen } from '../src/ui/placing';
 export { battlegroundScreen } from '../src/ui/battleground';
 export { battleScreen } from '../src/ui/battle';
 export { moveScreen } from '../src/ui/move';
