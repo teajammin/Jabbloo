@@ -356,6 +356,39 @@ export interface CreationStep {
   prompt: string;
 }
 
+/**
+ * How long a player has for the whole of creation, to spend as they like.
+ *
+ * The sum of the four timed steps it replaces — 105s for a character, 20s to
+ * name it, then 60s and 20s per weapon — because the budget is the same, only
+ * the control over it moves. A player who wants to spend four minutes on the
+ * character and rush one weapon can; so can somebody who wants two careful
+ * weapons and a stick figure.
+ *
+ * One clock rather than four is also the honest shape of the task: nobody
+ * drawing a character is thinking about how long naming it will take, and a
+ * timer that reset four times made the whole thing feel longer than it was.
+ */
+export const CREATION_BUDGET_SECONDS = 285;
+
+/** The same, for an Ultimate: one more weapon, drawn and named. */
+export const ULT_BUDGET_SECONDS = 80;
+
+/** Which budget this phase runs on. */
+export function budgetFor(state: RoomState): number {
+  if (state.phase === 'ult') return ULT_BUDGET_SECONDS;
+  return CREATION_BUDGET_SECONDS;
+}
+
+/**
+ * The fewest weapons a player may finish with.
+ *
+ * One is enough to fight. Somebody who spends their whole budget on a
+ * character they love should not be stopped, and the second weapon is a choice
+ * about how to spend time rather than a requirement.
+ */
+export const MIN_WEAPONS = 1;
+
 export const CREATION_STEPS: CreationStep[] = [
   { slot: 'character', kind: 'draw', seconds: 105, prompt: 'Draw your character' },
   { slot: 'character', kind: 'name', seconds: 20, prompt: 'Name your character' },
@@ -399,14 +432,17 @@ export function ultSteps(round: number): CreationStep[] {
  */
 export function remainingFor(player: Player, state: RoomState, now = Date.now()): number {
   if (player.progress.done) return 0;
-
-  const steps = stepsFor(state);
-  const current = Math.max(0, player.progress.endsAt - now);
-  const later = steps
-    .slice(player.progress.step + 1)
-    .reduce((total, step) => total + step.seconds * 1000, 0);
-
-  return current + later;
+  /*
+   * One deadline, so no arithmetic.
+   *
+   * This used to add up the seconds of every step the player had not reached
+   * yet, because each step carried its own clock. With a pooled budget there
+   * is nothing to add: the deadline they are working to is the only one they
+   * have. The `state` argument stays for callers and for the day a phase wants
+   * a different budget.
+   */
+  void state;
+  return Math.max(0, player.progress.endsAt - now);
 }
 
 /** How long until the slowest person still working is finished. */
@@ -602,6 +638,10 @@ export type ClientMessage =
    */
   | { type: 'submitDrawing'; slot: string; png: string; done?: boolean }
   | { type: 'submitName'; slot: string; name: string; kind?: WeaponKind }
+  /** "I have finished making things" — the budget's own Done. */
+  | { type: 'creationDone' }
+  /** Where the player put this weapon on their character. */
+  | { type: 'placeWeapon'; index: number; grip: Grip }
   /** Done early; the step advances once everyone has said so. */
   | { type: 'ready' }
   | { type: 'voteBattleground'; id: string }
@@ -641,10 +681,31 @@ export type ClientMessage =
  * `weapons` carries the slot each one came from so the order survives being
  * split up and arriving out of sequence.
  */
+/**
+ * Where on a character a weapon is held, as fractions of the character's box.
+ *
+ * Chosen by the player rather than measured off the drawing. src/engine/grip.ts
+ * inferred this from the artwork — the long axis of the ink, the lighter end
+ * taken for the handle — which is a good guess and still only a guess: a gun
+ * and an axe are the same shape to it, a chunky blob on a shaft, so one of them
+ * always came out held by the wrong end. Asking is both more accurate and more
+ * fun than measuring.
+ */
+export interface Grip {
+  /** 0 is the character's left edge, 1 its right. */
+  x: number;
+  /** 0 is the top of the character, 1 the ground under them. */
+  y: number;
+  /** Turns of the weapon from how it was drawn, in radians. */
+  rotation: number;
+  /** Relative to how big the weapon would otherwise be drawn. */
+  scale: number;
+}
+
 export interface PlayerArt {
   playerId: string;
   character: { png: string; name: string } | null;
-  weapons: { png: string; name: string; index?: number }[];
+  weapons: { png: string; name: string; index?: number; grip?: Grip }[];
 }
 
 /**

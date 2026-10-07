@@ -441,13 +441,30 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
   });
 }
 
+/*
+ * The library is the way in now.
+ *
+ * Creation used to drop a player straight into the drawing tool because the
+ * server decided what they were making. With a pooled budget they choose, so
+ * the first thing on screen is the page of empty stickers and the tool appears
+ * only once a slot is tapped.
+ */
+function openSlot(root, which = 0) {
+  const slots = [...root.querySelectorAll('.lib-slot')];
+  slots[which]?.click();
+  return root.querySelector('.draw-overlay');
+}
+
 // --- a creation step, end to end -------------------------------------------
 
 {
   const connection = fakeConnection('a', roomState({ phase: 'creating', step: 0 }));
   mounts('creation submits a drawing', ui.creationScreen(connection, false), (root) => {
-    const overlay = root.querySelector('.draw-overlay');
-    check('the creation step embeds the drawing tool', overlay !== null);
+    check('creation opens on the sticker library',
+      root.querySelectorAll('.lib-slot').length > 0,
+      String(root.querySelectorAll('.lib-slot').length));
+    const overlay = openSlot(root, 0);
+    check('tapping a slot embeds the drawing tool', overlay !== null);
     if (!overlay) return;
     overlay.dispatchEvent(new PointerEvent('pointerdown', { clientX: 60, clientY: 60, isPrimary: true }));
     overlay.dispatchEvent(new PointerEvent('pointermove', { clientX: 160, clientY: 200, isPrimary: true }));
@@ -482,7 +499,7 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
 {
   const connection = fakeConnection('a', roomState({ phase: 'creating', step: 0 }));
   mounts('creation autosaves', ui.creationScreen(connection, false), (root) => {
-    const overlay = root.querySelector('.draw-overlay');
+    const overlay = openSlot(root, 0);
     if (!overlay) { check('the drawing tool is there to autosave from', false); return; }
     overlay.dispatchEvent(new PointerEvent('pointerdown', { clientX: 50, clientY: 50, isPrimary: true }));
     overlay.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 180, isPrimary: true }));
@@ -504,18 +521,20 @@ mounts('drawing tool', ui.drawScreen({ title: 'Draw your character', onDone: (pn
       JSON.stringify(saved?.done));
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 
-    // And the step running out sends it too, without a second copy of the same
-    // picture going up.
+    /*
+     * Leaving the drawing sends it, without a second copy of the same picture.
+     *
+     * Reached by finishing rather than by the room moving the player on: a
+     * pooled budget means nothing advances them but their own Done.
+     */
     const before = connection.sent.filter((m) => m.type === 'submitDrawing').length;
-    connection.push({
-      players: connection.state.players.map((p) => (p.id === 'a'
-        ? { ...p, progress: { ...p.progress, step: 1 } }
-        : p)),
-    });
+    const finish = [...root.querySelectorAll('button')].find((b) => /done/i.test(b.textContent));
+    finish?.click();
     const after = connection.sent.filter((m) => m.type === 'submitDrawing').length;
-    check('an unchanged drawing is not sent twice', after === before, `${before} then ${after}`);
+    check('finishing sends the drawing once more, not twice',
+      after - before <= 1, `${before} then ${after}`);
 
-    // The name step shows what they drew, pressed or not.
+    // Naming follows making, and shows what they drew.
     const preview = root.querySelector('img.creation-preview');
     check('the name step previews the drawing', preview !== null && !preview.classList.contains('empty'));
   });

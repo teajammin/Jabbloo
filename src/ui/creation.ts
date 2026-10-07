@@ -3,10 +3,11 @@ import { el, button, type Screen, goHome } from './screens';
 import { countdown } from './timer';
 import { drawScreen } from './drawScreen';
 import { battlegroundScreen } from './battleground';
+import { play } from '../audio';
 import type { RoomConnection } from '../net/room';
 import {
-  creators, displayName, graceExpired, longestRemaining, standIn, stepFor, stepsFor, stillWorking,
-  OFFENSIVE_BONUS,
+  creators, displayName, graceExpired, longestRemaining, standIn, stepsFor, stillWorking,
+  OFFENSIVE_BONUS, WEAPON_COUNT, budgetFor,
   type Player, type RoomState, type WeaponKind,
 } from '../shared/protocol';
 
@@ -28,6 +29,18 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     let lastStep = '';
     /** Set once this screen has handed over, so it cannot hand over twice. */
     let leaving = false;
+
+    /*
+     * Where the player is, decided here rather than by the server.
+     *
+     * Creation used to be a queue the room walked everybody through, so the
+     * screen only had to render whichever step the server said they were on.
+     * With a pooled budget the order is the player's: they pick a slot, draw,
+     * name it, and come back to the library. Only this device knows which of
+     * those they are doing, so only this device can route it.
+     */
+    let view: 'library' | 'draw' | 'name' = 'library';
+    let activeSlot = '';
     /*
      * What was drawn, kept per slot.
      *
@@ -99,7 +112,14 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
         onSnapshot: (read) => { readDrawing = read; },
         onDone: (png) => {
           submitDrawing(png, slot);
-          showWaiting('Saved — waiting for everyone else');
+          /*
+           * Naming always follows making, which is the one piece of order the
+           * player does not choose. A thing with no name is a thing the game
+           * has to invent a name for, and it is funnier when they do it.
+           */
+          view = 'name';
+          lastStep = '';
+          if (connection.state) render(connection.state);
         },
       })(holder, go);
 
@@ -192,7 +212,11 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
           name: input.value,
           ...(isWeapon ? { kind } : {}),
         });
-        showWaiting('Named — waiting for everyone else');
+        // Back to the page, where the thing they just made is now a sticker.
+        view = 'library';
+        activeSlot = '';
+        lastStep = '';
+        if (connection.state) render(connection.state);
       };
 
       const form = el('form', { class: 'stack' },
@@ -212,16 +236,6 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       input.focus();
     }
 
-    function showWaiting(message: string): void {
-      // Tear down whatever was showing first. Replacing the DOM alone leaves
-      // the drawing tool's window listener bound and its menu in document.body
-      // — once per drawing step, so four by the end of the flow.
-      for (const fn of cleanups.splice(0)) fn();
-      body.replaceChildren(
-        el('p', { class: 'lede waiting' }, message),
-        roster,
-      );
-    }
 
     // --- watchers and judges ------------------------------------------------
 
@@ -237,6 +251,113 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
         el('p', { class: 'lede' }, 'Create your characters and weapons.'),
         roster,
       );
+    }
+
+    // --- the sticker library -------------------------------------------------
+
+    /**
+     * Everything this player can make, and what is in each slot.
+     *
+     * The character first and wider, because it is the thing that fights and
+     * the only slot whose order is fixed — a weapon held by nobody is not
+     * something anyone can place. The weapons after it, either of which may be
+     * left empty: one weapon is enough to fight, and somebody who spends their
+     * whole budget on a character they love should not be stopped.
+     */
+    function slotsFor(state: RoomState): { slot: string; label: string; wide: boolean }[] {
+      if (state.phase === 'ult') {
+        const index = WEAPON_COUNT + Math.max(0, state.ultRound - 1);
+        return [{ slot: `weapon${index}`, label: 'Your Ultimate', wide: true }];
+      }
+      return [
+        { slot: 'character', label: 'Your fighter', wide: true },
+        ...Array.from({ length: WEAPON_COUNT }, (_, i) => ({
+          slot: `weapon${i}`,
+          label: i === 0 ? 'First weapon' : 'Second weapon',
+          wide: false,
+        })),
+      ];
+    }
+
+    function nameOf(slot: string, me: Player): string {
+      if (slot === 'character') return me.characterName;
+      const index = Number(slot.replace('weapon', ''));
+      return me.weaponNames[index] ?? '';
+    }
+
+    /**
+     * The library: a page of die-cut stickers the player fills at their own pace.
+     *
+     * A filled slot shows the drawing with its name on a chip above it, pressed
+     * on at a slight angle. An empty one is the die line with no stock — a space
+     * waiting to be peeled into. Tapping either one goes there: an empty slot to
+     * make it, a filled one to redraw it while there is still time.
+     */
+    function showLibrary(state: RoomState, me: Player): void {
+      body.replaceChildren();
+
+      const slots = slotsFor(state);
+      const hasCharacter = state.phase === 'ult' || Boolean(drawnBySlot.get('character'))
+        || me.progress.drawn.includes('character');
+
+      const page = el('div', { class: 'library' });
+      for (const { slot, label, wide } of slots) {
+        const png = drawnBySlot.get(slot);
+        const name = nameOf(slot, me);
+        const filled = Boolean(png);
+        /*
+         * A weapon cannot be made before the fighter who holds it.
+         *
+         * Not an arbitrary order: the placement step that follows asks where on
+         * the character the weapon sits, and there is nothing to put it on
+         * until the character exists.
+         */
+        const locked = !filled && !hasCharacter && slot !== 'character';
+
+        const tile = el('button', {
+          class: `lib-slot sticker${filled ? ' is-tilted' : ' is-empty'}`
+            + (wide ? ' is-wide' : '') + (locked ? ' is-locked' : ''),
+          type: 'button',
+        });
+        tile.disabled = locked;
+
+        if (filled) {
+          tile.append(
+            el('img', { class: 'lib-art', src: png!, alt: '' }),
+            el('span', { class: 'lib-name' }, name || 'Tap to name'),
+          );
+          tile.setAttribute('aria-label', `${label}: ${name || 'unnamed'}. Tap to redraw.`);
+        } else {
+          tile.append(
+            el('span', { class: 'lib-plus' }, '+'),
+            el('span', { class: 'lib-label' }, locked ? 'Fighter first' : label),
+          );
+          tile.setAttribute('aria-label', locked ? `${label}, locked until you draw your fighter` : `Make ${label}`);
+        }
+
+        tile.addEventListener('click', () => {
+          if (locked) return;
+          play('click');
+          activeSlot = slot;
+          view = 'draw';
+          lastStep = '';
+          render(connection.state ?? state);
+        });
+
+        page.appendChild(tile);
+      }
+
+      const done = button('Done', () => {
+        play('click');
+        flushDrawing();
+        connection.send({ type: 'creationDone' });
+      }, 'big primary lib-done');
+      done.disabled = !hasCharacter;
+      done.title = hasCharacter
+        ? 'Finish early and wait for the others'
+        : 'Draw your fighter first';
+
+      body.append(page, el('div', { class: 'lib-actions' }, done));
     }
 
     // --- rendering ----------------------------------------------------------
@@ -300,10 +421,13 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
         return;
       }
 
-      const step = stepFor(state, me.id);
-
-      // Finished, and waiting on the others — the only place anyone waits now.
-      if (!step || me.progress.done) {
+      /*
+       * Finished, and waiting on the others.
+       *
+       * Reached by pressing Done or by the budget running out, which the server
+       * treats as the same event — so this is the one place anybody waits.
+       */
+      if (me.progress.done) {
         heading.textContent = 'All done';
         const others = stillWorking(state).filter((p) => p.id !== me.id);
         subheading.textContent = others.length === 0
@@ -323,25 +447,44 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
         return;
       }
 
-      heading.textContent = step.prompt;
-      subheading.textContent = ult
-        ? 'The scores are level. One more weapon — your Ultimate — decides it.'
-        : `Step ${me.progress.step + 1} of ${stepsFor(state).length}`;
-      clock.setDeadline(me.progress.endsAt, step.seconds);
+      /*
+       * Their own clock, against the whole budget.
+       *
+       * One bar draining once, rather than four bars each refilling: the player
+       * is spending a pot of time and the bar is how much of the pot is left.
+       */
+      clock.setDeadline(me.progress.endsAt, budgetFor(state));
 
-      // Only rebuild when this player's own step changes, so a stroke in
-      // progress survives somebody else finishing theirs.
-      const key = `${state.phase}:${state.ultRound}:${me.progress.step}`;
+      const ultLabel = state.phase === 'ult' ? 'One more weapon' : 'Your sticker library';
+      heading.textContent = view === 'draw'
+        ? (activeSlot === 'character' ? 'Draw your fighter' : 'Draw a weapon')
+        : view === 'name'
+          ? (activeSlot === 'character' ? 'Name your fighter' : 'Name it')
+          : ultLabel;
+      subheading.textContent = view === 'library'
+        ? (state.phase === 'ult'
+          ? 'The scores are level. One more weapon decides it.'
+          : 'The time is yours to spend. Fill a slot, or press Done when you are happy.')
+        : '';
+
+      /*
+       * Rebuilt only when this player moves, never when somebody else does.
+       *
+       * The key carries the local view and slot, because the server no longer
+       * knows which of the three the player is looking at — and a stroke in
+       * progress must survive another player finishing theirs.
+       */
+      const key = `${state.phase}:${state.ultRound}:${view}:${activeSlot}`;
       if (key === lastStep) return;
       lastStep = key;
 
-      // Their step is over: send whatever is on the canvas before the tool
-      // that holds it is torn down.
       flushDrawing();
       for (const fn of cleanups.splice(0)) fn();
 
-      if (step.kind === 'draw') showDraw(step.slot, step.prompt);
-      else showName(step.slot);
+      if (view === 'draw') showDraw(activeSlot, heading.textContent);
+      else if (view === 'name') showName(activeSlot);
+      else showLibrary(state, me);
+      return;
     }
 
     /*

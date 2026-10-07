@@ -322,16 +322,29 @@ const working = (name: string, step: number, endsIn: number): Player => ({
 });
 
 const steps = stepsFor(creating([]));
-const secondsAfter = (step: number) =>
-  steps.slice(step + 1).reduce((total, s) => total + s.seconds * 1000, 0);
 
-check('somebody mid-step is owed the rest of that step',
-  remainingFor(working('Ann', steps.length - 1, 9000), creating([]), NOW) === 9000,
-  String(remainingFor(working('Ann', steps.length - 1, 9000), creating([]), NOW)));
-
-check('and every step they have not reached',
-  remainingFor(working('Ann', 0, 9000), creating([]), NOW) === 9000 + secondsAfter(0),
+/*
+ * How long somebody is owed, under a pooled budget.
+ *
+ * This used to be arithmetic: each step carried its own clock, so the answer
+ * was the rest of the current step plus the full length of every step not yet
+ * reached — and the case worth protecting was that the person with the LATER
+ * deadline could be the one finishing FIRST, because they were further through
+ * the queue. The waiting screen asked "how long until everyone is done" and the
+ * furthest-away deadline was the wrong answer to it.
+ *
+ * A pooled budget removes the arithmetic and the trap with it. One deadline per
+ * player, so time left is time left, and the latest deadline in the room is the
+ * honest answer. These tests now pin that down instead, because the reading
+ * they replace was correct for a model that no longer exists.
+ */
+check('time left is the time left on the one deadline',
+  remainingFor(working('Ann', 0, 9000), creating([]), NOW) === 9000,
   String(remainingFor(working('Ann', 0, 9000), creating([]), NOW)));
+
+check('and the step they happen to be on changes nothing',
+  remainingFor(working('Ann', steps.length - 1, 9000), creating([]), NOW)
+    === remainingFor(working('Bo', 0, 9000), creating([]), NOW));
 
 const finished = (name: string): Player => ({
   ...player(name, 'teamA'),
@@ -341,19 +354,16 @@ const finished = (name: string): Player => ({
 check('somebody finished is owed nothing',
   remainingFor(finished('Ann'), creating([]), NOW) === 0);
 
-/*
- * The case that was wrong: the person on the later step has the later
- * deadline, and is the one who will finish first.
- */
 const early = working('Early', 0, 10_000);
 const late = working('Late', steps.length - 1, 30_000);
 const both = creating([host, early, late]);
 
-check('the slowest is the one with the most left, not the latest deadline',
-  longestRemaining(both, NOW) === remainingFor(early, both, NOW),
-  `${longestRemaining(both, NOW)} vs early ${remainingFor(early, both, NOW)}`);
-check('which is longer than the later deadline on its own',
-  longestRemaining(both, NOW) > 30_000, String(longestRemaining(both, NOW)));
+check('the room waits for the furthest deadline',
+  longestRemaining(both, NOW) === 30_000, String(longestRemaining(both, NOW)));
+
+check('which is the slowest person and nobody longer',
+  longestRemaining(both, NOW) === remainingFor(late, both, NOW),
+  `${longestRemaining(both, NOW)} vs late ${remainingFor(late, both, NOW)}`);
 
 check('a room where everyone has finished waits for nothing',
   longestRemaining(creating([host, finished('Ann')]), NOW) === 0,

@@ -41,7 +41,11 @@ import {
   type Role,
   type RoomState,
   type Side,
+  type Grip,
   SIDES,
+  budgetFor,
+  longestRemaining,
+  MIN_WEAPONS,
   guardsFor,
   caughtFraction,
   attacksFor,
@@ -297,6 +301,14 @@ export default class Room implements Party.Server {
    * needs it.
    */
   private readonly art = new Map<string, string>();
+  /**
+   * Where each weapon is held, keyed the same way the artwork is.
+   *
+   * Beside the art rather than inside it because the art store is a flat map of
+   * one PNG per slot, and a grip is not a picture. Cleared with the art, since a
+   * grip for a weapon nobody drew any more is worse than no grip at all.
+   */
+  private readonly grips = new Map<string, Grip>();
   private readonly names = new Map<string, string>();
   /** Timer that ends the current creation step. */
   private stepTimer: ReturnType<typeof setTimeout> | null = null;
@@ -318,13 +330,21 @@ export default class Room implements Party.Server {
       // Back before the room moved on: they pick up where they left off, with
       // a full step's time rather than the seconds that were left when their
       // phone died.
-      const steps = stepsFor(this.state);
-      if (this.isCreating() && player.progress.done
-        && player.progress.step < steps.length) {
-        player.progress.done = false;
-        player.progress.endsAt = Date.now()
-          + (steps[player.progress.step]?.seconds ?? 30) * 1000;
-        this.summariseDeadline();
+      /*
+       * Back before the room moved on.
+       *
+       * They get the rest of the room's time rather than a fresh budget: a
+       * phone that died is bad luck, and handing its owner a full four minutes
+       * while everyone else waits is worse luck for everyone else. If the room
+       * has nearly run out, so have they.
+       */
+      if (this.isCreating() && player.progress.done) {
+        const left = longestRemaining(this.state);
+        if (left > 2000) {
+          player.progress.done = false;
+          player.progress.endsAt = Date.now() + left;
+          this.summariseDeadline();
+        }
       }
 
       this.broadcastState();
@@ -377,6 +397,12 @@ export default class Room implements Party.Server {
         break;
       case 'voteBattleground':
         this.onVote(message.id, sender);
+        break;
+      case 'creationDone':
+        this.onCreationDone(sender);
+        break;
+      case 'placeWeapon':
+        this.onPlaceWeapon(message.index, message.grip, sender);
         break;
       case 'requestArt':
         this.onRequestArt(sender);
@@ -735,11 +761,19 @@ export default class Room implements Party.Server {
       return;
     }
 
+    /*
+     * One deadline for the whole of creation, spent however the player likes.
+     *
+     * Each player used to get a clock per step, which decided for them that a
+     * character is worth 105 seconds and naming it 20. The budget is the same
+     * total; what changes is who divides it.
+     */
     const now = Date.now();
+    const budget = budgetFor(this.state) * 1000;
     for (const player of this.state.players) {
       player.progress.step = 0;
       player.progress.done = false;
-      player.progress.endsAt = now + first.seconds * 1000;
+      player.progress.endsAt = now + budget;
     }
 
     this.state.step = 0;
@@ -756,20 +790,53 @@ export default class Room implements Party.Server {
    * runs out of time keeps whatever the drawing tool last saved.
    */
   private advancePlayer(player: Player): void {
-    const steps = stepsFor(this.state);
-    player.progress.step += 1;
-
-    const next = steps[player.progress.step];
-    if (!next) {
-      player.progress.done = true;
-      player.progress.endsAt = 0;
-      this.finishIfEveryoneIsDone();
-      return;
-    }
-
-    player.progress.endsAt = Date.now() + next.seconds * 1000;
-    this.state.step = Math.max(this.state.step, player.progress.step);
+    /*
+     * Nothing to advance any more.
+     *
+     * Creation used to be a queue, so finishing a thing moved you to the next
+     * one. With a pooled budget, finishing a thing is just a thing finished:
+     * the player decides what to make next and when they are done. Kept as a
+     * no-op rather than deleted because it is still the honest place for
+     * anything that must happen when a slot is filled.
+     */
+    void player;
     this.summariseDeadline();
+  }
+
+  /** The player says they have made everything they want to make. */
+  private onCreationDone(sender: Party.Connection): void {
+    const player = this.state.players.find((p) => p.id === sender.id);
+    if (!player || !this.isCreating() || player.progress.done) return;
+
+    this.ensureSomethingToFightWith(player);
+    player.progress.done = true;
+    player.progress.endsAt = 0;
+    this.summariseDeadline();
+    this.finishIfEveryoneIsDone();
+    this.broadcastState();
+  }
+
+  /**
+   * Makes sure a player leaves creation able to fight.
+   *
+   * Pressing Done ten seconds in is allowed — people do, and a game that
+   * refuses is a game arguing with somebody at a party. What it must not
+   * produce is a fighter with no character and no weapon, so anything not made
+   * is filled with the stand-in that was always waiting for it.
+   */
+  private ensureSomethingToFightWith(player: Player): void {
+    const seat = this.seatOf(player);
+    if (!player.characterName) {
+      player.characterName = defaultName('character', seat);
+      this.names.set(`${player.id}:character`, player.characterName);
+    }
+    for (let i = 0; i < MIN_WEAPONS; i++) {
+      if (player.weaponNames[i]) continue;
+      const name = defaultName(`weapon${i}`, seat);
+      player.weaponNames[i] = name;
+      player.weaponKinds[i] ||= 'offensive';
+      this.names.set(`${player.id}:weapon${i}`, name);
+    }
   }
 
   /**
@@ -791,10 +858,16 @@ export default class Room implements Party.Server {
       let moved = false;
       for (const player of creators(this.state)) {
         if (player.progress.done || player.progress.endsAt > now) continue;
-        this.advancePlayer(player);
+        // The budget is spent. Whatever they made is what they fight with.
+        this.ensureSomethingToFightWith(player);
+        player.progress.done = true;
+        player.progress.endsAt = 0;
         moved = true;
       }
-      if (moved) this.broadcastState();
+      if (moved) {
+        this.finishIfEveryoneIsDone();
+        this.broadcastState();
+      }
     }, 500);
   }
 
@@ -1204,6 +1277,7 @@ export default class Room implements Party.Server {
   private startOver(): void {
     if (this.stepTimer) clearTimeout(this.stepTimer);
     this.art.clear();
+    this.grips.clear();
     this.names.clear();
     this.turnCount = 0;
     this.state.ultRound = 0;
@@ -1550,6 +1624,41 @@ export default class Room implements Party.Server {
     this.broadcastState();
   }
 
+  /**
+   * Where the player put their weapon on their character.
+   *
+   * Stored on the artwork rather than the player, because it belongs to the
+   * weapon: it is as much a part of what they made as the drawing itself, and
+   * the host needs it at the same moment it needs the picture.
+   *
+   * Clamped rather than rejected. A grip slightly off the edge of the character
+   * is somebody holding a spear at arm's length, which is funny and fine; a
+   * grip at coordinate nine hundred is a broken client, and the difference is a
+   * clamp rather than an error message nobody will read.
+   */
+  private onPlaceWeapon(index: unknown, grip: unknown, sender: Party.Connection): void {
+    const player = this.state.players.find((p) => p.id === sender.id);
+    if (!player) return;
+
+    const slot = Math.max(0, Math.min(WEAPON_COUNT + 2, Math.floor(Number(index)) || 0));
+    // Only for a weapon that exists: a grip on an empty slot is a client bug,
+    // and storing it would hand the stage a position for nothing.
+    if (!this.art.has(`${player.id}:weapon${slot}`)) return;
+
+    const g = grip as Partial<Grip> | null;
+    const clamp = (value: unknown, lo: number, hi: number, fallback: number) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : fallback;
+    };
+    this.grips.set(`${player.id}:weapon${slot}`, {
+      x: clamp(g?.x, -0.4, 1.4, 0.5),
+      y: clamp(g?.y, -0.4, 1.4, 0.55),
+      rotation: clamp(g?.rotation, -Math.PI * 2, Math.PI * 2, 0),
+      scale: clamp(g?.scale, 0.3, 2.6, 1),
+    });
+    this.broadcastState();
+  }
+
   /** "I have finished this step" — the same event as running out of time. */
   private onReady(sender: Party.Connection): void {
     const player = this.state.players.find((p) => p.id === sender.id);
@@ -1652,7 +1761,10 @@ export default class Room implements Party.Server {
       weapons: pieces
         .filter((p) => p.slot.startsWith('weapon'))
         .sort((a, b) => a.slot.localeCompare(b.slot))
-        .map((w) => ({ png: w.png, name: w.name })),
+        .map((w) => {
+          const grip = this.grips.get(`${playerId}:${w.slot}`);
+          return { png: w.png, name: w.name, ...(grip ? { grip } : {}) };
+        }),
     };
   }
 
