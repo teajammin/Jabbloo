@@ -5,9 +5,9 @@ import { RoomConnection } from '../net/room';
 import { creationScreen } from './creation';
 import { battlegroundScreen } from './battleground';
 import {
-  displayName, isDuel, startBlockedBecause, type Player, type RoomState,
+  displayName, startBlockedBecause, type Player, type RoomState,
 } from '../shared/protocol';
-import { teamBoard, duelBoard } from './teams';
+import { teamBoard, duelBoard, judgeBench } from './teams';
 import { joinRoomScreen } from './joinRoom';
 import { forgetRoom, rememberRoom } from './resume';
 
@@ -62,29 +62,31 @@ export function lobbyScreen(
     startButton.disabled = true;
 
     /*
-     * The team board is for games that have teams.
+     * Which arrangement this game needs, decided from the capacity.
      *
-     * With two players there is one possible arrangement and the room makes it
-     * at kick-off, so the board would be a puzzle with a single solution
-     * standing between two people and their game. A duel gets the two of them
-     * facing each other instead — and the team-name boxes were showing right
-     * up until the second player arrived, asking the host to name two teams
-     * that were never going to exist.
+     * From the capacity the host chose, never from who happens to be in the
+     * room: a game opened for four used to flip to the two-player face-off the
+     * moment the second person joined, so the host watched the board they were
+     * using disappear while they were still waiting for people.
      *
-     * Decided from the capacity the host chose, which is known before the room
-     * answers, so both are laid out right the first time rather than corrected
-     * a moment later.
+     *   two        a duel. One arrangement, made at kick-off, nothing to decide.
+     *   three/five one fight and a bench. No teams exist to name, so the only
+     *              decision is who sits out and scores it.
+     *   four/six   tag team, where everybody fights and the teams are real.
      */
-    const duel = capacity === 2;
-    const board = isHost && !duel ? teamBoard(connection, capacity) : null;
-    // Built for every host, not only a room opened for two: a game opened for
-    // four that only two people turn up to is still a duel, and gets the same
-    // face-off rather than a board it can no longer use.
-    const versus = isHost ? duelBoard() : null;
-    // Laid out right before the room answers, like the board beside it: a
-    // face-off that appears and then vanishes when the first state arrives is
-    // the same flicker the judges' bench used to have.
-    if (versus) versus.root.hidden = !duel;
+    const arrangement: 'duel' | 'bench' | 'teams' =
+      capacity === 2 ? 'duel' : capacity % 2 === 1 ? 'bench' : 'teams';
+
+    const board = isHost && arrangement === 'teams' ? teamBoard(connection, capacity) : null;
+    const bench = isHost && arrangement === 'bench' ? judgeBench(connection) : null;
+    /*
+     * The face-off, for every game that has two fighters in it.
+     *
+     * Built for a duel and for a bench game alike: three players is still two
+     * people facing each other, with somebody watching.
+     */
+    const versus = isHost && arrangement !== 'teams' ? duelBoard() : null;
+
     const duelNote = el('p', { class: 'lede' }, '');
     const blocked = el('p', { class: 'help-note blocked' });
 
@@ -125,24 +127,20 @@ export function lobbyScreen(
         const players = state.players.filter((p) => !p.isHost);
         const target = state.capacity || capacity;
 
-        // The host arranges on the board; phones just see who is here. A duel
-        // has nothing to arrange, so the two of them simply face each other.
-        const twoPlayers = duel || isDuel(state);
-        if (versus) {
-          versus.root.hidden = !twoPlayers;
-          if (twoPlayers) versus.update(state);
-        }
-        if (board) {
-          board.root.hidden = twoPlayers;
-          if (!twoPlayers) board.update(state);
-        }
+        // The host arranges; phones just see who is here. Which arrangement was
+        // settled from the capacity before the room answered, so nothing here
+        // appears and then vanishes.
+        if (versus) versus.update(state);
+        if (board) board.update(state);
+        if (bench) bench.update(state);
         // The host sees the arrangement, one way or the other; the roster is
         // for the phones, which have nothing to arrange.
         if (!isHost) renderRoster(state);
         roster.hidden = isHost;
 
-        duelNote.textContent = twoPlayers && isHost && players.length === 2
-          ? `${players[0]?.name} v ${players[1]?.name}`
+        const fighters = players.filter((p) => p.role !== 'judge');
+        duelNote.textContent = isHost && arrangement !== 'teams' && fighters.length === 2
+          ? `${fighters[0]?.name} v ${fighters[1]?.name}`
           : '';
 
         status.textContent = isHost
@@ -282,6 +280,7 @@ export function lobbyScreen(
                 status,
                 duelNote,
                 ...(versus ? [versus.root] : []),
+                ...(bench ? [bench.root] : []),
                 ...(board ? [board.root] : []),
                 roster,
                 error,

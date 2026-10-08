@@ -780,10 +780,17 @@ function openSlot(root, which = 0) {
         root.querySelector('.zone input') === null);
       check('the two of them face each other instead',
         root.querySelector('.duel-board') !== null);
-      // Before anyone joins there is nobody to draw, and a pair of waiting
-      // outlines is a promise the room has not been given yet.
-      check('with nobody drawn in until they arrive',
-        [...root.querySelectorAll('.duel-side')].every((s) => s.hidden));
+      /*
+       * Two seats from the start, both of them empty.
+       *
+       * They used to hide until somebody arrived, on the reasoning that a pair
+       * of waiting outlines promises something the room has not been given. In
+       * practice it meant the row changed shape on every join, leave and
+       * reconnect — one icon off to the left, then two side by side — and a
+       * seat that says "waiting" is a better answer than a layout that moves.
+       */
+      check('with two empty seats waiting to be filled',
+        [...root.querySelectorAll('.duel-side')].every((s) => s.classList.contains('is-empty')));
     });
     mounts('lobby (player)', ui.lobbyScreen('ABCD', 2, false, { name: 'Ann' }), (root) => {
       check('a player is not offered a way to remove anybody',
@@ -792,11 +799,37 @@ function openSlot(root, which = 0) {
 
     // A room opened for four still has a board to arrange, and the face-off is
     // held back until it is actually a duel.
+    /*
+     * Which arrangement each size of game gets.
+     *
+     * Decided from the capacity the host chose, never from who happens to be
+     * standing in the room. Both readings of that were wrong in opposite
+     * directions: a game opened for four flipped to the two-player face-off the
+     * moment the second person joined, and three players were handed a board
+     * asking them to name two teams that a three-player game does not have.
+     */
     mounts('lobby (four seats)', ui.lobbyScreen('EFGH', 4, true), (root) => {
-      check('a bigger game keeps its team board',
+      check('four is tag team, so it keeps the team board',
         root.querySelector('.zone input') !== null);
-      check('with the face-off waiting out of sight',
-        root.querySelector('.duel-board')?.hidden !== false);
+      check('and has no face-off at all',
+        root.querySelector('.duel-board') === null);
+      check('and no judge bench either',
+        root.querySelector('.judge-bench') === null);
+    });
+
+    mounts('lobby (three seats)', ui.lobbyScreen('IJKL', 3, true), (root) => {
+      check('three players get a bench, not two teams',
+        root.querySelector('.judge-bench') !== null
+        && root.querySelector('.zone input') === null);
+      check('and the two fighters face each other',
+        root.querySelector('.duel-board') !== null);
+    });
+
+    mounts('lobby (two seats)', ui.lobbyScreen('MNOP', 2, true), (root) => {
+      check('two players face each other with nothing to arrange',
+        root.querySelector('.duel-board') !== null
+        && root.querySelector('.judge-bench') === null
+        && root.querySelector('.zone input') === null);
     });
   } finally {
     globalThis.WebSocket = realSocket;
@@ -1219,14 +1252,26 @@ function openSlot(root, which = 0) {
   document.body.appendChild(root);
 
   const seats = () => [...root.querySelectorAll('.duel-side')];
-  const shown = () => seats().filter((s) => !s.hidden);
+  const taken = () => seats().filter((s) => !s.classList.contains('is-empty'));
 
   try {
-    check('an empty room draws nobody', shown().length === 0);
+    /*
+     * Both seats are always there.
+     *
+     * They used to hide themselves when nobody was standing in them, so the
+     * row changed shape every time somebody joined, left or reconnected — one
+     * icon off to the left, then two side by side, then back again. An empty
+     * seat now reads as an empty seat and the layout never moves, which is the
+     * whole point: this is the screen a room looks at while it fills up.
+     */
+    check('there are always two seats', seats().length === 2);
+    check('an empty room has nobody in either of them', taken().length === 0);
+    check('and an empty seat says it is waiting',
+      seats()[0]?.textContent?.includes('Waiting'), seats()[0]?.textContent);
 
     // The host is in the room from the start and is not one of the fighters.
     board.update(roomState({ players: [player('h', 'Host', 'unassigned', { isHost: true })] }));
-    check('and the host does not count as a player', shown().length === 0);
+    check('the host does not take a seat', taken().length === 0);
 
     board.update(roomState({
       players: [
@@ -1234,11 +1279,13 @@ function openSlot(root, which = 0) {
         player('a', 'Ann', 'unassigned'),
       ],
     }));
-    check('the first to join appears alone', shown().length === 1);
-    check('with their name under them', shown()[0]?.textContent?.includes('Ann'),
-      shown()[0]?.textContent);
+    check('the first to join takes one seat', taken().length === 1);
+    check('with their name under them', taken()[0]?.textContent?.includes('Ann'),
+      taken()[0]?.textContent);
     check('and a plain figure, having brought no photo',
-      shown()[0]?.querySelector('.duel-icon')?.classList.contains('anon'));
+      taken()[0]?.querySelector('.duel-icon')?.classList.contains('anon'));
+    check('while the other seat still stands there empty',
+      seats().length === 2 && taken().length === 1);
 
     board.update(roomState({
       players: [
@@ -1247,20 +1294,40 @@ function openSlot(root, which = 0) {
         player('b', 'Bo', 'unassigned', { photo: 'data:image/png;base64,xx' }),
       ],
     }));
-    check('the second takes the other side', shown().length === 2);
+    check('the second takes the other side', taken().length === 2);
     check('the two of them are on opposite sides',
       seats()[0]?.textContent?.includes('Ann') && seats()[1]?.textContent?.includes('Bo'));
     check('a photo is used when there is one',
       seats()[1]?.querySelector('.duel-icon')?.classList.contains('anon') === false);
 
-    // Somebody leaves: the space they were in is empty again, not a placeholder.
+    /*
+     * Somebody judging is not somebody fighting.
+     *
+     * At three and five players the host puts somebody on the bench, and the
+     * face-off has to show the two who are left rather than the first two who
+     * walked in.
+     */
+    board.update(roomState({
+      players: [
+        player('h', 'Host', 'unassigned', { isHost: true }),
+        player('a', 'Ann', 'judge'),
+        player('b', 'Bo', 'unassigned'),
+        player('c', 'Cal', 'unassigned'),
+      ],
+    }));
+    check('a judge is not shown as a fighter',
+      seats()[0]?.textContent?.includes('Bo') && seats()[1]?.textContent?.includes('Cal'),
+      seats().map((n) => n.textContent).join(' | '));
+
+    // Somebody leaves: their seat empties, and the other one does not move.
     board.update(roomState({
       players: [
         player('h', 'Host', 'unassigned', { isHost: true }),
         player('a', 'Ann', 'unassigned'),
       ],
     }));
-    check('and leaving empties the space again', shown().length === 1);
+    check('leaving empties a seat without removing it',
+      taken().length === 1 && seats().length === 2)
   } catch (error) {
     check('the duel board renders', false, String(error?.message ?? error));
   }

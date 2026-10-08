@@ -253,23 +253,94 @@ export function duelBoard(): DuelBoard {
   const root = el('div', { class: 'duel-board' }, sides[0]!.root, sides[1]!.root);
 
   function update(state: RoomState): void {
-    const players = state.players.filter((p) => !p.isHost);
+    /*
+     * The two who fight, which is not always the first two who arrived.
+     *
+     * At three and five players somebody is judging, and in a game with a
+     * judge the bench is a choice the host makes — so the face-off shows
+     * whoever is not on it rather than whoever walked in first.
+     */
+    const players = state.players.filter((p) => !p.isHost && p.role !== 'judge');
     sides.forEach((seat, i) => seat.show(players[i]));
   }
 
   return { root, update };
 }
 
-/** One half of the screen: whoever is standing in it, or nothing at all. */
+/**
+ * A bench, and nothing else.
+ *
+ * Three players is one fight and one judge, so the two-team board is a puzzle
+ * with no pieces: there are no teams to name and nothing to arrange except who
+ * sits out. This is that one decision on its own — the fighters face each other
+ * above it, and anybody dropped here judges them.
+ */
+export function judgeBench(connection: RoomConnection): TeamBoard {
+  const list = el('ul', { class: 'zone-list' });
+  const hint = el('p', { class: 'bench-hint' }, '');
+  const root = el('section', { class: 'judge-bench' },
+    el('h2', { class: 'zone-title' }, 'Judge'),
+    list,
+    hint);
+
+  function update(state: RoomState): void {
+    const players = state.players.filter((p) => !p.isHost);
+    const judges = players.filter((p) => p.role === 'judge');
+    const fighters = players.filter((p) => p.role !== 'judge');
+
+    list.replaceChildren();
+    for (const player of players) {
+      const isJudge = player.role === 'judge';
+      const card = el('button', {
+        class: `bench-card sticker${isJudge ? ' is-judging' : ''}`,
+        type: 'button',
+      },
+        el('span', { class: 'bench-name' }, displayName(player)),
+        el('span', { class: 'bench-role' }, isJudge ? 'judging' : 'fighting'));
+      card.setAttribute('aria-pressed', String(isJudge));
+      card.addEventListener('click', () => {
+        // One tap moves somebody on or off the bench; there is nowhere else
+        // for them to go in a game this size.
+        connection.send({
+          type: 'setRole',
+          playerId: player.id,
+          role: isJudge ? 'unassigned' : 'judge',
+        });
+      });
+      list.appendChild(card);
+    }
+
+    hint.textContent = judges.length === 0
+      ? 'Tap somebody to have them judge. With nobody on the bench, the AI scores it.'
+      : fighters.length < 2
+        ? 'Two people have to fight. Tap a judge to put them back in.'
+        : `${judges.length === 1 ? 'They' : 'They'} will score every exchange.`;
+  }
+
+  return { root, update };
+}
+
+/**
+ * One half of the screen, which is always there.
+ *
+ * It used to hide itself when nobody was standing in it, so the row changed
+ * shape every time somebody joined, left or reconnected — one icon sitting off
+ * to the left, then two side by side, then back again. An empty seat now shows
+ * as an empty seat, and the layout never moves.
+ */
 function side(): { root: HTMLElement; show: (player?: Player) => void } {
   const icon = el('div', { class: 'duel-icon' });
   const name = el('span', { class: 'duel-name' }, '');
   const root = el('div', { class: 'duel-side' }, icon, name);
-  root.hidden = true;
 
   function show(player?: Player): void {
-    root.hidden = !player;
-    if (!player) return;
+    root.classList.toggle('is-empty', !player);
+    if (!player) {
+      name.textContent = 'Waiting…';
+      icon.classList.add('anon');
+      icon.style.backgroundImage = '';
+      return;
+    }
 
     name.textContent = displayName(player);
 
@@ -280,5 +351,8 @@ function side(): { root: HTMLElement; show: (player?: Player) => void } {
     icon.style.backgroundImage = hasPhoto ? `url(${JSON.stringify(player.photo)})` : '';
   }
 
+  // An empty seat from the start, rather than a blank one: the first state can
+  // be a second away, and a seat with no class and no name is neither.
+  show();
   return { root, show };
 }

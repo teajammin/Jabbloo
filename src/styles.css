@@ -1971,6 +1971,74 @@ body:has(.screen-draw) .backdrop { display: none; }
     0 8px 14px -10px rgba(0, 0, 0, 0.5);
 }
 
+/* ------------------------------------------------------------- judge bench */
+
+/*
+ * Three or five players: one fight, and somebody watching it.
+ *
+ * No teams exist to name at these counts, so the two-team board was a puzzle
+ * with no pieces. This is the one decision that is actually open — who sits out
+ * — with the fighters facing each other above it.
+ */
+.judge-bench {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.judge-bench .zone-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.bench-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 20px;
+  min-height: 64px;
+  justify-content: center;
+  cursor: pointer;
+  font: inherit;
+}
+.bench-name { font-weight: 700; font-size: 16px; }
+.bench-role {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--on-stock-dim);
+}
+
+/* On the bench: the stock itself takes the judge colour. */
+.bench-card.is-judging {
+  background: var(--judge);
+  box-shadow:
+    0 0 0 4px var(--die),
+    0 0 0 5.5px var(--die-ink),
+    0 6px 0 color-mix(in srgb, var(--judge) 52%, #000),
+    0 16px 26px -12px rgba(0, 0, 0, 0.5);
+}
+.bench-card.is-judging .bench-role { color: var(--die-ink); opacity: 0.8; }
+
+.bench-hint {
+  margin: 0;
+  max-width: 44ch;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
 /* ----------------------------------------------------------------- placing */
 
 /*
@@ -2695,8 +2763,10 @@ body:has(.screen-draw) .help-open { display: none !important; }
 .duel-board {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  align-items: center;
-  min-height: 168px;
+  align-items: start;
+  /* Tall enough for the biggest icon plus two lines of name, so the row never
+     changes height as people arrive, leave and come back. */
+  min-height: 260px;
   gap: 18px;
   margin: 4px 0 2px;
 }
@@ -2712,8 +2782,17 @@ body:has(.screen-draw) .help-open { display: none !important; }
 /* Out of step with each other, or the two read as one moving object. */
 .duel-side:last-child { animation-duration: 8.5s; animation-delay: -3.2s; }
 
+/*
+ * As big as the room can see.
+ *
+ * This is the one screen a group looks at together from across a coffee table,
+ * and a 96px circle at that distance is a dot. It scales with the viewport and
+ * stops at a size that still leaves room for a name underneath.
+ */
 .duel-icon {
-  width: 96px; height: 96px;
+  width: clamp(120px, 17vw, 200px);
+  aspect-ratio: 1;
+  height: auto;
   border-radius: 50%;
   background-color: var(--waiting);
   background-size: cover;
@@ -2722,8 +2801,12 @@ body:has(.screen-draw) .help-open { display: none !important; }
   box-shadow: var(--shadow);
 }
 
-.duel-side:first-child .duel-icon { box-shadow: 0 0 0 4px var(--team-a), var(--shadow); }
-.duel-side:last-child .duel-icon { box-shadow: 0 0 0 4px var(--team-b), var(--shadow); }
+.duel-side:first-child .duel-icon { box-shadow: 0 0 0 6px var(--team-a), var(--shadow); }
+.duel-side:last-child .duel-icon { box-shadow: 0 0 0 6px var(--team-b), var(--shadow); }
+
+/* An empty seat is a seat, not a gap: quiet, and the same size as a full one. */
+.duel-side.is-empty { opacity: 0.4; }
+.duel-side.is-empty .duel-icon { box-shadow: 0 0 0 4px var(--line), var(--shadow); }
 
 /*
  * Nobody's photo: a plain figure.
@@ -2746,20 +2829,42 @@ body:has(.screen-draw) .help-open { display: none !important; }
   mask: var(--figure) center / 62% no-repeat;
 }
 
+/*
+ * One line, two at most, and the same height either way.
+ *
+ * It was 11ch wide with `overflow-wrap: anywhere`, so a name any longer than
+ * that broke mid-word and stacked down the screen — and the row's height moved
+ * with it, which is why the two seats looked stacked sometimes and side by side
+ * others. Wider, clamped to two lines, and the box is reserved whether the name
+ * needs it or not.
+ */
 .duel-name {
   font-weight: 700;
-  font-size: 19px;
-  max-width: 11ch;
-  overflow-wrap: anywhere;
+  font-size: clamp(19px, 2.2vw, 26px);
+  max-width: 16ch;
   text-align: center;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  /* Two lines of the clamped size, always, so nothing below this moves. */
+  min-height: 2.4em;
 }
 
+/*
+ * A longer wander, and a wider one.
+ *
+ * Kept inside each seat's own half so the two can never collide, which is what
+ * bounds the amplitude rather than taste.
+ */
 @keyframes duel-bobble {
-  0%   { transform: translate(0, -6px); }
-  25%  { transform: translate(7px, 2px) rotate(1.5deg); }
-  50%  { transform: translate(-2px, 7px); }
-  75%  { transform: translate(-7px, -1px) rotate(-1.5deg); }
-  100% { transform: translate(0, -6px); }
+  0%   { transform: translate(0, -14px) rotate(-1deg); }
+  20%  { transform: translate(16px, 4px) rotate(3deg); }
+  40%  { transform: translate(6px, 16px) rotate(1deg); }
+  60%  { transform: translate(-13px, 8px) rotate(-3deg); }
+  80%  { transform: translate(-8px, -9px) rotate(-1.5deg); }
+  100% { transform: translate(0, -14px) rotate(-1deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
