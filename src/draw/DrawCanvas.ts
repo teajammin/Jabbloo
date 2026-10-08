@@ -531,6 +531,33 @@ export class DrawCanvas {
   }
 
   /**
+   * Starts from work already done.
+   *
+   * Going back into a drawing used to hand the player an empty canvas, so
+   * tapping their own fighter to fix one eye wiped the fighter. The previous
+   * PNG goes in as the bottom stroke rather than being painted onto the
+   * surface, because the surface is cleared and replayed from the stroke list
+   * on every repaint — anything painted outside that list survives until the
+   * next stroke and then vanishes, which is a worse bug than the one being
+   * fixed.
+   *
+   * Not undoable on purpose: it is not something this session did, and undo
+   * reaching back into the last session would be a way to lose finished work
+   * by pressing the button that is supposed to prevent that.
+   */
+  seed(data: string): void {
+    const image = new Image();
+    image.addEventListener('load', () => this.repaint());
+    image.src = data;
+    this.imageCache.set(data, image);
+    this.strokes.unshift({
+      kind: 'image', tool: 'select', data,
+      x: 0, y: 0, w: CANVAS_W, h: CANVAS_H,
+    });
+    this.repaint();
+  }
+
+  /**
    * Drops an image in as a floating layer, so it can be positioned before it
    * lands — the same path a paste takes, for the same reason.
    */

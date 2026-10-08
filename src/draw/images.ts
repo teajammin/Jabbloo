@@ -23,11 +23,49 @@ export interface ImportedImage {
 }
 
 /** Reads a File, downscaling it and normalising to PNG. */
+/**
+ * Decodes a picked file, whatever a phone camera gave us.
+ *
+ * `createImageBitmap` is the fast path and it cannot read HEIC, which is what
+ * an iPhone shoots by default — so every photo straight off an iPhone threw
+ * here and the only thing the player saw was "could not read that photo".
+ *
+ * The fallback hands the bytes to an <img>, which goes through the browser's
+ * own image pipeline: Safari decodes HEIC there because it is Apple's own
+ * format, and every browser decodes everything else. Slower and allocates more,
+ * which is exactly why it is second.
+ */
+export async function decodeImage(file: File): Promise<ImageBitmap | HTMLImageElement> {
+  try {
+    return await createImageBitmap(file);
+  } catch {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      return img;
+    } finally {
+      // Revoked after decode: the pixels are in the element now, and a blob
+      // URL left behind holds the whole file in memory for the page's life.
+      URL.revokeObjectURL(url);
+    }
+  }
+}
+
+/** The pixel size of whatever decodeImage returned. */
+export function sizeOfDecoded(source: ImageBitmap | HTMLImageElement): { w: number; h: number } {
+  return source instanceof HTMLImageElement
+    ? { w: source.naturalWidth, h: source.naturalHeight }
+    : { w: source.width, h: source.height };
+}
+
 export async function importFile(file: File): Promise<ImportedImage> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
+  const bitmap = await decodeImage(file);
+  const natural = sizeOfDecoded(bitmap);
+  const scale = Math.min(1, MAX_EDGE / Math.max(natural.w, natural.h));
+  const w = Math.round(natural.w * scale);
+  const h = Math.round(natural.h * scale);
 
   const scratch = document.createElement('canvas');
   scratch.width = w;
@@ -35,7 +73,7 @@ export async function importFile(file: File): Promise<ImportedImage> {
   const ctx = scratch.getContext('2d');
   if (!ctx) throw new Error('2D canvas unavailable');
   ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
+  if (bitmap instanceof ImageBitmap) bitmap.close();
 
   return { data: scratch.toDataURL('image/png'), w, h };
 }

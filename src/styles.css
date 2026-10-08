@@ -462,8 +462,35 @@ input[type='text'] {
   font-weight: 700;
 }
 
-.file { font-size: 15px; }
-.file-label { margin-bottom: 0; }
+/*
+ * The photo picker, as a target worth aiming at.
+ *
+ * It was a bare file input: 23px tall, drawn by the browser in system colours,
+ * belonging to no design system and easy to miss entirely. The input is still
+ * there behind this, so the picker and anything scripting it work unchanged.
+ */
+.file-label {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 20px;
+  min-height: 62px;
+  justify-content: center;
+  cursor: pointer;
+  text-align: center;
+}
+.file-label-main { font-weight: 700; font-size: 16px; }
+.file-label-note { font-size: 12px; color: var(--on-stock-dim); }
+
+/* Keyboard focus lands on the hidden input, so the label has to show it. */
+.file:focus-visible + .file-label,
+.sr-only:focus-visible + .file-label,
+.stack:has(.sr-only:focus-visible) .file-label {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
 .photo-preview {
   width: 84px; height: 84px;
   border-radius: 50%;

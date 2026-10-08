@@ -28,6 +28,13 @@ const SWATCHES = [
 
 export interface DrawScreenOptions {
   title?: string;
+  /**
+   * Work to carry on from, as a PNG.
+   *
+   * Going back into a drawing used to start it empty, so tapping your own
+   * fighter to fix one eye wiped the fighter.
+   */
+  startFrom?: string;
   onDone?: (png: string) => void;
   /**
    * Handed a way to read the drawing at any moment.
@@ -71,6 +78,7 @@ export function drawScreen(options: DrawScreenOptions = {}): Screen {
     area.appendChild(stage);
     const canvas = new DrawCanvas(stage);
     const surface = canvas.surface;
+    if (options.startFrom) canvas.seed(options.startFrom);
 
     /**
      * A tooltip that follows the pointer.

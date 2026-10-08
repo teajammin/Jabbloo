@@ -107,6 +107,10 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       const teardown = drawScreen({
         title: prompt,
         embedded: true,
+        // Carry on rather than start again: a slot already filled is work this
+        // player did, and reopening it to change one thing must not cost them
+        // the rest of it.
+        ...(drawnBySlot.get(slot) ? { startFrom: drawnBySlot.get(slot)! } : {}),
         // Weapons have a business end; a character does not.
         aim: slot.startsWith('weapon'),
         onSnapshot: (read) => { readDrawing = read; },

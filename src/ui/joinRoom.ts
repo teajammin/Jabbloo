@@ -1,3 +1,4 @@
+import { decodeImage, sizeOfDecoded } from '../draw/images';
 import { bubbleText } from './bubbleText';
 import { el, button, goHome, type Screen } from './screens';
 import { ROOM_CODE_LENGTH } from '../shared/protocol';
@@ -38,7 +39,15 @@ export const joinRoomScreen: Screen = (root, go) => {
     autocomplete: 'nickname' as AutoFill,
   });
 
-  const photo = el('input', { id: 'photo', type: 'file', accept: 'image/*', class: 'file' });
+  /*
+   * A real button, with the native input hidden behind it.
+   *
+   * A bare <input type="file"> is a 23px-tall control the browser draws itself
+   * in system colours, so it neither belongs to this game nor offers a target
+   * worth aiming at on a phone. The input stays for the file picker and for
+   * anything driving this by script; the label is what anybody sees.
+   */
+  const photo = el('input', { id: 'photo', type: 'file', accept: 'image/*', class: 'sr-only' });
   const preview = el('img', { class: 'photo-preview', alt: '' });
   preview.hidden = true;
 
@@ -53,18 +62,21 @@ export const joinRoomScreen: Screen = (root, go) => {
    * It is shown 40 pixels wide, so this loses nothing.
    */
   const shrink = async (file: File): Promise<string> => {
-    const bitmap = await createImageBitmap(file);
-    const edge = Math.min(AVATAR_EDGE, Math.max(bitmap.width, bitmap.height));
-    const scale = edge / Math.max(bitmap.width, bitmap.height);
+    // decodeImage, not createImageBitmap: an iPhone shoots HEIC by default and
+    // createImageBitmap cannot read it, so every photo off an iPhone failed.
+    const bitmap = await decodeImage(file);
+    const natural = sizeOfDecoded(bitmap);
+    const edge = Math.min(AVATAR_EDGE, Math.max(natural.w, natural.h));
+    const scale = edge / Math.max(natural.w, natural.h);
 
     const scratch = document.createElement('canvas');
-    scratch.width = Math.max(1, Math.round(bitmap.width * scale));
-    scratch.height = Math.max(1, Math.round(bitmap.height * scale));
+    scratch.width = Math.max(1, Math.round(natural.w * scale));
+    scratch.height = Math.max(1, Math.round(natural.h * scale));
     const ctx = scratch.getContext('2d');
     if (!ctx) throw new Error('2D canvas unavailable');
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bitmap, 0, 0, scratch.width, scratch.height);
-    bitmap.close?.();
+    if (bitmap instanceof ImageBitmap) bitmap.close();
     // JPEG, not PNG: a photo has no transparency to keep and a tenth the size.
     return scratch.toDataURL('image/jpeg', 0.82);
   };
@@ -114,7 +126,9 @@ export const joinRoomScreen: Screen = (root, go) => {
     code,
     el('label', { htmlFor: 'name' }, 'Name'),
     name,
-    el('label', { htmlFor: 'photo', class: 'file-label' }, 'Photo (optional)'),
+    el('label', { htmlFor: 'photo', class: 'file-label sticker' },
+      el('span', { class: 'file-label-main' }, 'Add a photo'),
+      el('span', { class: 'file-label-note' }, 'Optional — it becomes your icon')),
     photo,
     preview,
     error,
