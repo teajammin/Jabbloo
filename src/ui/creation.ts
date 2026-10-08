@@ -64,6 +64,32 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
     let lastSaved = '';
     let saveTimer: number | null = null;
 
+    /**
+     * A name being typed, and the slot it belongs to.
+     *
+     * Same rule as the drawing beside it: what somebody has typed is theirs
+     * whether or not they got round to pressing Save. A name only left the
+     * phone on Save, so running out of time while the name was sitting in the
+     * box — finished, correct, visible on screen — threw it away and gave them
+     * a stand-in instead.
+     */
+    let readName: (() => { slot: string; name: string; kind?: WeaponKind } | null) | null = null;
+    let lastName = '';
+
+    function flushName(): void {
+      const pending = readName?.();
+      if (!pending) return;
+      const clean = pending.name.trim();
+      if (!clean || clean === lastName) return;
+      lastName = clean;
+      connection.send({
+        type: 'submitName',
+        slot: pending.slot,
+        name: clean,
+        ...(pending.kind ? { kind: pending.kind } : {}),
+      });
+    }
+
     function flushDrawing(): void {
       if (!pendingSlot || !readDrawing) return;
       const png = readDrawing();
@@ -76,9 +102,10 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
 
     // A phone going to sleep or a tab going to the background is the most
     // likely way work is lost, and neither fires unload reliably.
-    const onHide = () => { if (document.visibilityState === 'hidden') flushDrawing(); };
+    const saveEverything = () => { flushDrawing(); flushName(); };
+    const onHide = () => { if (document.visibilityState === 'hidden') saveEverything(); };
     document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', flushDrawing);
+    window.addEventListener('pagehide', saveEverything);
 
     const clock = countdown();
     const heading = el('h1', { class: 'creation-title' }, '');
@@ -209,7 +236,26 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
         }
       }
 
+      /*
+       * What is in the box right now, for the autosave to find.
+       *
+       * Registered rather than read from a closure variable, so there is one
+       * source of truth: the input itself.
+       */
+      readName = () => ({
+        slot,
+        name: input.value,
+        ...(isWeapon ? { kind } : {}),
+      });
+      cleanups.push(() => {
+        // Leaving the naming view is the last chance to keep what was typed.
+        flushName();
+        readName = null;
+        lastName = '';
+      });
+
       const send = () => {
+        lastName = input.value.trim();
         connection.send({
           type: 'submitName',
           slot,
@@ -482,7 +528,7 @@ export function creationScreen(connection: RoomConnection, isHost: boolean): Scr
       if (key === lastStep) return;
       lastStep = key;
 
-      flushDrawing();
+      saveEverything();
       for (const fn of cleanups.splice(0)) fn();
 
       if (view === 'draw') showDraw(activeSlot, heading.textContent);

@@ -7,7 +7,7 @@ import { getSettings } from '../settings';
 import { report } from '../errors';
 import { loadingBadge } from './loading';
 import { play } from '../audio';
-import { narrate, hush, say, preloadLines, hasVoice } from './narrator';
+import { narrate, hush, say, preloadLines, hasVoice, whenQuiet } from './narrator';
 import { describeBeats } from './commentary';
 import type { RoomConnection } from '../net/room';
 import {
@@ -329,6 +329,8 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (opening || resumed === true) {
         resumed = false;
         caption.textContent = 'Fight!';
+        await whenQuiet();
+        if (disposed) return;
         say('fight');
         await stage.proclaim('fight', 0.9);
         if (disposed) return;
@@ -383,8 +385,21 @@ export function battleScreen(connection: RoomConnection, isHost: boolean): Scree
       if (isFinalRound(state!) && !saidFinalRound) {
         saidFinalRound = true;
         caption.textContent = 'Final round — every hit counts double';
+        /*
+         * Given room on both sides.
+         *
+         * It used to land on top of the fighters being introduced, because the
+         * recorded call and the spoken billing run on two different channels
+         * that cannot hear each other. The narrator now makes written lines
+         * wait their turn, and this waits for whatever was still finishing
+         * before it starts — a rule worth saying once is worth saying clearly.
+         */
+        await whenQuiet();
+        if (disposed) return;
         say('final');
-        await stage.proclaim('final round', 1.3);
+        await stage.proclaim('final round', 1.8);
+        if (disposed) return;
+        await whenQuiet();
         if (disposed) return;
       }
 

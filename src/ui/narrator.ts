@@ -239,6 +239,39 @@ export function say(id: string): void {
   void clip.play().catch(() => { duckMusic(false); });
 }
 
+/**
+ * Resolves once nothing is being said, on either channel.
+ *
+ * There are two: recorded clips play through an <audio> element and written
+ * lines through speech synthesis, and they do not know about each other. A clip
+ * cuts off another clip and an utterance cancels another utterance, so each
+ * channel is orderly on its own — and a clip and an utterance together simply
+ * both play. That is what happened when the final round was called over the
+ * fighters being introduced: two voices, one room, neither aware of the other.
+ *
+ * Capped, because a clip that never fires its `ended` event must not be able to
+ * hold up a fight.
+ */
+export function whenQuiet(limit = 3500): Promise<void> {
+  const clip = playing;
+  const speaking = canNarrate() && speechSynthesis.speaking;
+  if (!clip && !speaking) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => { if (!settled) { settled = true; resolve(); } };
+    if (clip) clip.addEventListener('ended', finish, { once: true });
+    // Speech synthesis has no reliable "finished everything" event, so this
+    // polls it rather than trusting one.
+    const poll = setInterval(() => {
+      const stillClip = playing !== null && !playing.paused && !playing.ended;
+      const stillSpeaking = canNarrate() && speechSynthesis.speaking;
+      if (!stillClip && !stillSpeaking) { clearInterval(poll); finish(); }
+    }, 120);
+    setTimeout(() => { clearInterval(poll); finish(); }, limit);
+  });
+}
+
 /** Stops the recording mid-word. */
 function stopClip(): void {
   duckMusic(false);
@@ -264,6 +297,17 @@ export async function narrate(text: string): Promise<void> {
   // A machine with the API and no voices installed: say nothing rather than
   // queueing utterances that will never be spoken.
   if (!voice) return;
+
+  /*
+   * Waits for the other channel before starting.
+   *
+   * Without this a written line begins the moment it is asked for, which over
+   * a recorded call is two voices at once. Cancelling the clip instead would
+   * be worse: the recorded lines are the ones that sound the same in every
+   * room, and they are short.
+   */
+  await whenQuiet();
+  if (!getSettings().narration) return;
 
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(line);

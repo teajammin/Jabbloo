@@ -491,6 +491,39 @@ function openSlot(root, which = 0) {
   return root.querySelector('.draw-overlay');
 }
 
+/*
+ * A name typed but never saved.
+ *
+ * Same rule as the drawing beside it: what somebody typed is theirs whether or
+ * not they pressed the button. A name used to leave the phone only on Save, so
+ * running out of time with the name sitting finished in the box threw it away
+ * and handed them a stand-in.
+ */
+{
+  const connection = fakeConnection('a', roomState({ phase: 'creating', step: 0 }));
+  mounts('creation keeps an unsaved name', ui.creationScreen(connection, false), (root) => {
+    const overlay = openSlot(root, 0);
+    if (!overlay) { check('the drawing tool opened', false); return; }
+
+    // Draw, finish, and arrive at naming.
+    overlay.dispatchEvent(new PointerEvent('pointerdown', { clientX: 60, clientY: 60, isPrimary: true }));
+    overlay.dispatchEvent(new PointerEvent('pointerup', { clientX: 90, clientY: 90, isPrimary: true }));
+    [...root.querySelectorAll('button')].find((b) => /done/i.test(b.textContent))?.click();
+
+    const box = root.querySelector('input.name-input');
+    if (!box) { check('the naming step has a box', false); return; }
+    box.value = 'Sir Bonkloid';
+
+    // A phone locking or the tab going away is the likeliest way this is lost.
+    window.dispatchEvent(new Event('pagehide'));
+
+    const named = connection.sent.filter((m) => m.type === 'submitName');
+    check('a typed name is saved without pressing Save',
+      named.some((m) => m.name === 'Sir Bonkloid'),
+      JSON.stringify(named));
+  });
+}
+
 // --- a creation step, end to end -------------------------------------------
 
 {
